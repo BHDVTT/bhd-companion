@@ -2,9 +2,11 @@
   {{#each tabs as |tab|}}
   <section class="tab bhd-tab {{tab.cssClass}}" data-group="{{tab.group}}" data-tab="{{tab.id}}">
     {{#if (eq tab.id "character")}}
-    {{> "modules/bhd-companion/templates/mobile/character.hbs" sheet=@root.sheet choices=@root.choices hpAmount=@root.hpAmount}}
+    {{> "modules/bhd-companion/templates/mobile/character.hbs" sheet=@root.sheet choices=@root.choices hpAmount=@root.hpAmount deathSaves=@root.deathSaves}}
     {{else if (eq tab.id "actions")}}
     {{> "modules/bhd-companion/templates/mobile/actions.hbs" actions=@root.actions filters=@root.actionFilters spellSearch=@root.spellSearch}}
+    {{else if (eq tab.id "combat")}}
+    {{> "modules/bhd-companion/templates/mobile/combat.hbs" combat=@root.combat deathSaves=@root.deathSaves}}
     {{else}}
     <div class="bhd-placeholder">
       <i class="{{tab.icon}}" aria-hidden="true"></i>

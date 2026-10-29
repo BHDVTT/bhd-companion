@@ -1,6 +1,7 @@
 import { MODULE_ID, TEMPLATE_PATH } from "../constants.js";
 import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "./character-data.js";
 import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.js";
+import { getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -74,7 +75,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       actionFilter: BHDMobileApp.#onActionFilter,
       closeTray: BHDMobileApp.#onCloseTray,
       chooseUse: BHDMobileApp.#onChooseUse,
-      closeChooser: BHDMobileApp.#onCloseChooser
+      closeChooser: BHDMobileApp.#onCloseChooser,
+      endTurn: BHDMobileApp.#onEndTurn,
+      dismissTurnAlert: BHDMobileApp.#onDismissTurnAlert
     }
   };
 
@@ -85,10 +88,13 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       templates: [
         `${TEMPLATE_PATH}/mobile/character.hbs`,
         `${TEMPLATE_PATH}/mobile/actions.hbs`,
-        `${TEMPLATE_PATH}/mobile/action-row.hbs`
+        `${TEMPLATE_PATH}/mobile/action-row.hbs`,
+        `${TEMPLATE_PATH}/mobile/combat.hbs`,
+        `${TEMPLATE_PATH}/mobile/death-saves.hbs`
       ],
       scrollable: [""]
     },
+    turn: { template: `${TEMPLATE_PATH}/mobile/turn.hbs` },
     nav: { template: `${TEMPLATE_PATH}/mobile/nav.hbs` }
   };
 
@@ -152,6 +158,12 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Objeto usado con "Más opciones": sus tiradas muestran las ventanas completas de dnd5e. */
   #fullOptionsItem = null;
 
+  /** Último turno avisado ("combate-ronda-turno"), para no repetir el aviso del mismo turno. */
+  #alertedTurn = null;
+
+  /** ¿Se está terminando el turno? Evita pasar dos turnos por tocar dos veces. */
+  #endingTurn = false;
+
   /**
    * Personaje que se muestra ahora mismo.
    * @type {Actor|null}
@@ -177,6 +189,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       label: game.i18n.localize(`BHD.Actions.Filter${id.capitalize()}`),
       active: id === this.#actionFilter
     }));
+    context.combat = prepareCombat(actor);
+    context.deathSaves = prepareDeathSaves(actor);
 
     const choices = getCharacterChoices();
     context.choices = (choices.length > 1) ? choices.map(a => ({
@@ -230,6 +244,17 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     toast.setAttribute("role", "status");
     toast.hidden = true;
     this.element.append(toast);
+
+    // Aviso a pantalla completa "¡Es tu turno!". Se toca en cualquier sitio para cerrarlo.
+    const alert = document.createElement("div");
+    alert.className = "bhd-turn-alert";
+    alert.dataset.action = "dismissTurnAlert";
+    alert.setAttribute("role", "alertdialog");
+    alert.hidden = true;
+    this.element.append(alert);
+
+    // Si al abrir la vista ya es el turno del jugador, también se le avisa.
+    this.onCombatUpdate();
   }
 
   /** @override */
@@ -510,6 +535,59 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /* -------------------------------------------- */
+  /*  Pestaña Combate                             */
+  /* -------------------------------------------- */
+
+  /**
+   * Llamado cuando cambia un combate (turno, ronda, inicio, fin): si ahora le toca al personaje
+   * del jugador, muestra el aviso a pantalla completa y hace vibrar el teléfono.
+   */
+  onCombatUpdate() {
+    const combat = getActiveCombat();
+    const actor = this.actor;
+    if ( !isActorTurn(combat, actor) ) {
+      this.#hideTurnAlert();
+      return;
+    }
+    const key = `${combat.id}-${combat.round}-${combat.turn}`;
+    if ( key === this.#alertedTurn ) return;
+    this.#alertedTurn = key;
+    this.#showTurnAlert(combat, actor);
+  }
+
+  /**
+   * Muestra el aviso "¡Es tu turno!".
+   * @param {Combat} combat
+   * @param {Actor} actor
+   */
+  #showTurnAlert(combat, actor) {
+    const alert = this.element?.querySelector(".bhd-turn-alert");
+    if ( !alert ) return;
+    const atZero = !!prepareDeathSaves(actor)?.canRoll;
+    const localize = key => game.i18n.localize(key);
+    alert.innerHTML = `
+      <div class="bhd-turn-alert-box">
+        <img class="bhd-turn-alert-img" src="" alt="">
+        <span class="bhd-turn-alert-round">${game.i18n.format("BHD.Combat.Round", { round: combat.round })}</span>
+        <strong class="bhd-turn-alert-title">${localize("BHD.Combat.YourTurnAlert")}</strong>
+        <span class="bhd-turn-alert-hint">${localize(atZero ? "BHD.Combat.YourTurnDying" : "BHD.Combat.YourTurnHint")}</span>
+        <button type="button" class="bhd-big-btn" data-action="dismissTurnAlert">${localize("BHD.Combat.LetsGo")}</button>
+      </div>`;
+    alert.querySelector(".bhd-turn-alert-img").src = combat.combatant?.img || actor.img;
+    alert.hidden = false;
+    // Vibración: funciona en Android; los iPhone no lo permiten y simplemente no vibran.
+    try {
+      navigator.vibrate?.([300, 150, 300, 150, 500]);
+    } catch(err) {}
+  }
+
+  /** Cierra el aviso "¡Es tu turno!" (por ejemplo, si el turno pasó a otro). */
+  #hideTurnAlert() {
+    const alert = this.element?.querySelector(".bhd-turn-alert");
+    if ( alert ) alert.hidden = true;
+  }
+
+  /* -------------------------------------------- */
 
   /**
    * La vista móvil no se cierra con Escape ni por accidente. Para cerrarla de verdad,
@@ -548,7 +626,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {Promise<{total: number}|null>}
    */
   async #rollInitiative(actor) {
-    const combat = game.combat;
+    const combat = getActiveCombat();
     const combatant = combat?.getCombatantsByActor(actor).find(c => c.isOwner && (c.initiative === null));
     if ( combatant ) {
       await combat.rollInitiative([combatant.id]);
@@ -601,6 +679,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         case "save": rolls = await actor.rollSavingThrow({ ability: key, event }, dialog); break;
         case "skill": rolls = await actor.rollSkill({ skill: key, event }, dialog); break;
         case "initiative": rolls = [await this.#rollInitiative(actor)]; break;
+        case "death": rolls = await actor.rollDeathSave({ event }, dialog); break;
       }
       this.#showRollResult(label, rolls?.[0]);
     } finally {
@@ -748,6 +827,31 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#trayRender++;
     const tray = this.element.querySelector(".bhd-tray");
     if ( tray ) tray.hidden = true;
+  }
+
+  /**
+   * Termina el turno del jugador y pasa al siguiente combatiente (como el botón del registro
+   * de combate de Foundry). Solo se puede si el turno actual es del personaje del jugador.
+   * @this {BHDMobileApp}
+   */
+  static async #onEndTurn() {
+    const combat = getActiveCombat();
+    if ( this.#endingTurn || !isActorTurn(combat, this.actor) || !combat.combatant.isOwner ) return;
+    this.#endingTurn = true;
+    this.#hideTurnAlert();
+    try {
+      await combat.nextTurn();
+    } finally {
+      this.#endingTurn = false;
+    }
+  }
+
+  /**
+   * Cierra el aviso "¡Es tu turno!".
+   * @this {BHDMobileApp}
+   */
+  static #onDismissTurnAlert() {
+    this.#hideTurnAlert();
   }
 
   /**

@@ -8,6 +8,7 @@ import { canUseMobileView, shouldUseMobileView } from "./device.js";
 import { enterMobileMode } from "./mobile-mode.js";
 import { BHDMobileApp } from "./apps/mobile-app.js";
 import { getCharacterChoices } from "./apps/character-data.js";
+import { getActiveCombat } from "./apps/combat-data.js";
 
 /** ¿Este cliente está en vista móvil? Se decide una sola vez al cargar. */
 let mobileView = false;
@@ -45,13 +46,18 @@ function openMobileView() {
   const isShown = actor => (actor?.type === "character")
     && ((actor === app.actor) || getCharacterChoices().includes(actor));
 
+  /** ¿Este actor está en el combate activo? (su vida aproximada se ve en la pestaña Combate) */
+  const inCombat = actor => !!actor && !!getActiveCombat()?.combatants.some(c => c.actor === actor);
+
   Hooks.on("updateUser", (user, changes) => {
-    if ( user.isSelf && ("character" in changes) ) refresh();
+    if ( !user.isSelf || !("character" in changes) ) return;
+    refresh();
+    app.onCombatUpdate();
   });
 
   // Personajes: vida, características, permisos (si el GM da o quita un personaje), etc.
   Hooks.on("updateActor", (actor, changes) => {
-    if ( isShown(actor) || ("ownership" in changes) ) refresh();
+    if ( isShown(actor) || inCombat(actor) || ("ownership" in changes) ) refresh();
   });
   Hooks.on("createActor", actor => {
     if ( actor.type === "character" ) refresh();
@@ -66,11 +72,18 @@ function openMobileView() {
   };
   const onEffect = effect => {
     const owner = (effect.parent instanceof Actor) ? effect.parent : effect.parent?.parent;
-    if ( owner === app.actor ) refresh();
+    if ( (owner === app.actor) || inCombat(owner) ) refresh();
+  };
+  // Combate: inicio y fin, ronda y turno, iniciativas, combatientes que entran, salen o caen.
+  const onCombat = () => {
+    refresh();
+    app.onCombatUpdate();
   };
   for ( const action of ["create", "update", "delete"] ) {
     Hooks.on(`${action}Item`, onItem);
     Hooks.on(`${action}ActiveEffect`, onEffect);
+    Hooks.on(`${action}Combat`, onCombat);
+    Hooks.on(`${action}Combatant`, onCombat);
     // Panel de resultados de la pestaña Acciones (tarjeta del objeto usado y sus tiradas).
     Hooks.on(`${action}ChatMessage`, message => app.onChatMessage(message, action));
   }

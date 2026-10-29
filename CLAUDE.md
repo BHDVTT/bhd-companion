@@ -54,10 +54,11 @@ scripts/mobile-mode.js       prepara el cliente para la vista móvil (sin mapa, 
 scripts/apps/mobile-app.js   BHDMobileApp (ApplicationV2) — la vista móvil, acciones (tiradas, vida)
 scripts/apps/character-data.js  elegir personaje y preparar sus datos para las plantillas
 scripts/apps/actions-data.js    datos de la pestaña Acciones (ataques, hechizos, rasgos, consumibles)
+scripts/apps/combat-data.js     datos de la pestaña Combate (turnos, vida aproximada, salvaciones de muerte)
 scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
-templates/mobile/*.hbs       partes de la vista: header, main, nav; parciales de pestaña:
-                             character.hbs, actions.hbs, action-row.hbs
+templates/mobile/*.hbs       partes de la vista: header, main, turn, nav; parciales de pestaña:
+                             character.hbs, actions.hbs, action-row.hbs, combat.hbs, death-saves.hbs
 styles/bhd-companion.css     estilos
 lang/es.json, en.json        traducciones
 ```
@@ -156,6 +157,31 @@ lang/es.json, en.json        traducciones
 - Los clics dentro del panel con `data-action` desconocido llegan también a `BHDMobileApp`, que
   los ignora; no usar en la app nombres de acción que use dnd5e en sus tarjetas.
 
+## Pestaña Combate (decisiones de la etapa 4)
+
+- **Qué combate** (`getActiveCombat` en `scripts/apps/combat-data.js`): el `active` de la escena
+  activa (la de la TV) o cualquier `active`. No se usa `game.combat` (depende del registro de
+  combate y de la escena vista, que sin mapa no son fiables). "Mi combatiente": `combatant.actor
+  === actor` o `combatant.actorId === actor.id` (fichas no vinculadas).
+- **Lista:** `combat.turns` filtrado como el registro de Foundry (`combatant.visible`) y sin fichas
+  ocultas ajenas. "Sigue" salta a los no visibles y, con `skipDefeated`, a los derrotados.
+  Retrato: `combatant.img`.
+- **Vida aproximada:** para todos menos el propio personaje; Sano (completa), Herido (> 50 %),
+  Ensangrentado (≤ 50 %), Casi muerto (≤ 25 %), Derrotado (0 PG o `isDefeated`). Para los
+  combatientes sin jugador dueño se oculta con el ajuste de mundo `showEnemyHealth` (sin recargar:
+  `onChange` redibuja la app). Los datos de los actores llegan a todos los clientes, por eso se puede.
+- **Turno:** `app.onCombatUpdate()` (hooks `create/update/deleteCombat`, `*Combatant`, cambio de
+  personaje y primer dibujo) muestra `.bhd-turn-alert` (fuera de las partes, z-index 5) y
+  `navigator.vibrate` (no existe en iPhone). Se avisa una vez por `combate-ronda-turno`.
+  La parte `turn` (`turn.hbs`, entre main y nav) es la barra "Es tu turno · Terminar turno" en
+  todas las pestañas; la variable CSS `--bhd-turn-bar` sube el panel y el aviso de tirada.
+  Terminar turno = `combat.nextTurn()` (Foundry deja a los jugadores cambiar el turno).
+- **Salvaciones de muerte** (`death-saves.hbs`, en Personaje y Combate, solo con 0 PG):
+  `actor.rollDeathSave({ event }, { configure: false })`; dnd5e aplica éxitos/fallos, el 20 natural
+  y el mensaje. Tras 3 éxitos dnd5e pone los contadores a 0 (no hay "estable" automático).
+- La iniciativa del botón usa el mismo `#rollInitiative` de la hoja (con `getActiveCombat`).
+- Actores del combate (vida, efectos) también disparan el redibujado.
+
 ## Entorno local
 
 - Datos de Foundry: `C:\Users\Frulo\AppData\Local\FoundryVTT\Data`
@@ -178,10 +204,12 @@ lang/es.json, en.json        traducciones
 3. **Acciones** ✅ (0.4.2, probada en iPad: toque rápido, ventaja/desventaja, ventanas compactas, hechizos de pacto) — pestaña Acciones: ataques con armas equipadas,
    hechizos por nivel con espacios, rasgos con usos, consumibles; filtros acción / adicional /
    reacción; buscador de hechizos; `item.use()`; panel con la tarjeta del chat; áreas sin mapa.
-4. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
+4. **Combate en tiempo real** (0.5.0, sin probar aún) — pestaña Combate: ronda, orden de
+   iniciativa con retratos, ahora / sigue, botón de iniciativa, aviso "¡Es tu turno!" con
+   vibración, Terminar turno, estado aproximado de vida de enemigos (ajuste del GM),
+   salvaciones de muerte. (El usuario pidió el combate antes que las tiradas.)
+5. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
-5. **Combate en tiempo real** — orden de iniciativa, aviso "¡Es tu turno!", terminar turno,
-   PG propios (daño/curación), condiciones; escuchando hooks de `Combat`.
 6. **Inventario y descansos** — objetos, monedas, descanso corto/largo.
 7. **Pulido y publicación** — rendimiento en teléfonos, pruebas con 5 jugadores, repositorio
    público (GitHub) con `manifest` y `download` en `module.json` para instalar en The Forge.

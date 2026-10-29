@@ -74,6 +74,43 @@
       "TemplateNoPermission": "You don't have permission to place areas on the map. Ask the DM.",
       "TemplateFailed": "The area could not be placed on the map."
     },
+    "Combat": {
+      "None": "No combat",
+      "NoneHint": "When the DM starts a combat, the initiative order and your turn will show up here.",
+      "Round": "Round {round}",
+      "Now": "Now:",
+      "Next": "Next:",
+      "You": "You",
+      "NowBadge": "Now",
+      "NextBadge": "Next",
+      "YourTurn": "It's your turn!",
+      "YourTurnAlert": "It's your turn!",
+      "YourTurnHint": "Use your actions in the Actions tab. When you're done, tap “End turn”.",
+      "YourTurnDying": "You're at 0 HP: roll your death saving throw, then end your turn.",
+      "LetsGo": "Let's go!",
+      "EndTurn": "End turn",
+      "NotStarted": "Combat hasn't started yet",
+      "NotStartedHint": "Roll your initiative while the DM sets up the combat.",
+      "RollInitiative": "Roll initiative",
+      "NotInCombat": "Your character isn't in this combat. Ask the DM to add your token.",
+      "Order": "Initiative order",
+      "Health": {
+        "healthy": "Healthy",
+        "hurt": "Hurt",
+        "bloodied": "Bloodied",
+        "dying": "Near death",
+        "defeated": "Defeated"
+      },
+      "Death": {
+        "Title": "Death saving throws",
+        "Successes": "Successes",
+        "Failures": "Failures",
+        "Roll": "Roll death save",
+        "Hint": "10 or higher is a success. A natural 20 brings you back with 1 HP; a natural 1 counts as two failures.",
+        "Stable": "You're stable. No need to roll anymore.",
+        "Dead": "Your character has died."
+      }
+    },
     "Dialogs": {
       "Formulas": "Formula & bonus",
       "Configuration": "Roll options",
@@ -95,6 +132,10 @@
       "ForceAll": {
         "Name": "Force mobile view on any device (testing)",
         "Hint": "Shows the mobile view to every player, even on a computer. Useful for testing. Does not affect the GM."
+      },
+      "ShowEnemyHealth": {
+        "Name": "Show enemy health status",
+        "Hint": "In the phone's Combat tab, players see an approximate status for each enemy (Healthy, Hurt, Bloodied, Near death), never the numbers. Uncheck to hide it."
       },
       "PreferNormal": {
         "Name": "Use the normal interface on this device",

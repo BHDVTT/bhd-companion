@@ -1,0 +1,7 @@
+{{!-- Barra "Es tu turno" encima de las pestañas: se ve desde cualquier pestaña. --}}
+<div class="bhd-turn-bar" {{#unless combat.isMyTurn}}hidden{{/unless}}>
+  <span class="bhd-turn-bar-text"><i class="fa-solid fa-bolt" aria-hidden="true"></i> {{localize "BHD.Combat.YourTurn"}}</span>
+  <button type="button" class="bhd-end-turn-small" data-action="endTurn">
+    <i class="fa-solid fa-flag-checkered" aria-hidden="true"></i> {{localize "BHD.Combat.EndTurn"}}
+  </button>
+</div>

@@ -1,0 +1,32 @@
+{{!-- Salvaciones de muerte (solo con 0 de vida). Recibe deathSaves. --}}
+<section class="bhd-card bhd-death {{#if deathSaves.dead}}bhd-dead{{/if}}">
+  <h3 class="bhd-death-title">
+    <i class="fa-solid fa-skull" aria-hidden="true"></i> {{localize "BHD.Combat.Death.Title"}}
+  </h3>
+  <div class="bhd-death-tracks">
+    <div class="bhd-death-track bhd-death-success">
+      <span>{{localize "BHD.Combat.Death.Successes"}}</span>
+      <span class="bhd-death-pips">
+        {{#each deathSaves.successes}}<i class="bhd-death-pip {{#if filled}}bhd-filled{{/if}}" aria-hidden="true"></i>{{/each}}
+      </span>
+    </div>
+    <div class="bhd-death-track bhd-death-failure">
+      <span>{{localize "BHD.Combat.Death.Failures"}}</span>
+      <span class="bhd-death-pips">
+        {{#each deathSaves.failures}}<i class="bhd-death-pip {{#if filled}}bhd-filled{{/if}}" aria-hidden="true"></i>{{/each}}
+      </span>
+    </div>
+  </div>
+  {{#if deathSaves.dead}}
+  <p class="bhd-death-note">{{localize "BHD.Combat.Death.Dead"}}</p>
+  {{else if deathSaves.stable}}
+  <p class="bhd-death-note">{{localize "BHD.Combat.Death.Stable"}}</p>
+  {{/if}}
+  {{#if deathSaves.canRoll}}
+  <button type="button" class="bhd-big-btn bhd-death-roll bhd-rollable" data-action="roll" data-type="death"
+          data-label="{{localize 'BHD.Combat.Death.Roll'}}">
+    <i class="fa-solid fa-dice-d20" aria-hidden="true"></i> {{localize "BHD.Combat.Death.Roll"}}
+  </button>
+  <p class="bhd-tap-hint">{{localize "BHD.Combat.Death.Hint"}}</p>
+  {{/if}}
+</section>

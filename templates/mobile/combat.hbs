@@ -1,0 +1,64 @@
+<div class="bhd-sheet bhd-combat">
+  {{#if combat}}
+  {{!-- Ronda y turno actual --}}
+  <section class="bhd-card bhd-combat-status {{#if combat.isMyTurn}}bhd-my-turn{{/if}}">
+    {{#if combat.started}}
+    <span class="bhd-combat-round">{{localize "BHD.Combat.Round" round=combat.round}}</span>
+    {{#if combat.isMyTurn}}
+    <strong class="bhd-combat-now">{{localize "BHD.Combat.YourTurn"}}</strong>
+    {{else if combat.current}}
+    <span class="bhd-combat-now">{{localize "BHD.Combat.Now"}} <strong>{{combat.current.name}}</strong></span>
+    {{/if}}
+    {{#if combat.next}}
+    <span class="bhd-combat-next">{{localize "BHD.Combat.Next"}} <strong>{{#if combat.next.mine}}{{localize "BHD.Combat.You"}}{{else}}{{combat.next.name}}{{/if}}</strong></span>
+    {{/if}}
+    {{else}}
+    <strong class="bhd-combat-now">{{localize "BHD.Combat.NotStarted"}}</strong>
+    <span class="bhd-combat-next">{{localize "BHD.Combat.NotStartedHint"}}</span>
+    {{/if}}
+  </section>
+
+  {{#if combat.isMyTurn}}
+  <button type="button" class="bhd-big-btn bhd-end-turn" data-action="endTurn">
+    <i class="fa-solid fa-flag-checkered" aria-hidden="true"></i> {{localize "BHD.Combat.EndTurn"}}
+  </button>
+  {{/if}}
+
+  {{#if combat.needsInitiative}}
+  <button type="button" class="bhd-big-btn bhd-roll-init bhd-rollable" data-action="roll" data-type="initiative"
+          data-label="{{localize 'BHD.Sheet.Initiative'}}">
+    <i class="fa-solid fa-dice-d20" aria-hidden="true"></i> {{localize "BHD.Combat.RollInitiative"}}
+  </button>
+  {{else if (not combat.inCombat)}}
+  <p class="bhd-combat-note">{{localize "BHD.Combat.NotInCombat"}}</p>
+  {{/if}}
+
+  {{#if deathSaves}}{{> "modules/bhd-companion/templates/mobile/death-saves.hbs" deathSaves=deathSaves}}{{/if}}
+
+  {{!-- Orden de iniciativa --}}
+  <h3 class="bhd-section-title">{{localize "BHD.Combat.Order"}}</h3>
+  <ol class="bhd-turns">
+    {{#each combat.turns}}
+    <li class="bhd-turn {{#if current}}bhd-current{{/if}} {{#if next}}bhd-next{{/if}} {{#if mine}}bhd-mine{{/if}} {{#if defeated}}bhd-defeated{{/if}}">
+      <span class="bhd-turn-init">{{#if initiative}}{{initiative}}{{else}}—{{/if}}</span>
+      <img class="bhd-turn-img" src="{{img}}" alt="">
+      <span class="bhd-turn-text">
+        <span class="bhd-turn-name">{{name}}</span>
+        {{#if current}}<span class="bhd-turn-badge">{{localize "BHD.Combat.NowBadge"}}</span>
+        {{else if next}}<span class="bhd-turn-badge bhd-badge-next">{{localize "BHD.Combat.NextBadge"}}</span>{{/if}}
+      </span>
+      {{#if health}}<span class="bhd-health bhd-health-{{health.id}}">{{health.label}}</span>
+      {{else if defeated}}<i class="fa-solid fa-skull bhd-turn-dead" aria-label="{{localize 'BHD.Combat.Health.defeated'}}"></i>{{/if}}
+    </li>
+    {{/each}}
+  </ol>
+
+  {{else}}
+  {{#if deathSaves}}{{> "modules/bhd-companion/templates/mobile/death-saves.hbs" deathSaves=deathSaves}}{{/if}}
+  <div class="bhd-placeholder">
+    <i class="fa-solid fa-swords" aria-hidden="true"></i>
+    <h2>{{localize "BHD.Combat.None"}}</h2>
+    <p>{{localize "BHD.Combat.NoneHint"}}</p>
+  </div>
+  {{/if}}
+</div>

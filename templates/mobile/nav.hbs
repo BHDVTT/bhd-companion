@@ -3,6 +3,7 @@
   <button type="button" class="bhd-nav-btn {{tab.cssClass}}" data-action="bhdTab"
           data-group="{{tab.group}}" data-tab="{{tab.id}}" aria-pressed="{{tab.active}}">
     <i class="{{tab.icon}}" aria-hidden="true"></i>
+    {{#if (and (eq tab.id "combat") @root.combat)}}<i class="bhd-nav-dot {{#if @root.combat.isMyTurn}}bhd-my-turn{{/if}}" aria-hidden="true"></i>{{/if}}
     <span>{{localize tab.label}}</span>
   </button>
   {{/each}}

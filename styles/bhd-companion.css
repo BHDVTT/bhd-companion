@@ -34,6 +34,7 @@ body.bhd-mobile {
   --bhd-gold-soft: rgba(212, 166, 70, 0.15);
   --bhd-nav-height: 68px;
   --bhd-touch: 48px;
+  --bhd-turn-bar: 0px; /* alto de la barra "Es tu turno" cuando se ve */
 
   position: fixed;
   inset: 0;
@@ -767,7 +768,7 @@ body.bhd-mobile {
 #bhd-mobile-app .bhd-toast {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--bhd-nav-height) + 16px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--bhd-nav-height) + var(--bhd-turn-bar) + 16px + env(safe-area-inset-bottom, 0px));
   z-index: 1;
   display: flex;
   align-items: center;
@@ -1098,7 +1099,7 @@ body.bhd-mobile {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(var(--bhd-nav-height) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--bhd-nav-height) + var(--bhd-turn-bar) + env(safe-area-inset-bottom, 0px));
   z-index: 1;
   display: flex;
   flex-direction: column;
@@ -1539,5 +1540,429 @@ body.bhd-mobile .bhd-item-info-sub {
   margin-top: 0;
   font-style: italic;
   opacity: 0.8;
+}
+
+/* ------------------------------------------ */
+/*  Pestaña Combate                            */
+/* ------------------------------------------ */
+
+/* Punto en el botón de la pestaña Combate cuando hay un combate activo */
+#bhd-mobile-app .bhd-nav-btn {
+  position: relative;
+}
+
+#bhd-mobile-app .bhd-nav-btn i.bhd-nav-dot {
+  position: absolute;
+  top: 8px;
+  left: calc(50% + 10px);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bhd-red-bright);
+  font-size: 0;
+}
+
+#bhd-mobile-app .bhd-nav-btn i.bhd-nav-dot.bhd-my-turn {
+  background: var(--bhd-gold);
+  animation: bhd-pulse 1s ease-in-out infinite;
+}
+
+/* Botón grande (tirar iniciativa, terminar turno, salvación de muerte) */
+#bhd-mobile-app .bhd-big-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 60px;
+  height: auto;
+  margin: 0;
+  padding: 12px 16px;
+  border: 2px solid var(--bhd-gold);
+  border-radius: 14px;
+  background: var(--bhd-red);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+#bhd-mobile-app .bhd-big-btn:active {
+  filter: brightness(1.2);
+  transform: scale(0.98);
+}
+
+#bhd-mobile-app .bhd-big-btn i {
+  font-size: 24px;
+}
+
+#bhd-mobile-app .bhd-end-turn {
+  background: #2f7d3a;
+  animation: bhd-glow 1.6s ease-in-out infinite;
+}
+
+/* Ronda y turno actual */
+#bhd-mobile-app .bhd-combat-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+#bhd-mobile-app .bhd-combat-status.bhd-my-turn {
+  border-color: var(--bhd-gold);
+  background: linear-gradient(180deg, #3a2a10 0%, var(--bhd-surface) 100%);
+}
+
+#bhd-mobile-app .bhd-combat-round {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--bhd-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#bhd-mobile-app .bhd-combat-now {
+  font-size: 20px;
+}
+
+#bhd-mobile-app .bhd-combat-status.bhd-my-turn .bhd-combat-now {
+  font-size: 26px;
+  color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-combat-next {
+  font-size: 15px;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-combat-next strong {
+  color: var(--bhd-text);
+}
+
+#bhd-mobile-app .bhd-combat-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--bhd-border);
+  border-radius: 10px;
+  color: var(--bhd-text-muted);
+  text-align: center;
+}
+
+/* Orden de iniciativa */
+#bhd-mobile-app .bhd-turns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#bhd-mobile-app .bhd-turn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--bhd-border);
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: var(--bhd-surface);
+}
+
+#bhd-mobile-app .bhd-turn.bhd-mine {
+  background: var(--bhd-surface-2);
+}
+
+#bhd-mobile-app .bhd-turn.bhd-next {
+  border-left-color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-turn.bhd-current {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold-soft);
+}
+
+#bhd-mobile-app .bhd-turn.bhd-defeated {
+  opacity: 0.5;
+}
+
+#bhd-mobile-app .bhd-turn.bhd-defeated .bhd-turn-name {
+  text-decoration: line-through;
+}
+
+#bhd-mobile-app .bhd-turn-init {
+  flex: none;
+  width: 30px;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--bhd-gold);
+  text-align: center;
+}
+
+#bhd-mobile-app .bhd-turn-img {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bhd-bg);
+}
+
+#bhd-mobile-app .bhd-turn.bhd-current .bhd-turn-img {
+  border: 2px solid var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-turn-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#bhd-mobile-app .bhd-turn-name {
+  overflow: hidden;
+  font-size: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#bhd-mobile-app .bhd-turn.bhd-mine .bhd-turn-name {
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-turn-badge {
+  align-self: flex-start;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--bhd-gold);
+  color: #1a1408;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+#bhd-mobile-app .bhd-turn-badge.bhd-badge-next {
+  background: var(--bhd-border);
+  color: var(--bhd-text);
+}
+
+#bhd-mobile-app .bhd-turn-dead {
+  flex: none;
+  color: var(--bhd-text-muted);
+  font-size: 18px;
+}
+
+/* Estado aproximado de vida */
+#bhd-mobile-app .bhd-health {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+#bhd-mobile-app .bhd-health-healthy { background: rgba(63, 154, 74, 0.25); color: #6fd27b; }
+#bhd-mobile-app .bhd-health-hurt { background: rgba(212, 166, 70, 0.2); color: #e2c172; }
+#bhd-mobile-app .bhd-health-bloodied { background: rgba(217, 120, 54, 0.25); color: #f0995a; }
+#bhd-mobile-app .bhd-health-dying { background: rgba(217, 54, 65, 0.25); color: #ff6b74; }
+#bhd-mobile-app .bhd-health-defeated { background: var(--bhd-surface-2); color: var(--bhd-text-muted); }
+
+/* Salvaciones de muerte */
+#bhd-mobile-app .bhd-death {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-color: var(--bhd-red);
+  background: linear-gradient(180deg, #2a1418 0%, var(--bhd-surface) 100%);
+}
+
+#bhd-mobile-app .bhd-death-title {
+  margin: 0;
+  border: none;
+  font-size: 16px;
+  color: var(--bhd-red-bright);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#bhd-mobile-app .bhd-death-tracks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-death-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-death-pips {
+  display: flex;
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-death-pip {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--bhd-border);
+  border-radius: 50%;
+}
+
+#bhd-mobile-app .bhd-death-success .bhd-death-pip.bhd-filled {
+  border-color: #3f9a4a;
+  background: #3f9a4a;
+}
+
+#bhd-mobile-app .bhd-death-failure .bhd-death-pip.bhd-filled {
+  border-color: var(--bhd-red-bright);
+  background: var(--bhd-red-bright);
+}
+
+#bhd-mobile-app .bhd-death-note {
+  margin: 0;
+  font-weight: bold;
+  text-align: center;
+}
+
+#bhd-mobile-app .bhd-death .bhd-tap-hint {
+  margin: 0;
+}
+
+/* Barra "Es tu turno" encima de las pestañas (se ve en todas) */
+#bhd-mobile-app:has(.bhd-turn-bar:not([hidden])) {
+  --bhd-turn-bar: 56px;
+}
+
+#bhd-mobile-app .bhd-turn-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: var(--bhd-turn-bar);
+  padding: 0 8px 0 16px;
+  border-top: 2px solid var(--bhd-gold);
+  background: #3a2a10;
+}
+
+#bhd-mobile-app .bhd-turn-bar[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-turn-bar-text {
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: bold;
+  color: var(--bhd-gold);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#bhd-mobile-app .bhd-end-turn-small {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: 44px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--bhd-gold);
+  border-radius: 10px;
+  background: #2f7d3a;
+  color: #fff;
+  font-size: 15px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+#bhd-mobile-app .bhd-end-turn-small:active {
+  filter: brightness(1.2);
+}
+
+/* Aviso a pantalla completa "¡Es tu turno!" (por encima de todo lo de la vista) */
+#bhd-mobile-app .bhd-turn-alert {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle, rgba(90, 20, 26, 0.96) 0%, rgba(10, 8, 12, 0.98) 75%);
+  animation: bhd-alert-in 0.25s ease-out;
+}
+
+#bhd-mobile-app .bhd-turn-alert[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-turn-alert-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+#bhd-mobile-app .bhd-turn-alert-img {
+  width: 140px;
+  height: 140px;
+  border: 4px solid var(--bhd-gold);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 30px rgba(212, 166, 70, 0.6);
+  animation: bhd-pulse 1.2s ease-in-out infinite;
+}
+
+#bhd-mobile-app .bhd-turn-alert-round {
+  font-size: 15px;
+  font-weight: bold;
+  color: var(--bhd-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+#bhd-mobile-app .bhd-turn-alert-title {
+  font-size: 44px;
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(217, 54, 65, 0.8);
+}
+
+#bhd-mobile-app .bhd-turn-alert-hint {
+  font-size: 17px;
+  color: var(--bhd-text);
+}
+
+#bhd-mobile-app .bhd-turn-alert .bhd-big-btn {
+  margin-top: 12px;
+}
+
+@keyframes bhd-alert-in {
+  from { opacity: 0; transform: scale(1.05); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bhd-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+@keyframes bhd-glow {
+  0%, 100% { box-shadow: 0 0 0 rgba(212, 166, 70, 0); }
+  50% { box-shadow: 0 0 18px rgba(212, 166, 70, 0.7); }
 }
 

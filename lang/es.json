@@ -74,6 +74,43 @@
       "TemplateNoPermission": "No tienes permiso para colocar áreas en el mapa. Pídeselo al DM.",
       "TemplateFailed": "No se pudo colocar el área en el mapa."
     },
+    "Combat": {
+      "None": "No hay combate",
+      "NoneHint": "Cuando el DM empiece un combate, aquí verás el orden de iniciativa y tu turno.",
+      "Round": "Ronda {round}",
+      "Now": "Ahora:",
+      "Next": "Sigue:",
+      "You": "Tú",
+      "NowBadge": "Ahora",
+      "NextBadge": "Sigue",
+      "YourTurn": "¡Es tu turno!",
+      "YourTurnAlert": "¡Es tu turno!",
+      "YourTurnHint": "Usa tus acciones en la pestaña Acciones. Cuando acabes, toca «Terminar turno».",
+      "YourTurnDying": "Estás a 0 de vida: tira tu salvación de muerte y luego termina el turno.",
+      "LetsGo": "¡Vamos!",
+      "EndTurn": "Terminar turno",
+      "NotStarted": "El combate aún no empieza",
+      "NotStartedHint": "Tira tu iniciativa mientras el DM prepara el combate.",
+      "RollInitiative": "Tirar iniciativa",
+      "NotInCombat": "Tu personaje no está en este combate. Pídele al DM que añada tu ficha.",
+      "Order": "Orden de iniciativa",
+      "Health": {
+        "healthy": "Sano",
+        "hurt": "Herido",
+        "bloodied": "Ensangrentado",
+        "dying": "Casi muerto",
+        "defeated": "Derrotado"
+      },
+      "Death": {
+        "Title": "Salvaciones de muerte",
+        "Successes": "Éxitos",
+        "Failures": "Fallos",
+        "Roll": "Tirar salvación de muerte",
+        "Hint": "10 o más es un éxito. Un 20 natural te levanta con 1 PG; un 1 natural cuenta como dos fallos.",
+        "Stable": "Estás estable. Ya no necesitas tirar.",
+        "Dead": "Tu personaje ha muerto."
+      }
+    },
     "Dialogs": {
       "Formulas": "Fórmula y bonificador",
       "Configuration": "Opciones de tirada",
@@ -95,6 +132,10 @@
       "ForceAll": {
         "Name": "Forzar vista móvil en cualquier dispositivo (pruebas)",
         "Hint": "Muestra la vista móvil a todos los jugadores aunque usen una computadora. Útil para probar. No afecta al GM."
+      },
+      "ShowEnemyHealth": {
+        "Name": "Mostrar estado de vida de los enemigos",
+        "Hint": "En la pestaña Combate del teléfono, los jugadores ven un estado aproximado de cada enemigo (Sano, Herido, Ensangrentado, Casi muerto), nunca los números. Desmárcalo para ocultarlo."
       },
       "PreferNormal": {
         "Name": "Usar la interfaz normal en este dispositivo",

@@ -61,6 +61,8 @@
     </div>
   </section>
 
+  {{#if deathSaves}}{{> "modules/bhd-companion/templates/mobile/death-saves.hbs" deathSaves=deathSaves}}{{/if}}
+
   {{!-- CA, iniciativa, velocidad, competencia --}}
   <section class="bhd-stats">
     <div class="bhd-stat">

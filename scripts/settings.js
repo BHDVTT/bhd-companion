@@ -24,6 +24,16 @@ export function registerSettings() {
     requiresReload: true
   });
 
+  // Pestaña Combate: estado aproximado de vida (Sano, Herido...) de los enemigos.
+  game.settings.register(MODULE_ID, "showEnemyHealth", {
+    name: "BHD.Settings.ShowEnemyHealth.Name",
+    hint: "BHD.Settings.ShowEnemyHealth.Hint",
+    scope: "world",
+    config: true,
+    type: new foundry.data.fields.BooleanField({ initial: true }),
+    onChange: () => game.modules.get(MODULE_ID).api?.app?.render()
+  });
+
   // Preferencia de cada dispositivo: usar la interfaz normal de Foundry en lugar de la vista móvil.
   game.settings.register(MODULE_ID, "preferNormal", {
     name: "BHD.Settings.PreferNormal.Name",
