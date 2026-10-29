@@ -6,6 +6,7 @@ import { MODULE_ID } from "./constants.js";
 import { registerSettings } from "./settings.js";
 import { canUseMobileView, shouldUseMobileView } from "./device.js";
 import { enterMobileMode } from "./mobile-mode.js";
+import { closeStrayWindows } from "./mobile-windows.js";
 import { BHDMobileApp } from "./apps/mobile-app.js";
 import { getCharacterChoices } from "./apps/character-data.js";
 import { getActiveCombat } from "./apps/combat-data.js";
@@ -41,6 +42,7 @@ Hooks.once("ready", () => {
  * Abre la vista móvil y la mantiene al día con el personaje del jugador.
  */
 function openMobileView() {
+  closeStrayWindows();
   const app = new BHDMobileApp();
   app.render({ force: true });
   game.modules.get(MODULE_ID).api = { app };

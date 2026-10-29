@@ -1799,6 +1799,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onExitMobile() {
     const confirmed = await DialogV2.confirm({
       window: { title: "BHD.Exit.Title" },
+      classes: ["bhd-dialog"],
       content: `<p>${game.i18n.localize("BHD.Exit.Content")}</p>`,
       rejectClose: false
     });

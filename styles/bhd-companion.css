@@ -1323,23 +1323,33 @@ body.bhd-mobile {
 /*  Ventanas de Foundry/dnd5e en el teléfono   */
 /* ------------------------------------------ */
 
-/* Teléfono: las ventanas (espacio de conjuro, opciones de tirada, elegir actividad...) salen abajo,
-   a todo el ancho, como una hoja de app. Se usa !important porque Foundry escribe la posición
-   en el propio elemento. Solo en vista móvil. */
-body.bhd-mobile .application:has(> .window-header) {
-  top: auto !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
+/* Teléfono: las ventanas permitidas (espacio de conjuro, opciones de tirada, elegir actividad...)
+   salen centradas, de una en una, con el ancho de la pantalla menos un margen (en ≥ 700 px, tarjeta
+   de 560 px). Se usa !important porque Foundry escribe la posición en el propio elemento.
+   scripts/mobile-windows.js decide cuáles se quedan: hasta entonces (sin .bhd-window) son invisibles,
+   las bloqueadas se cierran y las que esperan detrás de otra se ocultan. Solo en vista móvil. */
+body.bhd-mobile :is(.application:has(> .window-header), .window-app):not(.bhd-window) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.bhd-mobile :is(.bhd-window-waiting, .bhd-window-blocked) {
+  display: none !important;
+}
+
+body.bhd-mobile :is(.application:has(> .window-header), .window-app) {
+  top: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: 50% !important;
+  width: calc(100vw - 16px) !important;
   max-width: none;
   height: auto !important;
   min-height: 0 !important;
-  max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px)) !important;
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
   margin: 0;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  border-radius: 16px 16px 0 0;
-  transform: none !important;
+  border-radius: 16px;
+  transform: translate(-50%, -50%) !important;
   font-size: calc(16px * var(--bhd-text-scale, 1));
   /* Letra más grande en las ventanas de Foundry/dnd5e */
   --font-size-10: calc(13px * var(--bhd-text-scale, 1));
@@ -1350,31 +1360,27 @@ body.bhd-mobile .application:has(> .window-header) {
   --font-size-16: calc(17px * var(--bhd-text-scale, 1));
 }
 
-/* iPad / pantallas anchas: tarjeta centrada de ancho cómodo */
+/* iPad / pantallas anchas: tarjeta de ancho cómodo */
 @media (min-width: 700px) {
-  body.bhd-mobile .application:has(> .window-header) {
-    bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+  body.bhd-mobile :is(.application:has(> .window-header), .window-app) {
     width: min(560px, calc(100vw - 48px)) !important;
     max-height: calc(100dvh - 48px) !important;
-    margin: 0 auto;
-    padding-bottom: 0;
-    border-radius: 16px;
   }
 }
 
-body.bhd-mobile .application:has(> .window-header) > .window-header {
+body.bhd-mobile :is(.application:has(> .window-header), .window-app) > .window-header {
   min-height: 52px;
   padding: 4px 8px 4px 14px;
   font-size: calc(17px * var(--bhd-text-scale, 1));
 }
 
-body.bhd-mobile .application:has(> .window-header) > .window-header button {
+body.bhd-mobile :is(.application:has(> .window-header), .window-app) > .window-header button {
   min-width: 44px;
   min-height: 44px;
   font-size: calc(18px * var(--bhd-text-scale, 1));
 }
 
-body.bhd-mobile .application:has(> .window-header) > .window-content {
+body.bhd-mobile :is(.application:has(> .window-header), .window-app) > .window-content {
   flex: 1 1 auto;
   min-height: 0;
   padding: 12px 14px;
@@ -1382,27 +1388,27 @@ body.bhd-mobile .application:has(> .window-header) > .window-content {
   overscroll-behavior: contain;
 }
 
-body.bhd-mobile .application:has(> .window-header) .window-resize-handle {
+body.bhd-mobile :is(.application:has(> .window-header), .window-app) .window-resize-handle {
   display: none;
 }
 
-body.bhd-mobile .application:has(> .window-header) :is(.form-footer, footer) {
+body.bhd-mobile :is(.application:has(> .window-header), .window-app) :is(.form-footer, footer) {
   gap: 8px;
 }
 
-body.bhd-mobile .application:has(> .window-header) :is(.form-footer, footer) button {
+body.bhd-mobile :is(.application:has(> .window-header), .window-app) :is(.form-footer, footer) button {
   min-height: 52px;
   font-size: calc(17px * var(--bhd-text-scale, 1));
   font-weight: bold;
 }
 
 /* Campos de 16px o más: iOS no hace zoom al tocarlos */
-body.bhd-mobile .application:has(> .window-header) :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+body.bhd-mobile :is(.application:has(> .window-header), .window-app) :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 44px;
   font-size: calc(16px * var(--bhd-text-scale, 1));
 }
 
-body.bhd-mobile .application:has(> .window-header) :is(input[type="checkbox"], input[type="radio"]) {
+body.bhd-mobile :is(.application:has(> .window-header), .window-app) :is(input[type="checkbox"], input[type="radio"]) {
   flex: none;
   width: 24px;
   height: 24px;

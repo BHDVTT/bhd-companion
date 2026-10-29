@@ -1,6 +1,7 @@
 import { MODULE_ID } from "./constants.js";
 import { patchAbilityTemplates } from "./mobile-templates.js";
 import { registerCompactDialogs } from "./mobile-dialogs.js";
+import { registerMobileWindows } from "./mobile-windows.js";
 import { enableHomeScreenApp } from "./home-screen.js";
 
 /**
@@ -33,6 +34,7 @@ export function enterMobileMode() {
   patchPlaylistSounds();
   patchAbilityTemplates();
   registerCompactDialogs();
+  registerMobileWindows();
   enableHomeScreenApp();
 }
 
@@ -44,15 +46,28 @@ export function applyLargeText() {
 }
 
 /**
- * Activa el modo "sin mapa" de Foundry solo para esta sesión: el mapa (WebGL) nunca se crea,
- * lo que ahorra batería y memoria. No se guarda nada, así que la próxima carga decide de nuevo.
+ * El mapa (WebGL) nunca se crea en el teléfono: ahorra batería y memoria.
+ * No se toca el ajuste "Disable Game Canvas" (core.noCanvas), ni guardado ni leído: The Forge
+ * sincroniza los ajustes de cliente y avisaba de una diferencia. Se hace lo mismo que Foundry hace
+ * con ese ajuste activo: `Canvas#initialize` sale sin crear nada, así que `canvas.initialized`
+ * y `canvas.ready` quedan en false y `Scene#view` no dibuja.
  */
 function disableCanvas() {
-  const settings = game.settings;
-  const get = settings.get;
-  settings.get = function(namespace, key, options) {
-    if ( (namespace === "core") && (key === "noCanvas") ) return true;
-    return get.call(this, namespace, key, options);
+  foundry.canvas.Canvas.prototype.initialize = function() {};
+
+  // Lo que Foundry evita por su cuenta cuando el ajuste está activo y necesitaría el mapa:
+  // la pestaña de fichas de la escena y las miniaturas de vídeo.
+  const Placeables = CONFIG.ui.placeables;
+  if ( Placeables ) {
+    CONFIG.ui.placeables = class BHDPlaceableDirectory extends Placeables {
+      _canRender() {
+        return false;
+      }
+    };
+  }
+  const VideoHelper = foundry.helpers.media.VideoHelper;
+  VideoHelper.prototype.createThumbnail = async function() {
+    return "icons/svg/video.svg";
   };
 }
 

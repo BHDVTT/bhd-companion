@@ -64,6 +64,7 @@ scripts/economy.js           acción / adicional / reacción / Correr usados en 
 scripts/targets.js           objetivos sin mapa: game.user.targets con PhoneTarget y aviso a la TV
 scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
+scripts/mobile-windows.js    qué ventanas se permiten en vista móvil (cierra las de otros módulos), una a la vez
 scripts/connection.js        reconexión sin límite y aviso "Sin conexión" en vista móvil
 scripts/wake-lock.js         pantalla siempre encendida (Screen Wake Lock API)
 scripts/home-screen.js       manifiesto de app web y etiquetas apple-* (añadir a pantalla de inicio)
@@ -82,9 +83,12 @@ lang/es.json, en.json        traducciones
   aún sin crear). Condiciones: ajuste `enabled` activo, usuario no GM, ajuste de cliente
   `preferNormal` desactivado, y (`forceAll` o pantalla pequeña: lado corto de la pantalla o
   ancho de ventana < 768 px).
-- **Sin mapa:** en `mobile-mode.js` se sustituye `game.settings.get` solo para
-  `core.noCanvas`, devolviendo `true` en esta sesión. `Canvas#initialize` sale sin crear WebGL.
-  No se guarda en localStorage.
+- **Sin mapa:** en `mobile-mode.js` `Canvas.prototype.initialize` se vuelve vacío (lo mismo que hace
+  Foundry con `core.noCanvas`): no se crea WebGL, `canvas.initialized/ready` quedan en false. **No se toca
+  ni se finge `core.noCanvas`** (0.8.2): antes se sustituía `game.settings.get` y The Forge, que sincroniza
+  los ajustes de cliente, guardó `true` y mostraba "Difference in client settings detected". Lo que Foundry
+  evita con ese ajuste también se evita a mano: `CONFIG.ui.placeables` con `_canRender() → false` y
+  `VideoHelper#createThumbnail` con el icono de vídeo. `game.scenes.current` ahora es la escena activa.
 - **Avisos silenciados:** `CONFIG.ui.notifications` se reemplaza por una subclase que descarta
   `ERROR.RESOLUTION.*` (Foundry exige pantalla de PC) e `INFO.SceneViewCanvasDisabled`.
 - **Interfaz oculta:** clase `bhd-mobile` en `<body>`; el CSS oculta `#interface`, `#board`,
@@ -147,9 +151,15 @@ lang/es.json, en.json        traducciones
   `dnd5e.preCreateActivityTemplate` (devolviendo `false`) y crea el `MeasuredTemplate` en
   `game.scenes.active`, centrado en la ficha del personaje. El DM la mueve en la TV.
   Requiere el permiso `TEMPLATE_CREATE` (los jugadores lo tienen por defecto).
-- **Ventanas en el teléfono:** CSS `body.bhd-mobile .application:has(> .window-header)` las pone
-  abajo, a lo ancho (en ≥ 700 px, tarjeta centrada de 560 px), con `!important` sobre la posición
-  que Foundry escribe en línea; sube las variables `--font-size-*`.
+- **Ventanas en el teléfono** (`scripts/mobile-windows.js`, 0.8.2): hooks `render/closeApplicationV2` y
+  `render/closeApplication` (V1). Solo se quedan las ventanas con marco que sean `Dialog5e` de dnd5e,
+  `ActivityChoiceDialog`, las propias (clase `bhd-dialog` en nuestros `DialogV2`) y otros `DialogV2` /
+  `Dialog` V1 abiertos ≤ 3 s después de un toque; el resto (registro de combate en ventana, popups de
+  módulos, avisos de The Forge) se cierra al aparecer (`closeStrayWindows` en `ready` para las de la carga).
+  Pila de permitidas: solo la última se ve (`.bhd-window-waiting` oculta las demás). CSS
+  `:is(.application:has(> .window-header), .window-app)`: invisibles sin `.bhd-window`, centradas
+  (ancho de pantalla − 16 px; en ≥ 700 px, 560 px) con `!important` sobre la posición en línea;
+  sube las variables `--font-size-*`. Diálogos propios nuevos: poner `classes: ["bhd-dialog"]`.
 - **Ventanas compactas** (`scripts/mobile-dialogs.js`, 0.4.1): hook `renderDialog5e` añade
   `.bhd-compact` y pliega partes poco importantes (`FOLDED_PARTS`: en `activity-usage`
   concentración / recursos / área; en `roll-configuration` fórmula y opciones) con un botón
