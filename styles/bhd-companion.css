@@ -155,6 +155,7 @@ body.bhd-mobile {
 #bhd-mobile-app .bhd-main {
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -293,11 +294,22 @@ body.bhd-mobile {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
   padding-bottom: 16px;
+}
+
+/* Nada dentro de la hoja puede ser más ancho que la pantalla */
+#bhd-mobile-app .bhd-sheet * {
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 /* :where() para que estas reglas base no ganen a las de cada botón */
 #bhd-mobile-app .bhd-sheet :where(button) {
+  height: auto; /* Foundry fija height: 2em en todos los botones */
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   box-shadow: none;
   color: inherit;
@@ -490,25 +502,33 @@ body.bhd-mobile {
 
 #bhd-mobile-app .bhd-hp-buttons {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
+/* Icono encima del texto para que quepan textos largos ("Temporary") */
 #bhd-mobile-app .bhd-hp-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: var(--bhd-touch);
-  padding: 0 4px;
+  gap: 2px;
+  min-height: 56px;
+  padding: 6px 4px;
   border: none;
   border-radius: 10px;
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: bold;
+  line-height: 1.1;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
-#bhd-mobile-app .bhd-hp-btn i { margin: 0; }
+#bhd-mobile-app .bhd-hp-btn i {
+  margin: 0;
+  font-size: 18px;
+}
 #bhd-mobile-app .bhd-damage { background: var(--bhd-red); }
 #bhd-mobile-app .bhd-heal { background: #2f7d3a; }
 #bhd-mobile-app .bhd-temp { background: #2c5f8a; }
@@ -521,7 +541,7 @@ body.bhd-mobile {
 /* CA, iniciativa, velocidad, competencia */
 #bhd-mobile-app .bhd-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -551,9 +571,12 @@ body.bhd-mobile {
 }
 
 #bhd-mobile-app .bhd-stat-value {
+  max-width: 100%;
+  overflow: hidden;
   font-size: 18px;
   font-weight: bold;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 #bhd-mobile-app .bhd-stat-value i {
@@ -614,18 +637,27 @@ body.bhd-mobile {
 }
 
 /* Características */
+/* 3 columnas en teléfono, 6 en tableta */
 #bhd-mobile-app .bhd-abilities {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+@media (min-width: 600px) {
+  #bhd-mobile-app .bhd-abilities {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }
 
 #bhd-mobile-app .bhd-ability {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0;
-  padding: 8px 4px;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 0;
+  padding: 10px 4px;
   border: 1px solid var(--bhd-border);
   border-radius: 12px;
   background: var(--bhd-surface);
@@ -683,6 +715,7 @@ body.bhd-mobile {
 #bhd-mobile-app .bhd-row-label {
   flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 #bhd-mobile-app .bhd-row-label small {

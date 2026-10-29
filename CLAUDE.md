@@ -79,6 +79,9 @@ lang/es.json, en.json        traducciones
   interfaz normal, si el dispositivo podría usar la vista móvil, aparece un botón flotante
   "Vista móvil" que lo revierte.
 - Los CSS del núcleo de Foundry están en `@layer`, así que los estilos del módulo ganan.
+- **Ojo con el CSS del núcleo:** todo `<button>` trae `height: 2em; min-height: 2em`. Cualquier
+  botón con varias líneas (tarjetas) necesita `height: auto` (la hoja lo pone en `.bhd-sheet :where(button)`).
+  Las cuadrículas usan `minmax(0, 1fr)`, no `1fr`, para que un texto largo no ensanche la vista.
 
 ## Hoja de personaje (decisiones de la etapa 2)
 
@@ -113,7 +116,7 @@ lang/es.json, en.json        traducciones
    vista a pantalla completa sin mapa, encabezado con el personaje, barra de pestañas
    (Personaje, Acciones, Combate, Inventario, Notas), ajustes del GM (`enabled`, `forceAll`),
    botón para volver a la interfaz normal.
-2. **Hoja de personaje** 🧪 (hecha, falta probar en Foundry; incluye tiradas con un toque y botones de vida) — encabezado (nombre, retrato, PG, CA, velocidad,
+2. **Hoja de personaje** ✅ (probada; incluye tiradas con un toque y botones de vida; 0.3.1 arregla el diseño en iPad) — encabezado (nombre, retrato, PG, CA, velocidad,
    iniciativa), características, salvaciones, habilidades; pestañas inferiores estilo
    D&D Beyond. Se actualiza sola con `updateActor` / `updateItem`.
 3. **Tiradas** — tocar una característica, salvación o habilidad tira con dnd5e; ventaja /

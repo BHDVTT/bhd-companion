@@ -2,7 +2,7 @@
   "id": "bhd-companion",
   "title": "BHD Companion",
   "description": "Vista móvil para jugadores de Battlehammer's Dungeon: hoja de personaje, tiradas y combate en tiempo real desde el teléfono.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "authors": [
     {
       "name": "Battlehammer's Dungeon"
