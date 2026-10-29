@@ -204,10 +204,14 @@ lang/es.json, en.json        traducciones
 3. **Acciones** ✅ (0.4.2, probada en iPad: toque rápido, ventaja/desventaja, ventanas compactas, hechizos de pacto) — pestaña Acciones: ataques con armas equipadas,
    hechizos por nivel con espacios, rasgos con usos, consumibles; filtros acción / adicional /
    reacción; buscador de hechizos; `item.use()`; panel con la tarjeta del chat; áreas sin mapa.
-4. **Combate en tiempo real** (0.5.0, sin probar aún) — pestaña Combate: ronda, orden de
+4. **Combate en tiempo real** ✅ (0.5.0, probada: iniciativa, aviso de turno, Terminar turno,
+   vida aproximada de enemigos, salvaciones de muerte) — pestaña Combate: ronda, orden de
    iniciativa con retratos, ahora / sigue, botón de iniciativa, aviso "¡Es tu turno!" con
    vibración, Terminar turno, estado aproximado de vida de enemigos (ajuste del GM),
    salvaciones de muerte. (El usuario pidió el combate antes que las tiradas.)
+   - **Pendiente:** marcar automáticamente un fallo de salvación de muerte cuando un personaje
+     con 0 PG recibe daño (dos fallos si es un golpe crítico), con un ajuste del GM para
+     desactivarlo si Midi QOL (u otro módulo) ya lo hace y no contar doble.
 5. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
 6. **Inventario y descansos** — objetos, monedas, descanso corto/largo.
