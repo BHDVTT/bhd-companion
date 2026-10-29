@@ -20,6 +20,36 @@ const LONG_PRESS_TOLERANCE = 10;
 const SIMPLE_ACTIVITY_TYPES = new Set(["attack", "damage", "heal", "save", "check", "utility"]);
 
 /**
+ * ¿Este hechizo de nivel solo se puede lanzar con un tipo de espacio, y es el que dnd5e ya eligió?
+ * Pasa, por ejemplo, con un brujo que solo tiene espacios de pacto: no hay nada que elegir,
+ * así que con un toque se lanza directo al nivel del espacio de pacto.
+ * Usa las mismas reglas que la ventana de uso de dnd5e para decidir qué espacios se ofrecen.
+ * @param {Activity} activity
+ * @param {object} usageConfig  Configuración de uso ya preparada por dnd5e.
+ * @returns {boolean}
+ */
+function hasSingleSlotChoice(activity, usageConfig) {
+  if ( !activity.requiresSpellSlot || usageConfig.cause?.activity ) return false;
+  const consumeSlot = (usageConfig.consume === true) || usageConfig.consume?.spellSlot;
+  if ( !consumeSlot ) return false;
+  const actor = activity.actor;
+  const item = activity.item;
+  const spells = actor.system.spells ?? {};
+  const minimumLevel = item.system.level ?? 1;
+  const method = CONFIG.DND5E.spellcasting[item.system.method];
+  const options = Object.entries(spells).filter(([, slot]) => {
+    if ( !slot.max || !slot.type || (slot.level < minimumLevel) ) return false;
+    if ( method?.exclusive?.spells && (item.system.method !== slot.type) ) return false;
+    const model = CONFIG.DND5E.spellcasting[slot.type];
+    if ( model?.exclusive?.slots && (item.system.method !== slot.type) ) return false;
+    return true;
+  });
+  if ( options.length !== 1 ) return false;
+  const [key, slot] = options[0];
+  return (key === usageConfig.spell?.slot) && (slot.value > 0);
+}
+
+/**
  * Vista móvil a pantalla completa: encabezado, contenido por pestañas y barra de pestañas abajo.
  */
 export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
@@ -372,7 +402,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   onPreUseActivity(activity, usageConfig, dialogConfig) {
     if ( (activity.actor !== this.actor) || (activity.item.id !== this.#quickUseItem) ) return;
     const simple = SIMPLE_ACTIVITY_TYPES.has(activity.type)
-      && (usageConfig.scaling === false)          // sin elegir nivel de espacio
+      && ((usageConfig.scaling === false) || hasSingleSlotChoice(activity, usageConfig))
       && !usageConfig.concentration?.end;          // no hay que terminar otra concentración
     if ( simple ) dialogConfig.configure = false;
   }

@@ -54,6 +54,7 @@
       "DC": "DC {dc}",
       "ConcentrationAbbr": "C",
       "RitualAbbr": "R",
+      "LevelShort": "Lvl {level}",
       "Empty": "Your character has no equipped weapons, spells, features or consumables to use.",
       "NoneForFilter": "Nothing of this type.",
       "NoSpellsFound": "No spells match your search.",

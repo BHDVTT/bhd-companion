@@ -108,8 +108,13 @@ lang/es.json, en.json        traducciones
 
 - **Datos** (`scripts/apps/actions-data.js`): armas con `system.equipped`; hechizos agrupados con la
   misma lógica que `_prepareSpellbook` de la hoja de dnd5e (`CONFIG.DND5E.spellcasting[*]`,
-  `getSpellSlotKey`, `getAvailableLevels`); se ocultan los que se pueden preparar y no están
-  preparados; rasgos (`feat`) con actividades; consumibles con cantidad > 0, sin munición.
+  `getSpellSlotKey`, `getAvailableLevels`); métodos `isSingleLevel` (pacto) → todos los hechizos
+  de nivel 1+ en una sección, con etiqueta "Nv. X". Qué se muestra (`isSpellShown`, 0.4.2): trucos,
+  `prepared` 1/2, métodos que no preparan (innato, a voluntad, ritual) y **todos los de pacto**
+  (dnd5e 5.x los deja con `prepared: 0`; ocultarlos dejaba vacía la sección del brujo). Solo se
+  ocultan los sin preparar de una clase con `spellcasting.preparation.max > 0` (vía
+  `system.classIdentifier`; si no se sabe la clase, si alguna clase con ese método prepara).
+  Rasgos (`feat`) con actividades; consumibles con cantidad > 0, sin munición.
   Resumen con `item.labels` (activation, range, damages, toHit), CD de la actividad `save`,
   usos de `system.uses` o de la primera actividad con usos.
 - **Filtros y buscador:** se aplican en `#applyActionFilters` ocultando filas con `hidden`
@@ -143,7 +148,11 @@ lang/es.json, en.json        traducciones
   concentración; `dnd5e.preRollAttackV2` / `preRollDamageV2` → `dialog.configure = false` y
   `config.advantage/disadvantage` según `#pendingAttack` (válido 3 s tras el uso). "Más opciones"
   (`#fullOptionsItem`) deja todas las ventanas de dnd5e para ese objeto. Los hechizos de nivel
-  siguen mostrando la ventana de uso (compacta) para elegir el espacio.
+  muestran la ventana de uso (compacta) para elegir el espacio, salvo que `hasSingleSlotChoice`
+  (0.4.2, mismas reglas que `_prepareScalingContext` de dnd5e: `slot.max`, `slot.type`, nivel
+  mínimo, `exclusive.spells/slots`) vea un solo tipo de espacio con usos y sea el que dnd5e ya
+  eligió (p. ej. brujo solo con pacto): entonces se lanza directo y dnd5e gasta ese espacio y
+  escala al nivel del espacio.
 - Los clics dentro del panel con `data-action` desconocido llegan también a `BHDMobileApp`, que
   los ignora; no usar en la app nombres de acción que use dnd5e en sus tarjetas.
 

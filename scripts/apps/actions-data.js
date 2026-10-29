@@ -39,14 +39,14 @@ export function prepareActions(actor) {
   const spellAttributes = actor.system.attributes.spell ?? {};
 
   return {
-    attacks: attacks.sort(byName).map(prepareRow),
+    attacks: attacks.sort(byName).map(item => prepareRow(item)),
     spellbook,
     spellcasting: spellbook.length ? {
       dc: spellAttributes.dc ?? null,
       attack: Number.isFinite(spellAttributes.attack) ? signed(spellAttributes.attack) : null
     } : null,
-    features: features.sort(byName).map(prepareRow),
-    consumables: consumables.sort(byName).map(prepareRow),
+    features: features.sort(byName).map(item => prepareRow(item)),
+    consumables: consumables.sort(byName).map(item => prepareRow(item)),
     isEmpty: !attacks.length && !spellbook.length && !features.length && !consumables.length
   };
 }
@@ -55,14 +55,14 @@ export function prepareActions(actor) {
 
 /**
  * Hechizos agrupados por nivel (o por método: pacto, innatos...) con sus espacios de conjuro.
- * Sigue la misma lógica que la hoja de personaje de dnd5e para decidir la sección de cada hechizo.
- * Los hechizos que se pueden preparar pero no están preparados no se muestran.
+ * Sigue la misma lógica que la hoja de personaje de dnd5e para decidir la sección de cada hechizo:
+ * los de pacto van todos a "Magia de pacto" (se lanzan al nivel del espacio de pacto), los demás
+ * a la sección de su nivel. Qué hechizos se muestran lo decide `isSpellShown`.
  * @param {Actor} actor
  * @param {Item[]} spells
  * @returns {object[]}
  */
 function prepareSpellbook(actor, spells) {
-  const SingleLevel = dnd5e.dataModels.spellcasting?.SingleLevelSpellcasting;
   const sections = {};
 
   const registerSection = (key, level, config) => {
@@ -98,11 +98,12 @@ function prepareSpellbook(actor, spells) {
 
   for ( const spell of spells ) {
     const system = spell.system;
-    if ( (system.level > 0) && system.canPrepare && !system.prepared ) continue;
+    if ( !isSpellShown(spell, actor) ) continue;
     let method = system.method;
     if ( !(method in CONFIG.DND5E.spellcasting) ) method = "innate";
     const config = CONFIG.DND5E.spellcasting[method];
-    const level = (SingleLevel && (config instanceof SingleLevel) && (system.level !== 0)) ? null : (system.level || 0);
+    // Métodos de un solo nivel (pacto): todos los hechizos de nivel 1+ comparten sección.
+    const level = (config?.isSingleLevel && (system.level !== 0)) ? null : (system.level || 0);
     let key = config?.getSpellSlotKey?.(level) ?? method;
 
     // Hechizos que vienen de un objeto (p. ej. una varita)
@@ -115,11 +116,42 @@ function prepareSpellbook(actor, spells) {
     sections[key].items.push(spell);
   }
 
-  const byName = (a, b) => a.name.localeCompare(b.name, game.i18n.lang);
+  const byLevelAndName = (a, b) => ((a.system.level ?? 0) - (b.system.level ?? 0))
+    || a.name.localeCompare(b.name, game.i18n.lang);
   return Object.values(sections)
     .filter(section => section.items.length || section.slots?.max)
     .sort((a, b) => (a.order - b.order) || (a.level - b.level))
-    .map(section => ({ ...section, items: section.items.sort(byName).map(prepareRow) }));
+    .map(section => {
+      // En secciones por nivel ("Nivel 2") el nivel ya se ve en el título; en las demás (pacto,
+      // innatos, rituales...) cada hechizo muestra su nivel.
+      const showLevel = !/^spell\d+$/.test(section.key);
+      return { ...section, items: section.items.sort(byLevelAndName).map(item => prepareRow(item, { showLevel })) };
+    });
+}
+
+/**
+ * ¿Se muestra este hechizo en la pestaña Acciones?
+ * - Trucos, siempre preparados, preparados, innatos, a voluntad y rituales: sí.
+ * - Pacto (brujo): sí, todos los que conoce, aunque dnd5e los marque "sin preparar"
+ *   (en dnd5e 5.x los hechizos de pacto suelen quedar con `prepared: 0`).
+ * - Sin preparar de una clase que prepara hechizos (clérigo, mago, druida...): no, para no llenar
+ *   la lista con todo el libro de conjuros. Si la clase no prepara (o no se sabe y ninguna clase del
+ *   personaje con ese método prepara), se muestra.
+ * @param {Item} spell
+ * @param {Actor} actor
+ * @returns {boolean}
+ */
+function isSpellShown(spell, actor) {
+  const system = spell.system;
+  if ( !(system.level > 0) || system.prepared || !system.canPrepare ) return true;
+  const config = CONFIG.DND5E.spellcasting[system.method];
+  if ( config?.isSingleLevel ) return true;
+
+  const classes = actor.spellcastingClasses ?? {};
+  const prepares = cls => (cls?.system.spellcasting?.preparation?.max ?? 0) > 0;
+  const sourceClass = system.classIdentifier ? classes[system.classIdentifier] : null;
+  if ( sourceClass ) return !prepares(sourceClass);
+  return !Object.values(classes).some(cls => (cls.system.spellcasting?.type === system.method) && prepares(cls));
 }
 
 /* -------------------------------------------- */
@@ -127,9 +159,11 @@ function prepareSpellbook(actor, spells) {
 /**
  * Datos de una fila: nombre, icono, resumen, valor de tirada y usos restantes.
  * @param {Item} item
+ * @param {object} [options]
+ * @param {boolean} [options.showLevel]  Mostrar el nivel del hechizo ("Nv. 1") junto al nombre.
  * @returns {object}
  */
-function prepareRow(item) {
+function prepareRow(item, { showLevel=false }={}) {
   const system = item.system;
   const labels = item.labels ?? {};
   const activities = system.activities?.filter(a => a.canUse) ?? [];
@@ -145,9 +179,10 @@ function prepareRow(item) {
   const damage = (labels.damages ?? []).map(d => d.label ?? d.formula).filter(_ => _).join(" + ");
   const subtitle = [labels.activation, labels.range, damage].filter(_ => _).join(" · ");
 
-  // Etiquetas cortas: concentración y ritual (hechizos), cantidad (consumibles).
+  // Etiquetas cortas: nivel, concentración y ritual (hechizos), cantidad (consumibles).
   const tags = [];
   if ( item.type === "spell" ) {
+    if ( showLevel && (system.level > 0) ) tags.push(game.i18n.format("BHD.Actions.LevelShort", { level: system.level }));
     if ( system.properties?.has("concentration") ) tags.push(game.i18n.localize("BHD.Actions.ConcentrationAbbr"));
     if ( system.properties?.has("ritual") ) tags.push(game.i18n.localize("BHD.Actions.RitualAbbr"));
   }

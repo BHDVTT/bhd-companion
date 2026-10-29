@@ -54,6 +54,7 @@
       "DC": "CD {dc}",
       "ConcentrationAbbr": "C",
       "RitualAbbr": "R",
+      "LevelShort": "Nv. {level}",
       "Empty": "Tu personaje no tiene armas equipadas, hechizos, rasgos ni consumibles que usar.",
       "NoneForFilter": "Nada de este tipo.",
       "NoSpellsFound": "Ningún hechizo coincide con la búsqueda.",
