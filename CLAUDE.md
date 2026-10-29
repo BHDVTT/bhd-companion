@@ -175,7 +175,7 @@ lang/es.json, en.json        traducciones
 2. **Hoja de personaje** ✅ (probada; incluye tiradas con un toque y botones de vida; 0.3.1 arregla el diseño en iPad) — encabezado (nombre, retrato, PG, CA, velocidad,
    iniciativa), características, salvaciones, habilidades; pestañas inferiores estilo
    D&D Beyond. Se actualiza sola con `updateActor` / `updateItem`.
-3. **Acciones** (0.4.0, pendiente de probar) — pestaña Acciones: ataques con armas equipadas,
+3. **Acciones** ✅ (0.4.2, probada en iPad: toque rápido, ventaja/desventaja, ventanas compactas, hechizos de pacto) — pestaña Acciones: ataques con armas equipadas,
    hechizos por nivel con espacios, rasgos con usos, consumibles; filtros acción / adicional /
    reacción; buscador de hechizos; `item.use()`; panel con la tarjeta del chat; áreas sin mapa.
 4. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
