@@ -111,6 +111,54 @@
         "Dead": "Tu personaje ha muerto."
       }
     },
+    "Rest": {
+      "Title": "Descanso",
+      "HitDice": "Dados de golpe",
+      "Short": "Descanso corto",
+      "Long": "Descanso largo",
+      "OnlyGM": "En esta partida los descansos los inicia el DM.",
+      "ShortDone": "Descanso corto terminado",
+      "LongDone": "Descanso largo terminado",
+      "Healed": "+{hp} PG"
+    },
+    "Inventory": {
+      "Currency": "Monedas",
+      "CurrencyHint": "Toca una moneda para escribir la cantidad nueva.",
+      "Weight": "Peso",
+      "Attunement": "Sintonización",
+      "AttunementRequired": "Requiere sintonización",
+      "AttunementFull": "Ya tienes {max} objetos sintonizados, el máximo. Deja de sintonizar otro primero.",
+      "Load": {
+        "encumbered": "Vas cargado: tu velocidad baja 10 pies.",
+        "heavy": "Vas muy cargado: velocidad −20 pies y desventaja en pruebas, ataques y salvaciones de FUE, DES y CON.",
+        "over": "Llevas más peso del que puedes cargar."
+      },
+      "Containers": "Contenedores",
+      "ItemCount": "{count} objetos",
+      "EmptyContainer": "Está vacío.",
+      "Equip": "Equipar",
+      "Unequip": "Desequipar",
+      "Attune": "Sintonizar",
+      "Unattune": "Dejar de sintonizar",
+      "Quantity": "Cantidad",
+      "Empty": "Tu personaje no lleva ningún objeto.",
+      "Hint": "Círculo: equipar o desequipar. Sol: sintonizar. Toca un objeto para ver su descripción."
+    },
+    "Notes": {
+      "MyNotes": "Mis notas",
+      "Placeholder": "Escribe aquí lo que quieras recordar: pistas, nombres, misiones…",
+      "AutoSave": "Se guarda solo en tu personaje.",
+      "Unsaved": "Guardando…",
+      "Saved": "Guardado ✓",
+      "SaveFailed": "No se pudo guardar. Revisa la conexión.",
+      "Personality": "Personalidad",
+      "Traits": "Rasgos de personalidad",
+      "Ideals": "Ideales",
+      "Bonds": "Vínculos",
+      "Flaws": "Defectos",
+      "Biography": "Biografía",
+      "NoBiography": "Tu personaje aún no tiene biografía. Se escribe en la hoja normal de Foundry."
+    },
     "Dialogs": {
       "Formulas": "Fórmula y bonificador",
       "Configuration": "Opciones de tirada",

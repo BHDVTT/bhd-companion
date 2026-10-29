@@ -1,0 +1,86 @@
+{{!-- Pestaña Inventario. Recibe inventory. --}}
+<div class="bhd-sheet bhd-inventory">
+  {{#if inventory}}
+  {{!-- Monedas --}}
+  <section class="bhd-card bhd-currency">
+    <h3 class="bhd-section-title">{{localize "BHD.Inventory.Currency"}}</h3>
+    <div class="bhd-currency-grid">
+      {{#each inventory.currency}}
+      <label class="bhd-coin bhd-coin-{{key}}">
+        <img src="{{icon}}" alt="">
+        <span class="bhd-coin-abbr">{{abbr}}</span>
+        <input type="number" inputmode="numeric" min="0" step="1" name="bhdCurrency-{{key}}" data-bhd-currency="{{key}}"
+               value="{{value}}" aria-label="{{label}}">
+      </label>
+      {{/each}}
+    </div>
+    <p class="bhd-tap-hint">{{localize "BHD.Inventory.CurrencyHint"}}</p>
+  </section>
+
+  {{!-- Peso y sintonización --}}
+  <section class="bhd-card bhd-load">
+    {{#if inventory.encumbrance}}
+    <div class="bhd-load-row">
+      <span class="bhd-load-label"><i class="fa-solid fa-weight-hanging" aria-hidden="true"></i> {{localize "BHD.Inventory.Weight"}}</span>
+      <span class="bhd-load-value">
+        <strong>{{inventory.encumbrance.value}}</strong>{{#if inventory.encumbrance.max}} / {{inventory.encumbrance.max}}{{/if}}
+      </span>
+    </div>
+    <div class="bhd-load-bar bhd-load-{{inventory.encumbrance.status}}">
+      <div class="bhd-load-fill" style="width: {{inventory.encumbrance.pct}}%"></div>
+      {{#if inventory.encumbrance.stops}}
+      <i class="bhd-load-stop" style="left: {{inventory.encumbrance.stops.encumbered}}%" aria-hidden="true"></i>
+      <i class="bhd-load-stop" style="left: {{inventory.encumbrance.stops.heavilyEncumbered}}%" aria-hidden="true"></i>
+      {{/if}}
+    </div>
+    {{#if inventory.encumbrance.status}}
+    <p class="bhd-load-status">{{localize (concat "BHD.Inventory.Load." inventory.encumbrance.status)}}</p>
+    {{/if}}
+    {{/if}}
+    {{#if inventory.attunement}}
+    <div class="bhd-load-row">
+      <span class="bhd-load-label"><i class="fa-solid fa-sun" aria-hidden="true"></i> {{localize "BHD.Inventory.Attunement"}}</span>
+      <span class="bhd-load-value {{#if inventory.attunement.full}}bhd-full{{/if}}">
+        <strong>{{inventory.attunement.value}}</strong> / {{inventory.attunement.max}}
+      </span>
+    </div>
+    {{/if}}
+  </section>
+
+  {{!-- Objetos por tipo --}}
+  {{#each inventory.sections}}
+  <section class="bhd-action-group">
+    <h3 class="bhd-section-title">{{label}}</h3>
+    <div class="bhd-action-list">
+      {{#each items}}{{> "modules/bhd-companion/templates/mobile/inventory-row.hbs" row=this}}{{/each}}
+    </div>
+  </section>
+  {{/each}}
+
+  {{!-- Contenedores (mochilas, bolsas...) --}}
+  {{#if inventory.containers.length}}
+  <section class="bhd-action-group">
+    <h3 class="bhd-section-title">{{localize "BHD.Inventory.Containers"}}</h3>
+    <div class="bhd-action-list">
+      {{#each inventory.containers}}{{> "modules/bhd-companion/templates/mobile/inventory-container.hbs" container=this}}{{/each}}
+    </div>
+  </section>
+  {{/if}}
+
+  {{#if inventory.isEmpty}}
+  <div class="bhd-placeholder">
+    <i class="fa-solid fa-sack" aria-hidden="true"></i>
+    <p>{{localize "BHD.Inventory.Empty"}}</p>
+  </div>
+  {{else}}
+  <p class="bhd-tap-hint">{{localize "BHD.Inventory.Hint"}}</p>
+  {{/if}}
+
+  {{else}}
+  <div class="bhd-placeholder">
+    <i class="fa-solid fa-user-slash" aria-hidden="true"></i>
+    <h2>{{localize "BHD.NoCharacter"}}</h2>
+    <p>{{localize "BHD.Sheet.AskGM"}}</p>
+  </div>
+  {{/if}}
+</div>

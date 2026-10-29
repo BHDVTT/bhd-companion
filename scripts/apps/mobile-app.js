@@ -2,6 +2,8 @@ import { MODULE_ID, TEMPLATE_PATH } from "../constants.js";
 import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "./character-data.js";
 import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.js";
 import { getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
+import { prepareInventory } from "./inventory-data.js";
+import { getSavedNotes, NOTES_FLAG, prepareNotes } from "./notes-data.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -13,6 +15,9 @@ const LONG_PRESS_MS = 450;
 
 /** Cuánto se puede mover el dedo (px) sin que deje de contar como toque largo. */
 const LONG_PRESS_TOLERANCE = 10;
+
+/** Cuánto se espera (ms) desde la última tecla para guardar las notas personales. */
+const NOTES_SAVE_DELAY = 1000;
 
 /**
  * Actividades que con un toque rápido se usan sin ventana cuando no hay nivel de espacio que elegir.
@@ -77,7 +82,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       chooseUse: BHDMobileApp.#onChooseUse,
       closeChooser: BHDMobileApp.#onCloseChooser,
       endTurn: BHDMobileApp.#onEndTurn,
-      dismissTurnAlert: BHDMobileApp.#onDismissTurnAlert
+      dismissTurnAlert: BHDMobileApp.#onDismissTurnAlert,
+      bhdEquip: BHDMobileApp.#onEquip,
+      bhdAttune: BHDMobileApp.#onAttune,
+      bhdQuantity: BHDMobileApp.#onQuantity,
+      bhdRest: BHDMobileApp.#onRest
     }
   };
 
@@ -90,7 +99,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         `${TEMPLATE_PATH}/mobile/actions.hbs`,
         `${TEMPLATE_PATH}/mobile/action-row.hbs`,
         `${TEMPLATE_PATH}/mobile/combat.hbs`,
-        `${TEMPLATE_PATH}/mobile/death-saves.hbs`
+        `${TEMPLATE_PATH}/mobile/death-saves.hbs`,
+        `${TEMPLATE_PATH}/mobile/inventory.hbs`,
+        `${TEMPLATE_PATH}/mobile/inventory-row.hbs`,
+        `${TEMPLATE_PATH}/mobile/inventory-container.hbs`,
+        `${TEMPLATE_PATH}/mobile/notes.hbs`
       ],
       scrollable: [""]
     },
@@ -164,6 +177,34 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** ¿Se está terminando el turno? Evita pasar dos turnos por tocar dos veces. */
   #endingTurn = false;
 
+  /** Contenedores del inventario que el jugador dejó abiertos (se conservan al redibujar). */
+  #openContainers = new Set();
+
+  /** Cambios de inventario en curso, por objeto. Evita que dos toques seguidos se pisen. */
+  #itemUpdates = new Set();
+
+  /**
+   * Cantidades que el jugador está cambiando con − / + y aún no se guardaron, por objeto.
+   * Varios toques seguidos se guardan juntos en un solo cambio.
+   * @type {Map<string, {value: number, timer: number}>}
+   */
+  #pendingQuantities = new Map();
+
+  /** ¿Hay un descanso en curso? Evita abrir dos ventanas de descanso. */
+  #resting = false;
+
+  /**
+   * Notas personales que el jugador está escribiendo y aún no se guardaron.
+   * @type {{actorId: string, text: string}|null}
+   */
+  #notesDraft = null;
+
+  /** Temporizador del guardado automático de las notas. */
+  #notesTimeout;
+
+  /** Posición del cursor en las notas, para recuperarla si la vista se redibuja mientras se escribe. */
+  #notesSelection = null;
+
   /**
    * Personaje que se muestra ahora mismo.
    * @type {Actor|null}
@@ -191,6 +232,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }));
     context.combat = prepareCombat(actor);
     context.deathSaves = prepareDeathSaves(actor);
+    context.inventory = actor ? prepareInventory(actor, this.#openContainers) : null;
+    const draft = (this.#notesDraft?.actorId === actor?.id) ? this.#notesDraft.text : null;
+    context.notes = actor ? await prepareNotes(actor, draft) : null;
 
     const choices = getCharacterChoices();
     context.choices = (choices.length > 1) ? choices.map(a => ({
@@ -270,6 +314,140 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#applyActionFilters();
     });
     this.#applyActionFilters();
+
+    // Inventario: monedas editables y contenedores abiertos o cerrados.
+    for ( const input of this.element.querySelectorAll("[data-bhd-currency]") ) {
+      input.addEventListener("change", this.#onCurrencyChange.bind(this));
+      input.addEventListener("focus", () => input.select());
+    }
+    for ( const [itemId, pending] of this.#pendingQuantities ) this.#showQuantity(itemId, pending.value);
+    for ( const details of this.element.querySelectorAll(".bhd-inv-container") ) {
+      details.addEventListener("toggle", () => {
+        if ( details.open ) this.#openContainers.add(details.dataset.containerId);
+        else this.#openContainers.delete(details.dataset.containerId);
+      });
+    }
+
+    // Notas personales: se guardan solas un momento después de dejar de escribir.
+    const notes = this.element.querySelector("[data-bhd-notes]");
+    notes?.addEventListener("input", event => {
+      const actor = this.actor;
+      if ( !actor ) return;
+      this.#notesDraft = { actorId: actor.id, text: event.currentTarget.value };
+      this.#setNotesStatus("BHD.Notes.Unsaved");
+      clearTimeout(this.#notesTimeout);
+      this.#notesTimeout = setTimeout(() => this.#saveNotes(), NOTES_SAVE_DELAY);
+    });
+    notes?.addEventListener("change", () => this.#saveNotes());
+  }
+
+  /** @override */
+  _preSyncPartState(partId, newElement, priorElement, state) {
+    super._preSyncPartState(partId, newElement, priorElement, state);
+    // Si el jugador está escribiendo sus notas, recordar dónde estaba el cursor.
+    const notes = priorElement.querySelector("[data-bhd-notes]");
+    if ( notes && (notes === document.activeElement) ) {
+      state.bhdNotes = { start: notes.selectionStart, end: notes.selectionEnd, scroll: notes.scrollTop };
+    }
+  }
+
+  /** @override */
+  _syncPartState(partId, newElement, priorElement, state) {
+    super._syncPartState(partId, newElement, priorElement, state);
+    const notes = state.bhdNotes && newElement.querySelector("[data-bhd-notes]");
+    if ( !notes ) return;
+    notes.focus();
+    notes.setSelectionRange(state.bhdNotes.start, state.bhdNotes.end);
+    notes.scrollTop = state.bhdNotes.scroll;
+  }
+
+  /* -------------------------------------------- */
+  /*  Pestañas Inventario y Notas                 */
+  /* -------------------------------------------- */
+
+  /**
+   * Guarda una moneda cuando el jugador termina de escribir la cantidad.
+   * @param {Event} event
+   */
+  async #onCurrencyChange(event) {
+    const actor = this.actor;
+    const input = event.currentTarget;
+    const key = input.dataset.bhdCurrency;
+    if ( !actor || !(key in (actor.system.currency ?? {})) ) return;
+    const value = Math.max(parseInt(input.value) || 0, 0);
+    input.value = value;
+    if ( value !== actor.system.currency[key] ) await actor.update({ [`system.currency.${key}`]: value });
+  }
+
+  /**
+   * Guarda en el personaje las notas personales pendientes.
+   */
+  async #saveNotes() {
+    clearTimeout(this.#notesTimeout);
+    const draft = this.#notesDraft;
+    const actor = game.actors.get(draft?.actorId);
+    if ( !actor ) return;
+    try {
+      if ( draft.text !== getSavedNotes(actor) ) await actor.setFlag(MODULE_ID, NOTES_FLAG, draft.text);
+      // Si siguió escribiendo mientras se guardaba, queda pendiente lo nuevo.
+      if ( this.#notesDraft === draft ) {
+        this.#notesDraft = null;
+        this.#setNotesStatus("BHD.Notes.Saved");
+      }
+    } catch(err) {
+      console.error("BHD Companion | No se pudieron guardar las notas", err);
+      this.#setNotesStatus("BHD.Notes.SaveFailed");
+    }
+  }
+
+  /**
+   * Texto pequeño bajo las notas: "Guardado", "Sin guardar"...
+   * @param {string} key
+   */
+  #setNotesStatus(key) {
+    const status = this.element?.querySelector("[data-bhd-notes-status]");
+    if ( status ) status.textContent = game.i18n.localize(key);
+  }
+
+  /**
+   * Hace un cambio en un objeto del inventario, sin dejar que dos toques seguidos en el mismo
+   * objeto se pisen (el segundo se ignora hasta que termine el primero).
+   * @param {Item} item
+   * @param {object} changes
+   */
+  async #updateItem(item, changes) {
+    if ( this.#itemUpdates.has(item.id) ) return;
+    this.#itemUpdates.add(item.id);
+    try {
+      await item.update(changes);
+    } finally {
+      this.#itemUpdates.delete(item.id);
+    }
+  }
+
+  /**
+   * Muestra una cantidad en la fila de un objeto sin esperar a que se guarde.
+   * @param {string} itemId
+   * @param {number} value
+   */
+  #showQuantity(itemId, value) {
+    for ( const button of this.element.querySelectorAll(`[data-action="bhdQuantity"][data-item-id="${itemId}"]`) ) {
+      const group = button.closest(".bhd-inv-qty");
+      group.querySelector(".bhd-inv-qty-value").textContent = value;
+      if ( button.dataset.step === "-1" ) button.disabled = value <= 0;
+    }
+  }
+
+  /**
+   * Guarda la cantidad pendiente de un objeto.
+   * @param {string} itemId
+   */
+  async #commitQuantity(itemId) {
+    const pending = this.#pendingQuantities.get(itemId);
+    this.#pendingQuantities.delete(itemId);
+    const item = this.actor?.items.get(itemId);
+    if ( !pending || !item || (pending.value === item.system.quantity) ) return;
+    await item.update({ "system.quantity": pending.value });
   }
 
   /* -------------------------------------------- */
@@ -779,11 +957,15 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onItemInfo(event, target) {
     const item = this.actor?.items.get(target.dataset.itemId);
     if ( !item ) return;
+    // Los objetos sin identificar muestran a los jugadores solo su descripción "sin identificar".
+    const unidentified = (item.system.identified === false) && !game.user.isGM;
+    const html = unidentified ? item.system.unidentified?.description : item.system.description?.value;
     const description = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
-      item.system.description?.value ?? "",
+      html ?? "",
       { rollData: item.getRollData(), relativeTo: item, secrets: item.isOwner }
     );
-    const subtitle = target.closest(".bhd-action")?.querySelector(".bhd-action-sub")?.textContent ?? "";
+    const row = target.closest(".bhd-action, .bhd-inv-item");
+    const subtitle = row?.querySelector(".bhd-action-sub")?.textContent.trim() ?? "";
     const content = document.createElement("div");
     content.className = "bhd-item-info";
     if ( subtitle ) {
@@ -852,6 +1034,81 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static #onDismissTurnAlert() {
     this.#hideTurnAlert();
+  }
+
+  /**
+   * Equipa o desequipa un objeto del inventario.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onEquip(event, target) {
+    const item = this.actor?.items.get(target.dataset.itemId);
+    if ( !item || !("equipped" in item.system) ) return;
+    await this.#updateItem(item, { "system.equipped": !item.system.equipped });
+  }
+
+  /**
+   * Sintoniza o deja de sintonizar un objeto mágico. No deja pasar del máximo del personaje.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onAttune(event, target) {
+    const actor = this.actor;
+    const item = actor?.items.get(target.dataset.itemId);
+    if ( !item?.system.canAttune ) return;
+    const attuned = !item.system.attuned;
+    const attunement = actor.system.attributes?.attunement;
+    if ( attuned && attunement && (attunement.value >= attunement.max) ) {
+      ui.notifications.warn(game.i18n.format("BHD.Inventory.AttunementFull", { max: attunement.max }));
+      return;
+    }
+    await this.#updateItem(item, { "system.attuned": attuned });
+  }
+
+  /**
+   * Botones − / + de la cantidad de un objeto. El número cambia al momento y se guarda
+   * un instante después del último toque.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onQuantity(event, target) {
+    const itemId = target.dataset.itemId;
+    const item = this.actor?.items.get(itemId);
+    if ( !item ) return;
+    const pending = this.#pendingQuantities.get(itemId);
+    clearTimeout(pending?.timer);
+    const current = pending?.value ?? item.system.quantity ?? 0;
+    const value = Math.max(current + Number(target.dataset.step), 0);
+    const timer = setTimeout(() => this.#commitQuantity(itemId), 400);
+    this.#pendingQuantities.set(itemId, { value, timer });
+    this.#showQuantity(itemId, value);
+  }
+
+  /**
+   * Descanso corto o largo con el flujo de dnd5e: su ventana explica lo que se recupera y pide
+   * confirmar (en el corto, además, permite gastar dados de golpe). Si se cancela, no pasa nada.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onRest(event, target) {
+    const actor = this.actor;
+    if ( !actor || this.#resting ) return;
+    const long = target.dataset.type === "long";
+    this.#resting = true;
+    try {
+      const result = await (long ? actor.longRest() : actor.shortRest());
+      if ( !result ) return;
+      const healed = result.deltas?.hitPoints ?? result.dhp ?? 0;
+      const label = game.i18n.localize(long ? "BHD.Rest.LongDone" : "BHD.Rest.ShortDone");
+      const total = healed > 0 ? game.i18n.format("BHD.Rest.Healed", { hp: healed }) : "✓";
+      this.#showRollResult(label, { total });
+    } finally {
+      this.#resting = false;
+    }
   }
 
   /**

@@ -1,0 +1,21 @@
+{{!-- Un contenedor plegable con lo que lleva dentro (se llama a sí mismo para contenedores dentro de otros). Recibe container. --}}
+<details class="bhd-inv-container" data-container-id="{{container.id}}" {{#if container.open}}open{{/if}}>
+  <summary class="bhd-inv-container-header">
+    <img class="bhd-action-img" src="{{container.img}}" alt="">
+    <span class="bhd-action-text">
+      <span class="bhd-action-name">{{container.name}}</span>
+      <span class="bhd-action-sub">
+        {{localize "BHD.Inventory.ItemCount" count=container.count}}{{#if container.subtitle}} · {{container.subtitle}}{{/if}}
+      </span>
+    </span>
+    <i class="fa-solid fa-chevron-down bhd-inv-chevron" aria-hidden="true"></i>
+  </summary>
+  <div class="bhd-inv-container-body">
+    {{#if container.count}}
+    {{#each container.items}}{{> "modules/bhd-companion/templates/mobile/inventory-row.hbs" row=this}}{{/each}}
+    {{#each container.containers}}{{> "modules/bhd-companion/templates/mobile/inventory-container.hbs" container=this}}{{/each}}
+    {{else}}
+    <p class="bhd-no-results">{{localize "BHD.Inventory.EmptyContainer"}}</p>
+    {{/if}}
+  </div>
+</details>

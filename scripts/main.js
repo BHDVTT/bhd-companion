@@ -56,7 +56,9 @@ function openMobileView() {
   });
 
   // Personajes: vida, características, permisos (si el GM da o quita un personaje), etc.
-  Hooks.on("updateActor", (actor, changes) => {
+  Hooks.on("updateActor", (actor, changes, options, userId) => {
+    // Al guardar las notas mientras se escribe, no hace falta redibujar (el texto ya está en pantalla).
+    if ( (userId === game.user.id) && isOnlyModuleFlags(changes) ) return;
     if ( isShown(actor) || inCombat(actor) || ("ownership" in changes) ) refresh();
   });
   Hooks.on("createActor", actor => {
@@ -96,6 +98,17 @@ function openMobileView() {
   // Total de ataques y daños en el teléfono (el mensaje completo va al chat).
   Hooks.on("dnd5e.rollAttackV2", (rolls, { subject }={}) => app.onActivityRoll("attack", rolls, subject));
   Hooks.on("dnd5e.rollDamageV2", (rolls, { subject }={}) => app.onActivityRoll("damage", rolls, subject));
+}
+
+/**
+ * ¿Este cambio de actor solo toca datos del módulo (p. ej. las notas personales)?
+ * @param {object} changes
+ * @returns {boolean}
+ */
+function isOnlyModuleFlags(changes) {
+  const keys = Object.keys(foundry.utils.flattenObject(changes))
+    .filter(key => (key !== "_id") && !key.startsWith("_stats."));
+  return !!keys.length && keys.every(key => key.startsWith(`flags.${MODULE_ID}.`));
 }
 
 /**

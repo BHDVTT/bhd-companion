@@ -45,7 +45,24 @@ export function prepareCharacterSheet(actor) {
     speed: prepareSpeed(attributes.movement),
     conditions: prepareConditions(actor),
     abilities: prepareAbilities(system.abilities),
-    skills: prepareSkills(system.skills)
+    skills: prepareSkills(system.skills),
+    rest: prepareRest(actor)
+  };
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Datos de la tarjeta de descansos: dados de golpe y si el jugador puede descansar por su cuenta.
+ * @param {Actor} actor
+ */
+function prepareRest(actor) {
+  const hd = actor.system.attributes?.hd;
+  const sizes = hd?.sizes ? Array.from(hd.sizes).sort((a, b) => b - a).map(size => `d${size}`).join(" / ") : "";
+  return {
+    // dnd5e tiene un ajuste del mundo para que solo el DM pueda iniciar descansos.
+    allowed: game.user.isGM || game.settings.get("dnd5e", "allowRests"),
+    hitDice: hd?.max ? { value: hd.value ?? 0, max: hd.max, sizes } : null
   };
 }
 

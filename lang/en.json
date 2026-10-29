@@ -111,6 +111,54 @@
         "Dead": "Your character has died."
       }
     },
+    "Rest": {
+      "Title": "Rest",
+      "HitDice": "Hit dice",
+      "Short": "Short rest",
+      "Long": "Long rest",
+      "OnlyGM": "In this game, rests are started by the GM.",
+      "ShortDone": "Short rest finished",
+      "LongDone": "Long rest finished",
+      "Healed": "+{hp} HP"
+    },
+    "Inventory": {
+      "Currency": "Currency",
+      "CurrencyHint": "Tap a coin to type the new amount.",
+      "Weight": "Weight",
+      "Attunement": "Attunement",
+      "AttunementRequired": "Requires attunement",
+      "AttunementFull": "You already have {max} attuned items, the maximum. Unattune another one first.",
+      "Load": {
+        "encumbered": "Encumbered: your speed drops by 10 feet.",
+        "heavy": "Heavily encumbered: speed −20 feet and disadvantage on STR, DEX and CON checks, attacks and saves.",
+        "over": "You are carrying more than you can lift."
+      },
+      "Containers": "Containers",
+      "ItemCount": "{count} items",
+      "EmptyContainer": "It's empty.",
+      "Equip": "Equip",
+      "Unequip": "Unequip",
+      "Attune": "Attune",
+      "Unattune": "Unattune",
+      "Quantity": "Quantity",
+      "Empty": "Your character isn't carrying anything.",
+      "Hint": "Circle: equip or unequip. Sun: attune. Tap an item to see its description."
+    },
+    "Notes": {
+      "MyNotes": "My notes",
+      "Placeholder": "Write anything you want to remember: clues, names, quests…",
+      "AutoSave": "Saved automatically on your character.",
+      "Unsaved": "Saving…",
+      "Saved": "Saved ✓",
+      "SaveFailed": "Could not save. Check the connection.",
+      "Personality": "Personality",
+      "Traits": "Personality traits",
+      "Ideals": "Ideals",
+      "Bonds": "Bonds",
+      "Flaws": "Flaws",
+      "Biography": "Biography",
+      "NoBiography": "Your character has no biography yet. It is written in the normal Foundry sheet."
+    },
     "Dialogs": {
       "Formulas": "Formula & bonus",
       "Configuration": "Roll options",

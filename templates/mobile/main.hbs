@@ -7,6 +7,10 @@
     {{> "modules/bhd-companion/templates/mobile/actions.hbs" actions=@root.actions filters=@root.actionFilters spellSearch=@root.spellSearch}}
     {{else if (eq tab.id "combat")}}
     {{> "modules/bhd-companion/templates/mobile/combat.hbs" combat=@root.combat deathSaves=@root.deathSaves}}
+    {{else if (eq tab.id "inventory")}}
+    {{> "modules/bhd-companion/templates/mobile/inventory.hbs" inventory=@root.inventory}}
+    {{else if (eq tab.id "notes")}}
+    {{> "modules/bhd-companion/templates/mobile/notes.hbs" notes=@root.notes}}
     {{else}}
     <div class="bhd-placeholder">
       <i class="{{tab.icon}}" aria-hidden="true"></i>

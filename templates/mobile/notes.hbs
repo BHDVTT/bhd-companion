@@ -1,0 +1,42 @@
+{{!-- Pestaña Notas. Recibe notes. --}}
+<div class="bhd-sheet bhd-notes">
+  {{#if notes}}
+  {{!-- Notas personales del jugador (se guardan en el personaje) --}}
+  <section class="bhd-card bhd-notes-card">
+    <label class="bhd-notes-label" for="bhd-notes-text">
+      <i class="fa-solid fa-pen" aria-hidden="true"></i> {{localize "BHD.Notes.MyNotes"}}
+    </label>
+    <textarea id="bhd-notes-text" name="bhdNotes" data-bhd-notes rows="8"
+              placeholder="{{localize 'BHD.Notes.Placeholder'}}">{{notes.text}}</textarea>
+    <p class="bhd-notes-status" data-bhd-notes-status>{{localize "BHD.Notes.AutoSave"}}</p>
+  </section>
+
+  {{!-- Personalidad --}}
+  {{#if notes.personality.length}}
+  <h3 class="bhd-section-title">{{localize "BHD.Notes.Personality"}}</h3>
+  <section class="bhd-card bhd-personality">
+    {{#each notes.personality}}
+    <div class="bhd-personality-entry">
+      <span class="bhd-personality-label">{{label}}</span>
+      <p class="bhd-personality-text">{{text}}</p>
+    </div>
+    {{/each}}
+  </section>
+  {{/if}}
+
+  {{!-- Biografía (se edita en la hoja normal de dnd5e) --}}
+  <h3 class="bhd-section-title">{{localize "BHD.Notes.Biography"}}</h3>
+  {{#if notes.biography}}
+  <section class="bhd-card bhd-biography">{{{notes.biography}}}</section>
+  {{else}}
+  <p class="bhd-no-results">{{localize "BHD.Notes.NoBiography"}}</p>
+  {{/if}}
+
+  {{else}}
+  <div class="bhd-placeholder">
+    <i class="fa-solid fa-user-slash" aria-hidden="true"></i>
+    <h2>{{localize "BHD.NoCharacter"}}</h2>
+    <p>{{localize "BHD.Sheet.AskGM"}}</p>
+  </div>
+  {{/if}}
+</div>

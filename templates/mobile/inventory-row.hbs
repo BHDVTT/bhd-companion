@@ -1,0 +1,44 @@
+{{!-- Una fila del inventario. Recibe row. --}}
+<div class="bhd-inv-item {{#if row.equipped}}bhd-equipped{{/if}}">
+  {{#if row.canEquip}}
+  <button type="button" class="bhd-inv-equip {{#if row.equipped}}bhd-on{{/if}}" data-action="bhdEquip" data-item-id="{{row.id}}"
+          aria-pressed="{{row.equipped}}"
+          aria-label="{{#if row.equipped}}{{localize 'BHD.Inventory.Unequip'}}{{else}}{{localize 'BHD.Inventory.Equip'}}{{/if}}">
+    <i class="fa-solid {{#if row.equipped}}fa-circle-check{{else}}fa-circle{{/if}}" aria-hidden="true"></i>
+  </button>
+  {{else}}
+  <span class="bhd-inv-equip-spacer" aria-hidden="true"></span>
+  {{/if}}
+  <button type="button" class="bhd-inv-main" data-action="itemInfo" data-item-id="{{row.id}}">
+    <img class="bhd-action-img" src="{{row.img}}" alt="">
+    <span class="bhd-action-text">
+      <span class="bhd-action-name">{{row.name}}</span>
+      {{#if row.subtitle}}<span class="bhd-action-sub">{{row.subtitle}}</span>{{/if}}
+    </span>
+    {{#if row.uses}}
+    <span class="bhd-uses {{#if row.uses.empty}}bhd-empty{{/if}}" aria-label="{{localize 'BHD.Actions.Uses'}}">
+      {{row.uses.value}}/{{row.uses.max}}
+    </span>
+    {{/if}}
+  </button>
+  {{#if row.canAttune}}
+  <button type="button" class="bhd-inv-attune {{#if row.attuned}}bhd-on{{/if}}" data-action="bhdAttune" data-item-id="{{row.id}}"
+          aria-pressed="{{row.attuned}}"
+          aria-label="{{#if row.attuned}}{{localize 'BHD.Inventory.Unattune'}}{{else}}{{localize 'BHD.Inventory.Attune'}}{{/if}}">
+    <i class="fa-solid fa-sun" aria-hidden="true"></i>
+  </button>
+  {{/if}}
+  {{#if row.hasQuantity}}
+  <span class="bhd-inv-qty" role="group" aria-label="{{localize 'BHD.Inventory.Quantity'}}">
+    <button type="button" class="bhd-inv-qty-btn" data-action="bhdQuantity" data-item-id="{{row.id}}" data-step="-1"
+            aria-label="-1" {{#unless row.quantity}}disabled{{/unless}}>
+      <i class="fa-solid fa-minus" aria-hidden="true"></i>
+    </button>
+    <span class="bhd-inv-qty-value">{{row.quantity}}</span>
+    <button type="button" class="bhd-inv-qty-btn" data-action="bhdQuantity" data-item-id="{{row.id}}" data-step="1"
+            aria-label="+1">
+      <i class="fa-solid fa-plus" aria-hidden="true"></i>
+    </button>
+  </span>
+  {{/if}}
+</div>

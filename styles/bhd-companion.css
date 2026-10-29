@@ -1966,3 +1966,96 @@ body.bhd-mobile .bhd-item-info-sub {
   50% { box-shadow: 0 0 18px rgba(212, 166, 70, 0.7); }
 }
 
+
+/* ------------------------------------------ */
+/*  Descansos                                  */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-rest { display: flex; flex-direction: column; gap: 10px; }
+#bhd-mobile-app .bhd-rest-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 12px; }
+#bhd-mobile-app .bhd-rest-title { font-weight: bold; }
+#bhd-mobile-app .bhd-rest-hd { font-size: 14px; color: var(--bhd-text-muted); }
+#bhd-mobile-app .bhd-rest-hd strong { color: var(--bhd-text); font-size: 16px; }
+#bhd-mobile-app .bhd-rest-buttons { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+#bhd-mobile-app .bhd-rest-btn {
+  min-height: var(--bhd-touch); padding: 6px 8px; border: 1px solid var(--bhd-border); border-radius: 10px;
+  background: var(--bhd-surface-2); font-weight: bold;
+}
+#bhd-mobile-app .bhd-rest-btn:active { background: var(--bhd-gold-soft); }
+
+/* ------------------------------------------ */
+/*  Inventario                                 */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-currency-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+#bhd-mobile-app .bhd-coin { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+#bhd-mobile-app .bhd-coin img { width: 28px; height: 28px; border: none; }
+#bhd-mobile-app .bhd-coin-abbr { font-size: 12px; font-weight: bold; color: var(--bhd-text-muted); text-transform: uppercase; }
+#bhd-mobile-app .bhd-coin input {
+  width: 100%; height: 40px; padding: 0 2px; border: 1px solid var(--bhd-border); border-radius: 8px;
+  background: var(--bhd-surface-2); color: var(--bhd-text); font-size: 16px; text-align: center; user-select: text;
+}
+#bhd-mobile-app .bhd-load { display: flex; flex-direction: column; gap: 8px; }
+#bhd-mobile-app .bhd-load-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#bhd-mobile-app .bhd-load-label { color: var(--bhd-text-muted); }
+#bhd-mobile-app .bhd-load-value.bhd-full strong { color: var(--bhd-gold); }
+#bhd-mobile-app .bhd-load-bar { position: relative; height: 10px; border-radius: 5px; background: var(--bhd-surface-2); overflow: hidden; }
+#bhd-mobile-app .bhd-load-fill { height: 100%; background: var(--bhd-gold); }
+#bhd-mobile-app .bhd-load-encumbered .bhd-load-fill { background: #d9822b; }
+#bhd-mobile-app .bhd-load-heavy .bhd-load-fill,
+#bhd-mobile-app .bhd-load-over .bhd-load-fill { background: var(--bhd-red-bright); }
+#bhd-mobile-app .bhd-load-stop { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bhd-text-muted); }
+#bhd-mobile-app .bhd-load-status { margin: 0; font-size: 13px; color: var(--bhd-red-bright); }
+
+#bhd-mobile-app .bhd-inv-item { display: flex; align-items: stretch; border-bottom: 1px solid var(--bhd-border); }
+#bhd-mobile-app .bhd-inv-item:last-child { border-bottom: none; }
+#bhd-mobile-app .bhd-inv-equip,
+#bhd-mobile-app .bhd-inv-attune {
+  flex: none; width: 40px; padding: 0; border: none; border-radius: 0; background: transparent;
+  color: var(--bhd-text-muted); font-size: 18px;
+}
+#bhd-mobile-app .bhd-inv-equip.bhd-on,
+#bhd-mobile-app .bhd-inv-attune.bhd-on { color: var(--bhd-gold); }
+#bhd-mobile-app .bhd-inv-equip-spacer { flex: none; width: 40px; }
+#bhd-mobile-app .bhd-inv-main {
+  flex: 1; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 4px;
+  border: none; border-radius: 0; background: transparent; text-align: left;
+}
+#bhd-mobile-app .bhd-inv-main:active { background: var(--bhd-gold-soft); }
+#bhd-mobile-app .bhd-inv-qty { flex: none; display: flex; align-items: center; padding-right: 4px; }
+#bhd-mobile-app .bhd-inv-qty-btn {
+  width: 32px; height: 36px; min-height: 36px; padding: 0; border: none; border-radius: 8px;
+  background: transparent; color: var(--bhd-text-muted); font-size: 13px;
+}
+#bhd-mobile-app .bhd-inv-qty-btn:active { background: var(--bhd-surface-2); }
+#bhd-mobile-app .bhd-inv-qty-btn:disabled { opacity: 0.3; }
+#bhd-mobile-app .bhd-inv-qty-value { min-width: 24px; font-weight: bold; text-align: center; }
+
+#bhd-mobile-app .bhd-inv-container { border-bottom: 1px solid var(--bhd-border); }
+#bhd-mobile-app .bhd-inv-container:last-child { border-bottom: none; }
+#bhd-mobile-app .bhd-inv-container-header {
+  display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 12px 6px 10px;
+  list-style: none; cursor: pointer;
+}
+#bhd-mobile-app .bhd-inv-container-header::-webkit-details-marker { display: none; }
+#bhd-mobile-app .bhd-inv-chevron { color: var(--bhd-text-muted); transition: transform 0.2s; }
+#bhd-mobile-app .bhd-inv-container[open] > summary .bhd-inv-chevron { transform: rotate(180deg); }
+#bhd-mobile-app .bhd-inv-container-body { margin-left: 12px; border-left: 2px solid var(--bhd-border); border-top: 1px solid var(--bhd-border); }
+
+/* ------------------------------------------ */
+/*  Notas                                      */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-notes-card { display: flex; flex-direction: column; gap: 8px; }
+#bhd-mobile-app .bhd-notes-label { font-weight: bold; }
+#bhd-mobile-app .bhd-notes textarea {
+  width: 100%; min-height: 180px; padding: 10px; border: 1px solid var(--bhd-border); border-radius: 10px;
+  background: var(--bhd-surface-2); color: var(--bhd-text); font-family: inherit; font-size: 16px;
+  line-height: 1.4; resize: vertical; user-select: text;
+}
+#bhd-mobile-app .bhd-notes-status { margin: 0; font-size: 12px; color: var(--bhd-text-muted); }
+#bhd-mobile-app .bhd-personality { display: flex; flex-direction: column; gap: 10px; }
+#bhd-mobile-app .bhd-personality-label { font-size: 13px; font-weight: bold; color: var(--bhd-gold); }
+#bhd-mobile-app .bhd-personality-text { margin: 2px 0 0; white-space: pre-line; }
+#bhd-mobile-app .bhd-biography { user-select: text; overflow-wrap: anywhere; }
+#bhd-mobile-app .bhd-biography img { max-width: 100%; height: auto; }

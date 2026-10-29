@@ -55,10 +55,13 @@ scripts/apps/mobile-app.js   BHDMobileApp (ApplicationV2) — la vista móvil, a
 scripts/apps/character-data.js  elegir personaje y preparar sus datos para las plantillas
 scripts/apps/actions-data.js    datos de la pestaña Acciones (ataques, hechizos, rasgos, consumibles)
 scripts/apps/combat-data.js     datos de la pestaña Combate (turnos, vida aproximada, salvaciones de muerte)
+scripts/apps/inventory-data.js  datos de la pestaña Inventario (objetos, contenedores, monedas, peso)
+scripts/apps/notes-data.js      datos de la pestaña Notas (notas personales, personalidad, biografía)
 scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
 templates/mobile/*.hbs       partes de la vista: header, main, turn, nav; parciales de pestaña:
-                             character.hbs, actions.hbs, action-row.hbs, combat.hbs, death-saves.hbs
+                             character.hbs, actions.hbs, action-row.hbs, combat.hbs, death-saves.hbs,
+                             inventory.hbs, inventory-row.hbs, inventory-container.hbs, notes.hbs
 styles/bhd-companion.css     estilos
 lang/es.json, en.json        traducciones
 ```
@@ -182,6 +185,26 @@ lang/es.json, en.json        traducciones
 - La iniciativa del botón usa el mismo `#rollInitiative` de la hoja (con `getActiveCombat`).
 - Actores del combate (vida, efectos) también disparan el redibujado.
 
+## Inventario, notas y descansos (decisiones de la etapa 5)
+
+- **Inventario** (`scripts/apps/inventory-data.js`): secciones de `CONFIG.Item.dataModels[*].inventorySection`
+  (orden de dnd5e) con los objetos fuera de contenedores; los `container` van aparte como `<details>`
+  recursivos (`inventory-container.hbs`, hasta 5 niveles), abiertos recordados en `#openContainers`.
+  Peso de fila `system.totalWeight` + `dnd5e.utils.formatWeight`; carga de
+  `system.attributes.encumbrance` (marcas y avisos solo con la regla `variant`); sintonización de
+  `system.attributes.attunement` (no deja pasar del máximo).
+- Acciones con prefijo `bhd*` (`bhdEquip`, `bhdAttune`, `bhdQuantity`, `bhdRest`) para no chocar con
+  las de las tarjetas de dnd5e en el panel. Cantidad: − / + cambia el número al momento y se guarda
+  400 ms después del último toque (`#pendingQuantities`). Monedas: `change` del input → `system.currency.*`.
+- `itemInfo` muestra `system.unidentified.description` a jugadores si el objeto no está identificado.
+- **Notas** (`scripts/apps/notes-data.js`): flag `flags.bhd-companion.notes` del actor; se guardan 1 s
+  después de escribir o al salir del cuadro. `#notesDraft` conserva lo no guardado al redibujar y
+  `_preSyncPartState/_syncPartState` recuperan cursor y foco. `main.js` no redibuja en `updateActor`
+  propios que solo tocan flags del módulo. Personalidad y biografía (`enrichHTML`) solo lectura.
+- **Descansos:** `actor.shortRest()` / `longRest()`; la ventana de dnd5e es la confirmación (y en el
+  corto permite gastar dados de golpe). Si `dnd5e.allowRests` está desactivado, solo un aviso.
+  Al terminar, aviso con los PG recuperados (`result.deltas.hitPoints`).
+
 ## Entorno local
 
 - Datos de Foundry: `C:\Users\Frulo\AppData\Local\FoundryVTT\Data`
@@ -212,8 +235,11 @@ lang/es.json, en.json        traducciones
    - **Pendiente:** marcar automáticamente un fallo de salvación de muerte cuando un personaje
      con 0 PG recibe daño (dos fallos si es un golpe crítico), con un ajuste del GM para
      desactivarlo si Midi QOL (u otro módulo) ya lo hace y no contar doble.
-5. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
+5. **Inventario, notas y descansos** ✅ (0.6.0, probada; el usuario la pidió antes que las
+   tiradas) — pestaña Inventario (por tipo, contenedores, equipar, sintonizar, cantidades,
+   monedas, peso), pestaña Notas (notas personales, personalidad, biografía), descanso
+   corto / largo en la pestaña Personaje.
+6. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
-6. **Inventario y descansos** — objetos, monedas, descanso corto/largo.
 7. **Pulido y publicación** — rendimiento en teléfonos, pruebas con 5 jugadores, repositorio
    público (GitHub) con `manifest` y `download` en `module.json` para instalar en The Forge.

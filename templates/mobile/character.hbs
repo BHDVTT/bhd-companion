@@ -94,6 +94,31 @@
   </section>
   {{/if}}
 
+  {{!-- Descansos --}}
+  <section class="bhd-card bhd-rest">
+    <div class="bhd-rest-header">
+      <span class="bhd-rest-title"><i class="fa-solid fa-campground" aria-hidden="true"></i> {{localize "BHD.Rest.Title"}}</span>
+      {{#if sheet.rest.hitDice}}
+      <span class="bhd-rest-hd">
+        {{localize "BHD.Rest.HitDice"}} <strong>{{sheet.rest.hitDice.value}}/{{sheet.rest.hitDice.max}}</strong>
+        {{#if sheet.rest.hitDice.sizes}}<small>{{sheet.rest.hitDice.sizes}}</small>{{/if}}
+      </span>
+      {{/if}}
+    </div>
+    {{#if sheet.rest.allowed}}
+    <div class="bhd-rest-buttons">
+      <button type="button" class="bhd-rest-btn" data-action="bhdRest" data-type="short">
+        <i class="fa-solid fa-mug-hot" aria-hidden="true"></i> {{localize "BHD.Rest.Short"}}
+      </button>
+      <button type="button" class="bhd-rest-btn" data-action="bhdRest" data-type="long">
+        <i class="fa-solid fa-bed" aria-hidden="true"></i> {{localize "BHD.Rest.Long"}}
+      </button>
+    </div>
+    {{else}}
+    <p class="bhd-tap-hint">{{localize "BHD.Rest.OnlyGM"}}</p>
+    {{/if}}
+  </section>
+
   {{!-- Características --}}
   <h3 class="bhd-section-title">{{localize "BHD.Sheet.Abilities"}}</h3>
   <section class="bhd-abilities">
