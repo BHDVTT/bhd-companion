@@ -278,7 +278,7 @@ lang/es.json, en.json        traducciones
    tiradas) — pestaña Inventario (por tipo, contenedores, equipar, sintonizar, cantidades,
    monedas, peso), pestaña Notas (notas personales, personalidad, biografía), descanso
    corto / largo en la pestaña Personaje.
-6. **Uso real en la tienda** (0.7.0, hecha, **pendiente de probar**; el usuario la pidió antes que
+6. **Uso real en la tienda** ✅ (0.7.0, probada; el usuario la pidió antes que
    las tiradas) — rendimiento en teléfonos viejos, textos es/en revisados, pantalla encendida,
    reconexión automática, letra grande, añadir a la pantalla de inicio, avisos de consola, README.
 7. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
