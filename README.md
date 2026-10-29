@@ -81,8 +81,14 @@ En **Configure Settings → BHD Companion**:
 
 - **Foundry local (pruebas):** la carpeta del módulo está enlazada dentro de `Data\modules`,
   así que aparece sola en la lista de módulos.
-- **The Forge:** más adelante se publicará con un enlace de manifest para instalarlo desde
-  *Install Module → Manifest URL*.
+- **The Forge (o cualquier Foundry):** en *Add-on Modules → Install Module*, pega este enlace en
+  *Manifest URL* y pulsa *Install*:
+
+  ```
+  https://github.com/BHDVTT/bhd-companion/releases/latest/download/module.json
+  ```
+
+  Las versiones nuevas aparecen como actualización del módulo (botón *Update*).
 
 Para activarlo: entra al mundo como Gamemaster → **Configuración (⚙) → Manage Modules** →
 marca **BHD Companion** → **Save Module Settings**.

@@ -1,2 +1,8 @@
 * text=auto eol=lf
 *.png binary
+
+# Fuera del paquete del módulo (git archive)
+.gitattributes export-ignore
+.gitignore export-ignore
+CLAUDE.md export-ignore
+templates/.gitkeep export-ignore

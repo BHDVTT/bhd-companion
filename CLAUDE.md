@@ -319,6 +319,20 @@ lang/es.json, en.json        traducciones
   (ataque: total, crítico / pifia y por objetivo impacta o falla como la tarjeta de dnd5e; daño:
   total). Impacta / falla solo con el ajuste de mundo `showAttackResult` (nunca se muestra la CA).
 
+## Publicación (etapa 8)
+
+- Repositorio público `https://github.com/BHDVTT/bhd-companion` (gh autenticado como `BHDVTT`).
+- Enlace de manifest para The Forge (fijo, siempre la última versión):
+  `https://github.com/BHDVTT/bhd-companion/releases/latest/download/module.json`.
+- `module.json` lleva `download` = `.../releases/download/v<versión>/module.zip`: al subir `version`,
+  cambiar también ese enlace.
+- Paquete: `git archive --format=zip -o <scratchpad>/module.zip HEAD` (archivos en la raíz del zip;
+  `.gitattributes` excluye CLAUDE.md y archivos de git con `export-ignore`). No usar
+  `Compress-Archive` de PowerShell 5.1 (rutas con `\`, fallan en Linux / The Forge).
+- Publicar: commit + `git push`, luego
+  `gh release create v<versión> <scratchpad>/module.zip module.json --title "v<versión>" --notes "..."`.
+  En The Forge la actualización aparece en el gestor de módulos (Update).
+
 ## Entorno local
 
 - Datos de Foundry: `C:\Users\Frulo\AppData\Local\FoundryVTT\Data`
