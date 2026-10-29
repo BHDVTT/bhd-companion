@@ -18,6 +18,24 @@ export function getSavedNotes(actor) {
 }
 
 /**
+ * Copia en el propio teléfono (localStorage) de las notas que aún no se guardaron, para no perderlas
+ * si se cae el Wi-Fi y la página se recarga. El navegador puede no permitirlo (modo privado):
+ * entonces simplemente no hay copia.
+ * @param {string} actorId
+ * @param {string|null} [text]  Texto a guardar; null para borrar la copia. Sin dar, solo se lee.
+ * @returns {string|null}  La copia guardada (al leer).
+ */
+export function localNotesDraft(actorId, text) {
+  const key = `${MODULE_ID}.notesDraft.${actorId}`;
+  try {
+    if ( text === undefined ) return window.localStorage.getItem(key);
+    if ( text === null ) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, text);
+  } catch(err) {}
+  return null;
+}
+
+/**
  * Datos completos de la pestaña Notas.
  * @param {Actor} actor
  * @param {string|null} draft  Texto que el jugador está escribiendo y aún no se guardó.

@@ -3,7 +3,10 @@ import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "
 import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.js";
 import { getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
 import { prepareInventory } from "./inventory-data.js";
-import { getSavedNotes, NOTES_FLAG, prepareNotes } from "./notes-data.js";
+import { getSavedNotes, localNotesDraft, NOTES_FLAG, prepareNotes } from "./notes-data.js";
+import { applyLargeText, syncPlaylistSounds } from "../mobile-mode.js";
+import { canKeepAwake, updateWakeLock } from "../wake-lock.js";
+import { getInstallMode, promptInstall } from "../home-screen.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -86,7 +89,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       bhdEquip: BHDMobileApp.#onEquip,
       bhdAttune: BHDMobileApp.#onAttune,
       bhdQuantity: BHDMobileApp.#onQuantity,
-      bhdRest: BHDMobileApp.#onRest
+      bhdRest: BHDMobileApp.#onRest,
+      bhdSettings: BHDMobileApp.#onOpenSettings,
+      bhdCloseSettings: BHDMobileApp.#onCloseSettings,
+      bhdToggleSetting: BHDMobileApp.#onToggleSetting,
+      bhdInstall: BHDMobileApp.#onInstall
     }
   };
 
@@ -103,7 +110,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         `${TEMPLATE_PATH}/mobile/inventory.hbs`,
         `${TEMPLATE_PATH}/mobile/inventory-row.hbs`,
         `${TEMPLATE_PATH}/mobile/inventory-container.hbs`,
-        `${TEMPLATE_PATH}/mobile/notes.hbs`
+        `${TEMPLATE_PATH}/mobile/notes.hbs`,
+        `${TEMPLATE_PATH}/mobile/settings.hbs`
       ],
       scrollable: [""]
     },
@@ -215,26 +223,33 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /* -------------------------------------------- */
 
-  /** @override */
+  /**
+   * Solo se preparan y dibujan los datos de la pestaña que se ve: en teléfonos viejos, rehacer
+   * todas las pestañas (lista de hechizos, inventario, biografía) con cada cambio de vida es lento.
+   * Las demás se preparan al tocarlas (ver #onTab).
+   * @override
+   */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     const actor = this.actor;
+    const tab = this.tabGroups.primary;
     context.userName = game.user.name;
     context.character = actor ? { name: actor.name, img: actor.img } : null;
-    context.sheet = actor ? prepareCharacterSheet(actor) : null;
+    context.sheet = (actor && (tab === "character")) ? prepareCharacterSheet(actor) : null;
     context.hpAmount = this.#hpAmount;
-    context.actions = actor ? prepareActions(actor) : null;
+    context.actions = (actor && (tab === "actions")) ? prepareActions(actor) : null;
     context.spellSearch = this.#spellSearch;
     context.actionFilters = ["all", ...ACTION_FILTERS].map(id => ({
       id,
       label: game.i18n.localize(`BHD.Actions.Filter${id.capitalize()}`),
       active: id === this.#actionFilter
     }));
+    // El combate se prepara siempre: la barra de pestañas y la barra "Es tu turno" lo usan.
     context.combat = prepareCombat(actor);
     context.deathSaves = prepareDeathSaves(actor);
-    context.inventory = actor ? prepareInventory(actor, this.#openContainers) : null;
+    context.inventory = (actor && (tab === "inventory")) ? prepareInventory(actor, this.#openContainers) : null;
     const draft = (this.#notesDraft?.actorId === actor?.id) ? this.#notesDraft.text : null;
-    context.notes = actor ? await prepareNotes(actor, draft) : null;
+    context.notes = (actor && (tab === "notes")) ? await prepareNotes(actor, draft) : null;
 
     const choices = getCharacterChoices();
     context.choices = (choices.length > 1) ? choices.map(a => ({
@@ -297,6 +312,21 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     alert.hidden = true;
     this.element.append(alert);
 
+    // Panel de ajustes del teléfono (letra grande, pantalla encendida, música, instalar...).
+    const settings = document.createElement("div");
+    settings.className = "bhd-settings";
+    settings.hidden = true;
+    this.element.append(settings);
+
+    // Notas que no se llegaron a guardar antes de una recarga (p. ej. se cayó el Wi-Fi).
+    const actor = this.actor;
+    const unsaved = actor ? localNotesDraft(actor.id) : null;
+    if ( (unsaved !== null) && (unsaved !== getSavedNotes(actor)) ) {
+      this.#notesDraft = { actorId: actor.id, text: unsaved };
+      this.#saveNotes();
+    }
+    else if ( actor ) localNotesDraft(actor.id, null);
+
     // Si al abrir la vista ya es el turno del jugador, también se le avisa.
     this.onCombatUpdate();
   }
@@ -334,6 +364,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const actor = this.actor;
       if ( !actor ) return;
       this.#notesDraft = { actorId: actor.id, text: event.currentTarget.value };
+      localNotesDraft(actor.id, this.#notesDraft.text);
       this.#setNotesStatus("BHD.Notes.Unsaved");
       clearTimeout(this.#notesTimeout);
       this.#notesTimeout = setTimeout(() => this.#saveNotes(), NOTES_SAVE_DELAY);
@@ -392,6 +423,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       // Si siguió escribiendo mientras se guardaba, queda pendiente lo nuevo.
       if ( this.#notesDraft === draft ) {
         this.#notesDraft = null;
+        localNotesDraft(actor.id, null);
         this.#setNotesStatus("BHD.Notes.Saved");
       }
     } catch(err) {
@@ -754,8 +786,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     alert.querySelector(".bhd-turn-alert-img").src = combat.combatant?.img || actor.img;
     alert.hidden = false;
     // Vibración: funciona en Android; los iPhone no lo permiten y simplemente no vibran.
+    // Chrome la bloquea (con un aviso en la consola) si aún no se tocó la pantalla.
+    const touched = navigator.userActivation?.hasBeenActive ?? true;
     try {
-      navigator.vibrate?.([300, 150, 300, 150, 500]);
+      if ( touched ) navigator.vibrate?.([300, 150, 300, 150, 500]);
     } catch(err) {}
   }
 
@@ -832,8 +866,18 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {PointerEvent} event
    * @param {HTMLElement} target
    */
-  static #onTab(event, target) {
-    this.changeTab(target.dataset.tab, target.dataset.group, { event });
+  static async #onTab(event, target) {
+    const { tab, group } = target.dataset;
+    const main = this.parts?.main;
+    // Tocar la pestaña en la que ya estás sube al principio, como en las apps del teléfono.
+    if ( this.tabGroups[group] === tab ) {
+      main?.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    // Solo la pestaña visible tiene contenido (ver _prepareContext): hay que dibujar la nueva.
+    this.tabGroups[group] = tab;
+    await this.render({ parts: ["main", "nav"] });
+    if ( this.parts?.main ) this.parts.main.scrollTop = 0;
   }
 
   /**
@@ -1109,6 +1153,71 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     } finally {
       this.#resting = false;
     }
+  }
+
+  /* -------------------------------------------- */
+  /*  Ajustes del teléfono                        */
+  /* -------------------------------------------- */
+
+  /**
+   * Dibuja el panel de ajustes con el estado actual de cada opción.
+   */
+  async #renderSettings() {
+    const panel = this.element.querySelector(".bhd-settings");
+    if ( !panel ) return;
+    const get = key => game.settings.get(MODULE_ID, key);
+    panel.innerHTML = await foundry.applications.handlebars.renderTemplate(`${TEMPLATE_PATH}/mobile/settings.hbs`, {
+      toggles: [
+        { key: "largeText", icon: "fa-solid fa-text-height", on: get("largeText") },
+        { key: "keepAwake", icon: "fa-solid fa-sun", on: get("keepAwake"), unsupported: !canKeepAwake() },
+        { key: "phoneMusic", icon: "fa-solid fa-music", on: get("phoneMusic") }
+      ],
+      install: getInstallMode()
+    });
+  }
+
+  /**
+   * Abre el panel de ajustes (botón del engranaje del encabezado).
+   * @this {BHDMobileApp}
+   */
+  static async #onOpenSettings() {
+    await this.#renderSettings();
+    const panel = this.element.querySelector(".bhd-settings");
+    if ( panel ) panel.hidden = false;
+  }
+
+  /**
+   * Cierra el panel de ajustes.
+   * @this {BHDMobileApp}
+   */
+  static #onCloseSettings() {
+    const panel = this.element.querySelector(".bhd-settings");
+    if ( panel ) panel.hidden = true;
+  }
+
+  /**
+   * Activa o desactiva una opción del teléfono y la aplica al momento, sin recargar.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onToggleSetting(event, target) {
+    const key = target.dataset.setting;
+    if ( !["largeText", "keepAwake", "phoneMusic"].includes(key) ) return;
+    await game.settings.set(MODULE_ID, key, !game.settings.get(MODULE_ID, key));
+    if ( key === "largeText" ) applyLargeText();
+    else if ( key === "keepAwake" ) updateWakeLock();
+    else if ( key === "phoneMusic" ) syncPlaylistSounds();
+    await this.#renderSettings();
+  }
+
+  /**
+   * Botón "Instalar" (Chrome / Android): muestra el aviso del navegador para añadir la app.
+   * @this {BHDMobileApp}
+   */
+  static async #onInstall() {
+    await promptInstall();
+    await this.#renderSettings();
   }
 
   /**

@@ -8,7 +8,6 @@
       "inventory": "Inventario",
       "notes": "Notas"
     },
-    "ComingSoon": "Próximamente",
     "NoCharacter": "Sin personaje asignado",
     "Sheet": {
       "AskGM": "Pídele al DM que te asigne un personaje. Aparecerá aquí automáticamente.",
@@ -172,7 +171,36 @@
       "Content": "Se recargará la página con la interfaz normal de Foundry en este dispositivo. Podrás volver a la vista móvil con el botón «Vista móvil»."
     },
     "ReturnMobile": "Vista móvil",
+    "Connection": {
+      "Lost": "Sin conexión",
+      "Back": "Conexión recuperada",
+      "Hint": "Reconectando con la partida… Revisa que el teléfono siga conectado al Wi-Fi. Tus notas no se pierden.",
+      "Attempt": "Intento {attempt}",
+      "Reload": "Recargar ahora"
+    },
+    "Install": {
+      "Title": "Añadir a la pantalla de inicio",
+      "Description": "Tu hoja de personaje de Battlehammer's Dungeon.",
+      "Installed": "Ya la estás usando como app desde la pantalla de inicio. ✓",
+      "Button": "Instalar como app",
+      "IOS": "En Safari, toca <strong>Compartir</strong> (el cuadrado con la flecha hacia arriba) y luego <strong>Añadir a pantalla de inicio</strong>. La primera vez tendrás que iniciar sesión otra vez.",
+      "Android": "En Chrome, abre el menú <strong>⋮</strong> (arriba a la derecha) y toca <strong>Añadir a la pantalla de inicio</strong> o <strong>Instalar app</strong>."
+    },
     "Settings": {
+      "Title": "Ajustes del teléfono",
+      "LargeText": {
+        "Name": "Letra grande",
+        "Hint": "Agranda todos los textos y botones de la vista."
+      },
+      "KeepAwake": {
+        "Name": "Pantalla siempre encendida",
+        "Hint": "La pantalla no se apaga sola mientras la vista está abierta. Gasta algo más de batería.",
+        "Unsupported": "Este navegador no lo permite (hace falta HTTPS, como en The Forge, y un navegador reciente)."
+      },
+      "PhoneMusic": {
+        "Name": "Música en el teléfono",
+        "Hint": "Normalmente la música suena solo en la TV. Actívalo para oírla también aquí (gasta datos y batería)."
+      },
       "Enabled": {
         "Name": "Activar vista móvil",
         "Hint": "Los jugadores que entren desde un teléfono o pantalla pequeña verán la vista móvil de BHD Companion en lugar de la interfaz normal. No afecta al GM."

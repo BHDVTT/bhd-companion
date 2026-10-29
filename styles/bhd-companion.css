@@ -54,7 +54,7 @@ body.bhd-mobile {
   background: var(--bhd-bg);
   color: var(--bhd-text);
   font-family: var(--font-body, "Signika"), sans-serif;
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
   line-height: 1.4;
   overflow: hidden;
   user-select: none;
@@ -98,7 +98,7 @@ body.bhd-mobile {
   align-items: center;
   justify-content: center;
   color: var(--bhd-text-muted);
-  font-size: 22px;
+  font-size: calc(22px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-identity {
@@ -110,7 +110,7 @@ body.bhd-mobile {
 
 #bhd-mobile-app .bhd-name {
   overflow: hidden;
-  font-size: 20px;
+  font-size: calc(20px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: var(--bhd-gold);
   white-space: nowrap;
@@ -119,7 +119,7 @@ body.bhd-mobile {
 
 #bhd-mobile-app .bhd-player {
   overflow: hidden;
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -141,7 +141,7 @@ body.bhd-mobile {
   background: transparent;
   box-shadow: none;
   color: var(--bhd-text-muted);
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-exit:active {
@@ -182,14 +182,14 @@ body.bhd-mobile {
 }
 
 #bhd-mobile-app .bhd-placeholder i {
-  font-size: 48px;
+  font-size: calc(48px * var(--bhd-text-scale, 1));
   color: var(--bhd-red);
 }
 
 #bhd-mobile-app .bhd-placeholder h2 {
   margin: 0;
   border: none;
-  font-size: 24px;
+  font-size: calc(24px * var(--bhd-text-scale, 1));
   color: var(--bhd-gold);
 }
 
@@ -233,13 +233,13 @@ body.bhd-mobile {
   background: transparent;
   box-shadow: none;
   color: var(--bhd-text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--bhd-text-scale, 1));
   line-height: 1.1;
 }
 
 #bhd-mobile-app .bhd-nav-btn i {
   margin: 0;
-  font-size: 22px;
+  font-size: calc(22px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-nav-btn span {
@@ -281,7 +281,7 @@ body.bhd-mobile {
   background: #b3202a;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   color: #fff;
-  font-size: 14px;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
   font-weight: bold;
   white-space: nowrap;
   cursor: pointer;
@@ -331,7 +331,7 @@ body.bhd-mobile {
   align-items: center;
   gap: 8px;
   color: var(--bhd-text-muted);
-  font-size: 14px;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-select select {
@@ -342,7 +342,7 @@ body.bhd-mobile {
   border-radius: 10px;
   background: var(--bhd-surface-2);
   color: var(--bhd-text);
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
 }
 
 /* Retrato, nombre y clase */
@@ -374,18 +374,18 @@ body.bhd-mobile {
 #bhd-mobile-app .bhd-hero-name {
   margin: 0;
   border: none;
-  font-size: 22px;
+  font-size: calc(22px * var(--bhd-text-scale, 1));
   line-height: 1.15;
   color: var(--bhd-gold);
   overflow-wrap: anywhere;
 }
 
 #bhd-mobile-app .bhd-hero-class {
-  font-size: 14px;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-hero-level {
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
 }
 
@@ -403,13 +403,13 @@ body.bhd-mobile {
   border-radius: 12px;
   background: var(--bhd-surface);
   color: var(--bhd-text-muted);
-  font-size: 9px;
+  font-size: calc(9px * var(--bhd-text-scale, 1));
   text-transform: uppercase;
 }
 
 #bhd-mobile-app .bhd-inspiration i {
   margin: 0;
-  font-size: 22px;
+  font-size: calc(22px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-inspiration.bhd-on {
@@ -434,23 +434,23 @@ body.bhd-mobile {
 
 #bhd-mobile-app .bhd-hp-title {
   width: 100%;
-  font-size: 12px;
+  font-size: calc(12px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
   text-transform: uppercase;
 }
 
 #bhd-mobile-app .bhd-hp-value {
-  font-size: 18px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
 }
 
 #bhd-mobile-app .bhd-hp-value strong {
-  font-size: 32px;
+  font-size: calc(32px * var(--bhd-text-scale, 1));
   color: var(--bhd-text);
 }
 
 #bhd-mobile-app .bhd-hp-temp {
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: #6fb3e6;
 }
@@ -486,7 +486,7 @@ body.bhd-mobile {
   border-radius: 10px;
   background: var(--bhd-bg);
   color: var(--bhd-text);
-  font-size: 22px;
+  font-size: calc(22px * var(--bhd-text-scale, 1));
   text-align: center;
 }
 
@@ -498,7 +498,7 @@ body.bhd-mobile {
   border: 1px solid var(--bhd-border);
   border-radius: 10px;
   background: var(--bhd-surface-2);
-  font-size: 18px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-hp-buttons {
@@ -519,7 +519,7 @@ body.bhd-mobile {
   border: none;
   border-radius: 10px;
   color: #fff;
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
   font-weight: bold;
   line-height: 1.1;
   text-align: center;
@@ -528,7 +528,7 @@ body.bhd-mobile {
 
 #bhd-mobile-app .bhd-hp-btn i {
   margin: 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
 }
 #bhd-mobile-app .bhd-damage { background: var(--bhd-red); }
 #bhd-mobile-app .bhd-heal { background: #2f7d3a; }
@@ -564,7 +564,7 @@ body.bhd-mobile {
 #bhd-mobile-app .bhd-stat-label {
   max-width: 100%;
   overflow: hidden;
-  font-size: 10px;
+  font-size: calc(10px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
   text-transform: uppercase;
   white-space: nowrap;
@@ -574,20 +574,20 @@ body.bhd-mobile {
 #bhd-mobile-app .bhd-stat-value {
   max-width: 100%;
   overflow: hidden;
-  font-size: 18px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
   font-weight: bold;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 #bhd-mobile-app .bhd-stat-value i {
-  font-size: 14px;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
 }
 
 #bhd-mobile-app .bhd-speed-others {
   margin: -4px 0 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
   text-align: center;
 }
@@ -607,7 +607,7 @@ body.bhd-mobile {
   border: 1px solid var(--bhd-red);
   border-radius: 16px;
   background: rgba(179, 32, 42, 0.2);
-  font-size: 14px;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-condition img {
@@ -620,7 +620,7 @@ body.bhd-mobile {
 #bhd-mobile-app .bhd-section-title {
   margin: 8px 0 -4px;
   border: none;
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: var(--bhd-gold);
   text-transform: uppercase;
@@ -665,13 +665,13 @@ body.bhd-mobile {
 }
 
 #bhd-mobile-app .bhd-ability-abbr {
-  font-size: 12px;
+  font-size: calc(12px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: var(--bhd-text-muted);
 }
 
 #bhd-mobile-app .bhd-ability-mod {
-  font-size: 26px;
+  font-size: calc(26px * var(--bhd-text-scale, 1));
   font-weight: bold;
   line-height: 1.1;
 }
@@ -682,7 +682,7 @@ body.bhd-mobile {
   border: 1px solid var(--bhd-border);
   border-radius: 10px;
   background: var(--bhd-bg);
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
 }
 
 /* Listas: salvaciones y habilidades */
@@ -720,12 +720,12 @@ body.bhd-mobile {
 }
 
 #bhd-mobile-app .bhd-row-label small {
-  font-size: 11px;
+  font-size: calc(11px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
 }
 
 #bhd-mobile-app .bhd-row-value {
-  font-size: 18px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
   font-weight: bold;
 }
 
@@ -756,7 +756,7 @@ body.bhd-mobile {
 
 #bhd-mobile-app .bhd-tap-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
   text-align: center;
 }
@@ -790,13 +790,13 @@ body.bhd-mobile {
 
 #bhd-mobile-app .bhd-toast-label {
   overflow: hidden;
-  font-size: 15px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 #bhd-mobile-app .bhd-toast-total {
-  font-size: 32px;
+  font-size: calc(32px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: var(--bhd-gold);
 }
@@ -842,7 +842,7 @@ body.bhd-mobile {
   border-radius: 20px;
   background: var(--bhd-surface);
   color: var(--bhd-text-muted);
-  font-size: 14px;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
   white-space: nowrap;
 }
 
@@ -922,7 +922,7 @@ body.bhd-mobile {
 }
 
 #bhd-mobile-app .bhd-action-name {
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
   font-weight: bold;
   line-height: 1.2;
   overflow-wrap: anywhere;
@@ -934,14 +934,14 @@ body.bhd-mobile {
   padding: 0 5px;
   border: 1px solid var(--bhd-border);
   border-radius: 6px;
-  font-size: 11px;
+  font-size: calc(11px * var(--bhd-text-scale, 1));
   font-weight: normal;
   color: var(--bhd-text-muted);
   vertical-align: middle;
 }
 
 #bhd-mobile-app .bhd-action-sub {
-  font-size: 12px;
+  font-size: calc(12px * var(--bhd-text-scale, 1));
   line-height: 1.25;
   color: var(--bhd-text-muted);
   overflow-wrap: anywhere;
@@ -950,7 +950,7 @@ body.bhd-mobile {
 #bhd-mobile-app .bhd-action-roll {
   flex: none;
   min-width: 40px;
-  font-size: 17px;
+  font-size: calc(17px * var(--bhd-text-scale, 1));
   font-weight: bold;
   text-align: center;
   white-space: nowrap;
@@ -964,7 +964,7 @@ body.bhd-mobile {
   border-radius: 10px;
   background: var(--bhd-gold-soft);
   color: var(--bhd-gold);
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
   font-weight: bold;
   text-align: center;
   white-space: nowrap;
@@ -985,7 +985,7 @@ body.bhd-mobile {
   border-radius: 0;
   background: transparent;
   color: var(--bhd-text-muted);
-  font-size: 18px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-action-info:active {
@@ -999,13 +999,13 @@ body.bhd-mobile {
   flex-wrap: wrap;
   gap: 4px 16px;
   margin: 0;
-  font-size: 14px;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
 }
 
 #bhd-mobile-app .bhd-spellcasting strong {
   color: var(--bhd-text);
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-search {
@@ -1028,7 +1028,7 @@ body.bhd-mobile {
   background: transparent;
   box-shadow: none;
   color: var(--bhd-text);
-  font-size: 16px; /* 16px o más: iOS no hace zoom al escribir */
+  font-size: calc(16px * var(--bhd-text-scale, 1)); /* 16px o más: iOS no hace zoom al escribir */
 }
 
 #bhd-mobile-app .bhd-spell-level {
@@ -1046,7 +1046,7 @@ body.bhd-mobile {
 }
 
 #bhd-mobile-app .bhd-spell-level-label {
-  font-size: 15px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
   font-weight: bold;
 }
 
@@ -1080,7 +1080,7 @@ body.bhd-mobile {
 
 #bhd-mobile-app .bhd-slots-count {
   margin-left: 2px;
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
 }
 
@@ -1125,7 +1125,7 @@ body.bhd-mobile {
 }
 
 #bhd-mobile-app .bhd-tray-title {
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: var(--bhd-gold);
   text-transform: uppercase;
@@ -1141,7 +1141,7 @@ body.bhd-mobile {
   background: transparent;
   box-shadow: none;
   color: var(--bhd-text-muted);
-  font-size: 22px;
+  font-size: calc(22px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-tray-log {
@@ -1158,7 +1158,7 @@ body.bhd-mobile {
 /* Botones de las tarjetas de dnd5e más fáciles de tocar */
 #bhd-mobile-app .bhd-tray-log .card-buttons button {
   min-height: 44px;
-  font-size: 15px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
 }
 
 /* Con el panel abierto, el aviso de la tirada sale arriba para no taparlo */
@@ -1176,7 +1176,8 @@ body.bhd-mobile {
 /*  Menú del toque largo                       */
 /* ------------------------------------------ */
 
-#bhd-mobile-app .bhd-chooser {
+#bhd-mobile-app .bhd-chooser,
+#bhd-mobile-app .bhd-settings {
   position: absolute;
   inset: 0;
   z-index: 3;
@@ -1185,7 +1186,8 @@ body.bhd-mobile {
   justify-content: flex-end;
 }
 
-#bhd-mobile-app .bhd-chooser[hidden] {
+#bhd-mobile-app .bhd-chooser[hidden],
+#bhd-mobile-app .bhd-settings[hidden] {
   display: none;
 }
 
@@ -1233,7 +1235,7 @@ body.bhd-mobile {
 }
 
 #bhd-mobile-app .bhd-chooser-name {
-  font-size: 18px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: var(--bhd-gold);
   overflow-wrap: anywhere;
@@ -1259,7 +1261,7 @@ body.bhd-mobile {
   background: var(--bhd-surface-2);
   box-shadow: none;
   color: var(--bhd-text);
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
   line-height: 1.15;
   text-align: center;
 }
@@ -1277,7 +1279,7 @@ body.bhd-mobile {
 }
 
 #bhd-mobile-app .bhd-mode i {
-  font-size: 22px;
+  font-size: calc(22px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-mode-adv {
@@ -1338,14 +1340,14 @@ body.bhd-mobile .application:has(> .window-header) {
   padding-bottom: env(safe-area-inset-bottom, 0px);
   border-radius: 16px 16px 0 0;
   transform: none !important;
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
   /* Letra más grande en las ventanas de Foundry/dnd5e */
-  --font-size-10: 13px;
-  --font-size-11: 13px;
-  --font-size-12: 14px;
-  --font-size-13: 15px;
-  --font-size-14: 16px;
-  --font-size-16: 17px;
+  --font-size-10: calc(13px * var(--bhd-text-scale, 1));
+  --font-size-11: calc(13px * var(--bhd-text-scale, 1));
+  --font-size-12: calc(14px * var(--bhd-text-scale, 1));
+  --font-size-13: calc(15px * var(--bhd-text-scale, 1));
+  --font-size-14: calc(16px * var(--bhd-text-scale, 1));
+  --font-size-16: calc(17px * var(--bhd-text-scale, 1));
 }
 
 /* iPad / pantallas anchas: tarjeta centrada de ancho cómodo */
@@ -1363,13 +1365,13 @@ body.bhd-mobile .application:has(> .window-header) {
 body.bhd-mobile .application:has(> .window-header) > .window-header {
   min-height: 52px;
   padding: 4px 8px 4px 14px;
-  font-size: 17px;
+  font-size: calc(17px * var(--bhd-text-scale, 1));
 }
 
 body.bhd-mobile .application:has(> .window-header) > .window-header button {
   min-width: 44px;
   min-height: 44px;
-  font-size: 18px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
 }
 
 body.bhd-mobile .application:has(> .window-header) > .window-content {
@@ -1390,14 +1392,14 @@ body.bhd-mobile .application:has(> .window-header) :is(.form-footer, footer) {
 
 body.bhd-mobile .application:has(> .window-header) :is(.form-footer, footer) button {
   min-height: 52px;
-  font-size: 17px;
+  font-size: calc(17px * var(--bhd-text-scale, 1));
   font-weight: bold;
 }
 
 /* Campos de 16px o más: iOS no hace zoom al tocarlos */
 body.bhd-mobile .application:has(> .window-header) :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 44px;
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
 }
 
 body.bhd-mobile .application:has(> .window-header) :is(input[type="checkbox"], input[type="radio"]) {
@@ -1420,7 +1422,7 @@ body.bhd-mobile .bhd-compact .form-group {
 
 body.bhd-mobile .bhd-compact .form-group > label {
   flex: 1 1 40%;
-  font-size: 15px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
   line-height: 1.2;
 }
 
@@ -1429,7 +1431,7 @@ body.bhd-mobile .bhd-compact .form-group > .form-fields {
 }
 
 body.bhd-mobile .bhd-compact .hint {
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
 }
 
 /* En teléfonos estrechos, la etiqueta va encima del campo */
@@ -1458,7 +1460,7 @@ body.bhd-mobile .bhd-compact .dialog-buttons button {
   min-height: 56px;
   margin: 0;
   padding: 6px 4px;
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
   font-weight: bold;
   line-height: 1.15;
   white-space: normal;
@@ -1467,7 +1469,7 @@ body.bhd-mobile .bhd-compact .dialog-buttons button {
 /* Elegir actividad: botones grandes; sin el aviso de teclas (no hay teclado) */
 body.bhd-mobile .bhd-compact.activity-choice menu button {
   min-height: 56px;
-  font-size: 17px;
+  font-size: calc(17px * var(--bhd-text-scale, 1));
 }
 
 body.bhd-mobile .bhd-compact .control-hint {
@@ -1501,7 +1503,7 @@ body.bhd-mobile .bhd-fold-toggle {
   min-height: 44px;
   margin: 0 0 6px;
   padding: 6px 12px;
-  font-size: 15px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
   text-align: left;
 }
 
@@ -1531,7 +1533,7 @@ body.bhd-mobile .bhd-dialog > .window-content {
 }
 
 body.bhd-mobile .bhd-item-info {
-  font-size: 15px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
   line-height: 1.45;
   user-select: text;
 }
@@ -1583,7 +1585,7 @@ body.bhd-mobile .bhd-item-info-sub {
   background: var(--bhd-red);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
   color: #fff;
-  font-size: 20px;
+  font-size: calc(20px * var(--bhd-text-scale, 1));
   font-weight: bold;
   line-height: 1.2;
 }
@@ -1594,11 +1596,24 @@ body.bhd-mobile .bhd-item-info-sub {
 }
 
 #bhd-mobile-app .bhd-big-btn i {
-  font-size: 24px;
+  font-size: calc(24px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-end-turn {
+  position: relative;
   background: #2f7d3a;
+}
+
+/* Brillo que late: se anima solo la opacidad de una capa (animar la sombra directamente obliga
+   a repintar el botón 60 veces por segundo, lento en teléfonos viejos). */
+#bhd-mobile-app .bhd-end-turn::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  box-shadow: 0 0 18px rgba(212, 166, 70, 0.7);
+  opacity: 0;
+  pointer-events: none;
   animation: bhd-glow 1.6s ease-in-out infinite;
 }
 
@@ -1617,7 +1632,7 @@ body.bhd-mobile .bhd-item-info-sub {
 }
 
 #bhd-mobile-app .bhd-combat-round {
-  font-size: 13px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: var(--bhd-gold);
   text-transform: uppercase;
@@ -1625,16 +1640,16 @@ body.bhd-mobile .bhd-item-info-sub {
 }
 
 #bhd-mobile-app .bhd-combat-now {
-  font-size: 20px;
+  font-size: calc(20px * var(--bhd-text-scale, 1));
 }
 
 #bhd-mobile-app .bhd-combat-status.bhd-my-turn .bhd-combat-now {
-  font-size: 26px;
+  font-size: calc(26px * var(--bhd-text-scale, 1));
   color: var(--bhd-gold);
 }
 
 #bhd-mobile-app .bhd-combat-next {
-  font-size: 15px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
 }
 
@@ -1696,7 +1711,7 @@ body.bhd-mobile .bhd-item-info-sub {
 #bhd-mobile-app .bhd-turn-init {
   flex: none;
   width: 30px;
-  font-size: 18px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: var(--bhd-gold);
   text-align: center;
@@ -1725,7 +1740,7 @@ body.bhd-mobile .bhd-item-info-sub {
 
 #bhd-mobile-app .bhd-turn-name {
   overflow: hidden;
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -1740,7 +1755,7 @@ body.bhd-mobile .bhd-item-info-sub {
   border-radius: 8px;
   background: var(--bhd-gold);
   color: #1a1408;
-  font-size: 11px;
+  font-size: calc(11px * var(--bhd-text-scale, 1));
   font-weight: bold;
   text-transform: uppercase;
 }
@@ -1753,7 +1768,7 @@ body.bhd-mobile .bhd-item-info-sub {
 #bhd-mobile-app .bhd-turn-dead {
   flex: none;
   color: var(--bhd-text-muted);
-  font-size: 18px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
 }
 
 /* Estado aproximado de vida */
@@ -1761,7 +1776,7 @@ body.bhd-mobile .bhd-item-info-sub {
   flex: none;
   padding: 2px 8px;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--bhd-text-scale, 1));
   font-weight: bold;
   white-space: nowrap;
 }
@@ -1784,7 +1799,7 @@ body.bhd-mobile .bhd-item-info-sub {
 #bhd-mobile-app .bhd-death-title {
   margin: 0;
   border: none;
-  font-size: 16px;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
   color: var(--bhd-red-bright);
   text-align: center;
   text-transform: uppercase;
@@ -1802,7 +1817,7 @@ body.bhd-mobile .bhd-item-info-sub {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
   color: var(--bhd-text-muted);
 }
 
@@ -1861,7 +1876,7 @@ body.bhd-mobile .bhd-item-info-sub {
 
 #bhd-mobile-app .bhd-turn-bar-text {
   overflow: hidden;
-  font-size: 17px;
+  font-size: calc(17px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: var(--bhd-gold);
   white-space: nowrap;
@@ -1881,7 +1896,7 @@ body.bhd-mobile .bhd-item-info-sub {
   border-radius: 10px;
   background: #2f7d3a;
   color: #fff;
-  font-size: 15px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
   font-weight: bold;
   white-space: nowrap;
 }
@@ -1928,7 +1943,7 @@ body.bhd-mobile .bhd-item-info-sub {
 }
 
 #bhd-mobile-app .bhd-turn-alert-round {
-  font-size: 15px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
   font-weight: bold;
   color: var(--bhd-gold);
   text-transform: uppercase;
@@ -1936,14 +1951,14 @@ body.bhd-mobile .bhd-item-info-sub {
 }
 
 #bhd-mobile-app .bhd-turn-alert-title {
-  font-size: 44px;
+  font-size: calc(44px * var(--bhd-text-scale, 1));
   line-height: 1.1;
   color: #fff;
   text-shadow: 0 0 20px rgba(217, 54, 65, 0.8);
 }
 
 #bhd-mobile-app .bhd-turn-alert-hint {
-  font-size: 17px;
+  font-size: calc(17px * var(--bhd-text-scale, 1));
   color: var(--bhd-text);
 }
 
@@ -1962,8 +1977,8 @@ body.bhd-mobile .bhd-item-info-sub {
 }
 
 @keyframes bhd-glow {
-  0%, 100% { box-shadow: 0 0 0 rgba(212, 166, 70, 0); }
-  50% { box-shadow: 0 0 18px rgba(212, 166, 70, 0.7); }
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 
 
@@ -1974,8 +1989,8 @@ body.bhd-mobile .bhd-item-info-sub {
 #bhd-mobile-app .bhd-rest { display: flex; flex-direction: column; gap: 10px; }
 #bhd-mobile-app .bhd-rest-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 12px; }
 #bhd-mobile-app .bhd-rest-title { font-weight: bold; }
-#bhd-mobile-app .bhd-rest-hd { font-size: 14px; color: var(--bhd-text-muted); }
-#bhd-mobile-app .bhd-rest-hd strong { color: var(--bhd-text); font-size: 16px; }
+#bhd-mobile-app .bhd-rest-hd { font-size: calc(14px * var(--bhd-text-scale, 1)); color: var(--bhd-text-muted); }
+#bhd-mobile-app .bhd-rest-hd strong { color: var(--bhd-text); font-size: calc(16px * var(--bhd-text-scale, 1)); }
 #bhd-mobile-app .bhd-rest-buttons { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 #bhd-mobile-app .bhd-rest-btn {
   min-height: var(--bhd-touch); padding: 6px 8px; border: 1px solid var(--bhd-border); border-radius: 10px;
@@ -1990,10 +2005,10 @@ body.bhd-mobile .bhd-item-info-sub {
 #bhd-mobile-app .bhd-currency-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 #bhd-mobile-app .bhd-coin { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 #bhd-mobile-app .bhd-coin img { width: 28px; height: 28px; border: none; }
-#bhd-mobile-app .bhd-coin-abbr { font-size: 12px; font-weight: bold; color: var(--bhd-text-muted); text-transform: uppercase; }
+#bhd-mobile-app .bhd-coin-abbr { font-size: calc(12px * var(--bhd-text-scale, 1)); font-weight: bold; color: var(--bhd-text-muted); text-transform: uppercase; }
 #bhd-mobile-app .bhd-coin input {
   width: 100%; height: 40px; padding: 0 2px; border: 1px solid var(--bhd-border); border-radius: 8px;
-  background: var(--bhd-surface-2); color: var(--bhd-text); font-size: 16px; text-align: center; user-select: text;
+  background: var(--bhd-surface-2); color: var(--bhd-text); font-size: calc(16px * var(--bhd-text-scale, 1)); text-align: center; user-select: text;
 }
 #bhd-mobile-app .bhd-load { display: flex; flex-direction: column; gap: 8px; }
 #bhd-mobile-app .bhd-load-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -2005,14 +2020,14 @@ body.bhd-mobile .bhd-item-info-sub {
 #bhd-mobile-app .bhd-load-heavy .bhd-load-fill,
 #bhd-mobile-app .bhd-load-over .bhd-load-fill { background: var(--bhd-red-bright); }
 #bhd-mobile-app .bhd-load-stop { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bhd-text-muted); }
-#bhd-mobile-app .bhd-load-status { margin: 0; font-size: 13px; color: var(--bhd-red-bright); }
+#bhd-mobile-app .bhd-load-status { margin: 0; font-size: calc(13px * var(--bhd-text-scale, 1)); color: var(--bhd-red-bright); }
 
 #bhd-mobile-app .bhd-inv-item { display: flex; align-items: stretch; border-bottom: 1px solid var(--bhd-border); }
 #bhd-mobile-app .bhd-inv-item:last-child { border-bottom: none; }
 #bhd-mobile-app .bhd-inv-equip,
 #bhd-mobile-app .bhd-inv-attune {
   flex: none; width: 40px; padding: 0; border: none; border-radius: 0; background: transparent;
-  color: var(--bhd-text-muted); font-size: 18px;
+  color: var(--bhd-text-muted); font-size: calc(18px * var(--bhd-text-scale, 1));
 }
 #bhd-mobile-app .bhd-inv-equip.bhd-on,
 #bhd-mobile-app .bhd-inv-attune.bhd-on { color: var(--bhd-gold); }
@@ -2025,7 +2040,7 @@ body.bhd-mobile .bhd-item-info-sub {
 #bhd-mobile-app .bhd-inv-qty { flex: none; display: flex; align-items: center; padding-right: 4px; }
 #bhd-mobile-app .bhd-inv-qty-btn {
   width: 32px; height: 36px; min-height: 36px; padding: 0; border: none; border-radius: 8px;
-  background: transparent; color: var(--bhd-text-muted); font-size: 13px;
+  background: transparent; color: var(--bhd-text-muted); font-size: calc(13px * var(--bhd-text-scale, 1));
 }
 #bhd-mobile-app .bhd-inv-qty-btn:active { background: var(--bhd-surface-2); }
 #bhd-mobile-app .bhd-inv-qty-btn:disabled { opacity: 0.3; }
@@ -2050,12 +2065,279 @@ body.bhd-mobile .bhd-item-info-sub {
 #bhd-mobile-app .bhd-notes-label { font-weight: bold; }
 #bhd-mobile-app .bhd-notes textarea {
   width: 100%; min-height: 180px; padding: 10px; border: 1px solid var(--bhd-border); border-radius: 10px;
-  background: var(--bhd-surface-2); color: var(--bhd-text); font-family: inherit; font-size: 16px;
+  background: var(--bhd-surface-2); color: var(--bhd-text); font-family: inherit; font-size: calc(16px * var(--bhd-text-scale, 1));
   line-height: 1.4; resize: vertical; user-select: text;
 }
-#bhd-mobile-app .bhd-notes-status { margin: 0; font-size: 12px; color: var(--bhd-text-muted); }
+#bhd-mobile-app .bhd-notes-status { margin: 0; font-size: calc(12px * var(--bhd-text-scale, 1)); color: var(--bhd-text-muted); }
 #bhd-mobile-app .bhd-personality { display: flex; flex-direction: column; gap: 10px; }
-#bhd-mobile-app .bhd-personality-label { font-size: 13px; font-weight: bold; color: var(--bhd-gold); }
+#bhd-mobile-app .bhd-personality-label { font-size: calc(13px * var(--bhd-text-scale, 1)); font-weight: bold; color: var(--bhd-gold); }
 #bhd-mobile-app .bhd-personality-text { margin: 2px 0 0; white-space: pre-line; }
 #bhd-mobile-app .bhd-biography { user-select: text; overflow-wrap: anywhere; }
 #bhd-mobile-app .bhd-biography img { max-width: 100%; height: auto; }
+
+/* ------------------------------------------ */
+/*  Letra grande (ajuste del teléfono)         */
+/* ------------------------------------------ */
+
+/* Todos los tamaños de letra del módulo se multiplican por --bhd-text-scale
+   (también los de las ventanas de dnd5e en vista móvil). */
+body.bhd-mobile.bhd-large-text {
+  --bhd-text-scale: 1.2;
+}
+
+body.bhd-large-text #bhd-mobile-app {
+  --bhd-nav-height: 78px;
+}
+
+/* ------------------------------------------ */
+/*  Panel de ajustes del teléfono              */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-settings-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100% - 24px);
+  margin: 0 auto;
+  padding: 12px 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 2px solid var(--bhd-gold);
+  border-radius: 18px 18px 0 0;
+  background: var(--bhd-surface);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.6);
+  animation: bhd-tray-in 0.18s ease-out;
+}
+
+#bhd-mobile-app .bhd-settings-sheet * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+#bhd-mobile-app .bhd-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-settings-header h2 {
+  margin: 0;
+  border: none;
+  color: var(--bhd-gold);
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-setting-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: auto;
+  min-height: 64px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-surface-2);
+  box-shadow: none;
+  color: var(--bhd-text);
+  text-align: left;
+}
+
+#bhd-mobile-app .bhd-setting-toggle:disabled {
+  opacity: 0.6;
+}
+
+#bhd-mobile-app .bhd-setting-icon {
+  flex: none;
+  width: 24px;
+  margin: 0;
+  color: var(--bhd-gold);
+  font-size: calc(20px * var(--bhd-text-scale, 1));
+  text-align: center;
+}
+
+#bhd-mobile-app .bhd-setting-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#bhd-mobile-app .bhd-setting-name {
+  font-size: calc(16px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-setting-hint {
+  margin: 0;
+  color: var(--bhd-text-muted);
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+  line-height: 1.3;
+}
+
+#bhd-mobile-app .bhd-setting-hint strong {
+  color: var(--bhd-text);
+}
+
+/* Interruptor de encendido / apagado */
+#bhd-mobile-app .bhd-switch {
+  flex: none;
+  position: relative;
+  width: 48px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--bhd-border);
+  transition: background-color 0.15s;
+}
+
+#bhd-mobile-app .bhd-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bhd-text);
+  transition: transform 0.15s;
+}
+
+#bhd-mobile-app .bhd-setting-toggle.bhd-on .bhd-switch {
+  background: #2f7d3a;
+}
+
+#bhd-mobile-app .bhd-setting-toggle.bhd-on .bhd-switch::after {
+  transform: translateX(20px);
+}
+
+#bhd-mobile-app .bhd-setting-install {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-surface-2);
+}
+
+#bhd-mobile-app .bhd-install-btn {
+  min-height: 52px;
+  font-size: calc(17px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-settings-exit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: auto;
+  min-height: 48px;
+  margin: 4px 0 0;
+  padding: 8px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--bhd-text-muted);
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+}
+
+/* ------------------------------------------ */
+/*  Aviso "Sin conexión"                       */
+/* ------------------------------------------ */
+
+/* Va directamente en <body> (no dentro de la vista) para tapar también las ventanas de dnd5e. */
+body.bhd-mobile .bhd-offline {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 8, 12, 0.88);
+  color: #ece6dc;
+  font-family: var(--font-body, "Signika"), sans-serif;
+  text-align: center;
+}
+
+body.bhd-mobile .bhd-offline[hidden] {
+  display: none;
+}
+
+body.bhd-mobile .bhd-offline-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 360px;
+}
+
+body.bhd-mobile .bhd-offline-icon {
+  color: #d93641;
+  font-size: calc(48px * var(--bhd-text-scale, 1));
+  animation: bhd-offline-blink 1.2s ease-in-out infinite;
+}
+
+body.bhd-mobile .bhd-offline.bhd-online .bhd-offline-icon {
+  color: #3f9a4a;
+  animation: none;
+}
+
+body.bhd-mobile .bhd-offline-title {
+  font-size: calc(26px * var(--bhd-text-scale, 1));
+}
+
+body.bhd-mobile .bhd-offline-hint {
+  font-size: calc(16px * var(--bhd-text-scale, 1));
+  line-height: 1.4;
+}
+
+body.bhd-mobile .bhd-offline-attempt {
+  color: #9d95a3;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+}
+
+body.bhd-mobile .bhd-offline-reload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  height: auto;
+  min-height: 48px;
+  margin: 8px 0 0;
+  padding: 8px 20px;
+  border: 1px solid #d4a646;
+  border-radius: 12px;
+  background: #b3202a;
+  color: #fff;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+@keyframes bhd-offline-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ------------------------------------------ */
+/*  Menos movimiento                           */
+/* ------------------------------------------ */
+
+/* Si el teléfono tiene activado "reducir movimiento", sin animaciones (también ahorra batería). */
+@media (prefers-reduced-motion: reduce) {
+  #bhd-mobile-app *,
+  #bhd-mobile-app *::after,
+  body.bhd-mobile .bhd-offline * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

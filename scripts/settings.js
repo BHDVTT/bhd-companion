@@ -43,4 +43,30 @@ export function registerSettings() {
     type: new foundry.data.fields.BooleanField({ initial: false }),
     requiresReload: true
   });
+
+  // Preferencias del teléfono. Se cambian desde el botón de ajustes de la vista móvil
+  // (en la interfaz normal están ocultas: no hacen nada fuera de la vista móvil).
+  game.settings.register(MODULE_ID, "largeText", {
+    name: "BHD.Settings.LargeText.Name",
+    hint: "BHD.Settings.LargeText.Hint",
+    scope: "client",
+    config: false,
+    type: new foundry.data.fields.BooleanField({ initial: false })
+  });
+
+  game.settings.register(MODULE_ID, "keepAwake", {
+    name: "BHD.Settings.KeepAwake.Name",
+    hint: "BHD.Settings.KeepAwake.Hint",
+    scope: "client",
+    config: false,
+    type: new foundry.data.fields.BooleanField({ initial: true })
+  });
+
+  game.settings.register(MODULE_ID, "phoneMusic", {
+    name: "BHD.Settings.PhoneMusic.Name",
+    hint: "BHD.Settings.PhoneMusic.Hint",
+    scope: "client",
+    config: false,
+    type: new foundry.data.fields.BooleanField({ initial: false })
+  });
 }

@@ -8,7 +8,6 @@
       "inventory": "Inventory",
       "notes": "Notes"
     },
-    "ComingSoon": "Coming soon",
     "NoCharacter": "No character assigned",
     "Sheet": {
       "AskGM": "Ask the DM to assign you a character. It will show up here automatically.",
@@ -172,7 +171,36 @@
       "Content": "The page will reload with the normal Foundry interface on this device. You can switch back with the \"Mobile view\" button."
     },
     "ReturnMobile": "Mobile view",
+    "Connection": {
+      "Lost": "No connection",
+      "Back": "Connection restored",
+      "Hint": "Reconnecting to the game… Check that your phone is still on the Wi-Fi. Your notes are safe.",
+      "Attempt": "Attempt {attempt}",
+      "Reload": "Reload now"
+    },
+    "Install": {
+      "Title": "Add to Home Screen",
+      "Description": "Your Battlehammer's Dungeon character sheet.",
+      "Installed": "You are already using it as an app from your home screen. ✓",
+      "Button": "Install as app",
+      "IOS": "In Safari, tap <strong>Share</strong> (the square with the up arrow) and then <strong>Add to Home Screen</strong>. You will need to log in again the first time.",
+      "Android": "In Chrome, open the <strong>⋮</strong> menu (top right) and tap <strong>Add to Home screen</strong> or <strong>Install app</strong>."
+    },
     "Settings": {
+      "Title": "Phone settings",
+      "LargeText": {
+        "Name": "Large text",
+        "Hint": "Makes all text and buttons in the view bigger."
+      },
+      "KeepAwake": {
+        "Name": "Keep screen on",
+        "Hint": "The screen won't turn off by itself while the view is open. Uses a bit more battery.",
+        "Unsupported": "This browser doesn't allow it (it needs HTTPS, like The Forge, and a recent browser)."
+      },
+      "PhoneMusic": {
+        "Name": "Music on the phone",
+        "Hint": "Music normally plays only on the TV. Turn this on to hear it here too (uses data and battery)."
+      },
       "Enabled": {
         "Name": "Enable mobile view",
         "Hint": "Players joining from a phone or small screen see the BHD Companion mobile view instead of the normal interface. Does not affect the GM."

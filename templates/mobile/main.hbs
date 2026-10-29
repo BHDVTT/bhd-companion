@@ -1,6 +1,8 @@
 <main class="bhd-main">
   {{#each tabs as |tab|}}
   <section class="tab bhd-tab {{tab.cssClass}}" data-group="{{tab.group}}" data-tab="{{tab.id}}">
+    {{!-- Solo se dibuja la pestaña visible (más rápido en teléfonos viejos). --}}
+    {{#if tab.active}}
     {{#if (eq tab.id "character")}}
     {{> "modules/bhd-companion/templates/mobile/character.hbs" sheet=@root.sheet choices=@root.choices hpAmount=@root.hpAmount deathSaves=@root.deathSaves}}
     {{else if (eq tab.id "actions")}}
@@ -11,12 +13,7 @@
     {{> "modules/bhd-companion/templates/mobile/inventory.hbs" inventory=@root.inventory}}
     {{else if (eq tab.id "notes")}}
     {{> "modules/bhd-companion/templates/mobile/notes.hbs" notes=@root.notes}}
-    {{else}}
-    <div class="bhd-placeholder">
-      <i class="{{tab.icon}}" aria-hidden="true"></i>
-      <h2>{{localize tab.label}}</h2>
-      <p>{{localize "BHD.ComingSoon"}}</p>
-    </div>
+    {{/if}}
     {{/if}}
   </section>
   {{/each}}

@@ -59,9 +59,14 @@ scripts/apps/inventory-data.js  datos de la pestaña Inventario (objetos, conten
 scripts/apps/notes-data.js      datos de la pestaña Notas (notas personales, personalidad, biografía)
 scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
+scripts/connection.js        reconexión sin límite y aviso "Sin conexión" en vista móvil
+scripts/wake-lock.js         pantalla siempre encendida (Screen Wake Lock API)
+scripts/home-screen.js       manifiesto de app web y etiquetas apple-* (añadir a pantalla de inicio)
+icons/icon-{180,192,512}.png icono de la app (generado con System.Drawing de PowerShell)
 templates/mobile/*.hbs       partes de la vista: header, main, turn, nav; parciales de pestaña:
                              character.hbs, actions.hbs, action-row.hbs, combat.hbs, death-saves.hbs,
-                             inventory.hbs, inventory-row.hbs, inventory-container.hbs, notes.hbs
+                             inventory.hbs, inventory-row.hbs, inventory-container.hbs, notes.hbs;
+                             settings.hbs (panel de ajustes, se dibuja con renderTemplate)
 styles/bhd-companion.css     estilos
 lang/es.json, en.json        traducciones
 ```
@@ -83,7 +88,8 @@ lang/es.json, en.json        traducciones
 - **App:** `BHDMobileApp` con `window.frame/positioned = false`, pestañas en `TABS.primary`.
   Las pestañas usan la acción propia `bhdTab` (el `_onClickTab` de Foundry usa
   `event.target` y falla al tocar el icono). `close()` ignora cierres salvo `{bhdForce: true}`.
-- **Salida / regreso:** el botón del encabezado pone `preferNormal = true` y recarga. En la
+- **Salida / regreso:** "Volver a la interfaz normal" (en el panel de ajustes del engranaje, desde
+  0.7.0) pone `preferNormal = true` y recarga. En la
   interfaz normal, si el dispositivo podría usar la vista móvil, aparece un botón flotante
   "Vista móvil" que lo revierte.
 - Los CSS del núcleo de Foundry están en `@layer`, así que los estilos del módulo ganan.
@@ -205,6 +211,39 @@ lang/es.json, en.json        traducciones
   corto permite gastar dados de golpe). Si `dnd5e.allowRests` está desactivado, solo un aviso.
   Al terminar, aviso con los PG recuperados (`result.deltas.hitPoints`).
 
+## Uso real en la tienda (decisiones de la etapa 6)
+
+- **Solo la pestaña visible:** `_prepareContext` prepara hoja / acciones / inventario / notas solo si
+  es la pestaña activa (`this.tabGroups.primary`), y `main.hbs` solo dibuja la sección con
+  `tab.active`. `#onTab` cambia `tabGroups` y hace `render({ parts: ["main", "nav"] })` (ya no usa
+  `changeTab`), y sube al principio; tocar la pestaña actual también sube. Combate y salvaciones
+  de muerte se preparan siempre (barra de pestañas y barra de turno).
+- **Pantalla apagada:** en `main.js` el `refresh` no dibuja con `document.hidden`; dibuja una vez en
+  `visibilitychange`.
+- **CSS:** todo `font-size: Npx` es `calc(Npx * var(--bhd-text-scale, 1))` (también las
+  `--font-size-*` de las ventanas). Letra grande = clase `bhd-large-text` en `<body>`
+  (`--bhd-text-scale: 1.2`, barra inferior 78 px). Al añadir CSS nuevo, seguir la misma forma.
+  Animaciones infinitas solo de `transform` / `opacity` (el brillo de Terminar turno es un `::after`);
+  `prefers-reduced-motion` las quita.
+- **Ajustes del teléfono** (cliente, `config: false`): `largeText`, `keepAwake` (true), `phoneMusic`
+  (false). Se cambian en el panel del engranaje (`bhdSettings`, `bhdToggleSetting`) y se aplican sin
+  recargar (`applyLargeText`, `updateWakeLock`, `syncPlaylistSounds`).
+- **Música:** `mobile-mode.js` sustituye `PlaylistSound.prototype.sync` (de `CONFIG.PlaylistSound.documentClass`):
+  sin `phoneMusic` no se crea ni descarga el sonido. Los sonidos de interfaz (dados) siguen.
+- **Reconexión** (`connection.js`): Foundry usa socket.io 4.8 con 10 intentos de 500 ms y luego manda a
+  `/no`. En vista móvil: `manager.reconnectionAttempts(Infinity)`, espera 1–5 s, `socket.connect()` en
+  `visibilitychange` y `online`, reintento manual tras `"io server disconnect"`. Aviso `.bhd-offline`
+  en `<body>` (z-index 100000) que bloquea los toques. Foundry recarga solo si estuvo ≥ 5 s sin conexión.
+  Sus avisos en inglés de conexión se silencian (`getSilencedNotifications`, también sin consola:
+  `console: false`).
+- **Notas a salvo:** el borrador también va a `localStorage` (`bhd-companion.notesDraft.<actorId>`,
+  `localNotesDraft`); en `_onFirstRender` se recupera y se guarda si difiere de lo guardado.
+- **Pantalla de inicio** (`home-screen.js`, en `setup`): manifiesto creado como Blob con URLs absolutas
+  (`getRoute`, sirve en local y en The Forge), `apple-touch-icon` y metas `apple-mobile-web-app-*`.
+  `beforeinstallprompt` se guarda para el botón "Instalar" (Chrome / Android); en iPhone, instrucciones.
+- **Consola:** la vibración del aviso de turno solo con `navigator.userActivation.hasBeenActive`
+  (si no, Chrome avisa en la consola).
+
 ## Entorno local
 
 - Datos de Foundry: `C:\Users\Frulo\AppData\Local\FoundryVTT\Data`
@@ -239,7 +278,10 @@ lang/es.json, en.json        traducciones
    tiradas) — pestaña Inventario (por tipo, contenedores, equipar, sintonizar, cantidades,
    monedas, peso), pestaña Notas (notas personales, personalidad, biografía), descanso
    corto / largo en la pestaña Personaje.
-6. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
+6. **Uso real en la tienda** (0.7.0, hecha, **pendiente de probar**; el usuario la pidió antes que
+   las tiradas) — rendimiento en teléfonos viejos, textos es/en revisados, pantalla encendida,
+   reconexión automática, letra grande, añadir a la pantalla de inicio, avisos de consola, README.
+7. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
-7. **Pulido y publicación** — rendimiento en teléfonos, pruebas con 5 jugadores, repositorio
-   público (GitHub) con `manifest` y `download` en `module.json` para instalar en The Forge.
+8. **Publicación** — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
+   `download` en `module.json` para instalar en The Forge.

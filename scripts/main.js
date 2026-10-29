@@ -9,6 +9,8 @@ import { enterMobileMode } from "./mobile-mode.js";
 import { BHDMobileApp } from "./apps/mobile-app.js";
 import { getCharacterChoices } from "./apps/character-data.js";
 import { getActiveCombat } from "./apps/combat-data.js";
+import { watchConnection } from "./connection.js";
+import { updateWakeLock } from "./wake-lock.js";
 
 /** ¿Este cliente está en vista móvil? Se decide una sola vez al cargar. */
 let mobileView = false;
@@ -38,9 +40,21 @@ function openMobileView() {
   const app = new BHDMobileApp();
   app.render({ force: true });
   game.modules.get(MODULE_ID).api = { app };
+  watchConnection();
+  updateWakeLock();
 
   // Varios cambios seguidos (p. ej. el GM aplica daño y un estado) producen un solo redibujado.
-  const refresh = foundry.utils.debounce(() => app.render(), 50);
+  // Con la pantalla apagada o en otra app no se dibuja nada (ahorra batería): se hace una vez al volver.
+  let pendingRender = false;
+  const refresh = foundry.utils.debounce(() => {
+    if ( document.hidden ) pendingRender = true;
+    else app.render();
+  }, 50);
+  document.addEventListener("visibilitychange", () => {
+    if ( document.hidden || !pendingRender ) return;
+    pendingRender = false;
+    app.render();
+  });
 
   /** ¿Este personaje aparece en la vista (el que se muestra o uno del selector)? */
   const isShown = actor => (actor?.type === "character")

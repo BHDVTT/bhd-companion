@@ -1,0 +1,44 @@
+{{!-- Panel de ajustes del teléfono. Recibe toggles e install. --}}
+<div class="bhd-chooser-backdrop" data-action="bhdCloseSettings"></div>
+<section class="bhd-settings-sheet" role="dialog" aria-modal="true" aria-labelledby="bhd-settings-title">
+  <header class="bhd-settings-header">
+    <h2 id="bhd-settings-title"><i class="fa-solid fa-gear" aria-hidden="true"></i> {{localize "BHD.Settings.Title"}}</h2>
+    <button type="button" class="bhd-tray-close" data-action="bhdCloseSettings" aria-label="{{localize 'BHD.Actions.Close'}}">
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+    </button>
+  </header>
+
+  {{#each toggles}}
+  <button type="button" class="bhd-setting-toggle {{#if on}}bhd-on{{/if}}" data-action="bhdToggleSetting"
+          data-setting="{{key}}" aria-pressed="{{on}}" {{#if unsupported}}disabled{{/if}}>
+    <i class="{{icon}} bhd-setting-icon" aria-hidden="true"></i>
+    <span class="bhd-setting-text">
+      <span class="bhd-setting-name">{{localize (concat "BHD.Settings." key ".Name")}}</span>
+      <span class="bhd-setting-hint">
+        {{#if unsupported}}{{localize "BHD.Settings.KeepAwake.Unsupported"}}{{else}}{{localize (concat "BHD.Settings." key ".Hint")}}{{/if}}
+      </span>
+    </span>
+    <span class="bhd-switch" aria-hidden="true"></span>
+  </button>
+  {{/each}}
+
+  {{!-- Añadir a la pantalla de inicio --}}
+  <div class="bhd-setting-install">
+    <span class="bhd-setting-name"><i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i> {{localize "BHD.Install.Title"}}</span>
+    {{#if (eq install "installed")}}
+    <p class="bhd-setting-hint">{{localize "BHD.Install.Installed"}}</p>
+    {{else if (eq install "prompt")}}
+    <button type="button" class="bhd-big-btn bhd-install-btn" data-action="bhdInstall">
+      <i class="fa-solid fa-download" aria-hidden="true"></i> {{localize "BHD.Install.Button"}}
+    </button>
+    {{else if (eq install "ios")}}
+    <p class="bhd-setting-hint">{{{localize "BHD.Install.IOS"}}}</p>
+    {{else}}
+    <p class="bhd-setting-hint">{{{localize "BHD.Install.Android"}}}</p>
+    {{/if}}
+  </div>
+
+  <button type="button" class="bhd-settings-exit" data-action="exitMobile">
+    <i class="fa-solid fa-display" aria-hidden="true"></i> {{localize "BHD.Exit.Button"}}
+  </button>
+</section>
