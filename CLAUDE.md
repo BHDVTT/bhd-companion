@@ -256,6 +256,9 @@ lang/es.json, en.json        traducciones
   `checkCollision` (tipo de pared de `CONFIG.Token.movement.actions[action].walls`; puertas cerradas
   bloquean) y mueve con `token.move(waypoint, { method: "keyboard" })`. Responde `moveResult` solo al
   jugador; sin respuesta en 5 s → aviso. Requiere que el DM esté conectado y viendo esa escena.
+  Si sale "El DM no responde", lo primero: el cliente del DM tiene código viejo → recargarlo (F5).
+  Se valoró mover directo desde el teléfono (dueño) con comprobación de paredes propia; se descartó
+  por ahora porque no vería regiones ni paredes por altura de otros módulos.
 - **Reglas** (`getMovementBlock`, comunes a teléfono y DM): dueño de la ficha, ajuste de mundo
   `lockMovement`, pausa, ficha bloqueada (`token.locked`) y, en combate empezado con esa ficha, solo en su
   turno salvo ajuste `moveOutsideTurn`.
@@ -310,7 +313,7 @@ lang/es.json, en.json        traducciones
 6. **Uso real en la tienda** ✅ (0.7.0, probada; el usuario la pidió antes que
    las tiradas) — rendimiento en teléfonos viejos, textos es/en revisados, pantalla encendida,
    reconexión automática, letra grande, añadir a la pantalla de inicio, avisos de consola, README.
-   - **6D. Mover desde el teléfono** (0.7.1, sin probar) — pestaña Mover con cruceta de 8 direcciones,
+   - **6D. Mover desde el teléfono** (0.7.1, probado en iPad: la ficha se mueve; falta probar el resto) — pestaña Mover con cruceta de 8 direcciones,
      paredes y puertas, pies usados / restantes, Deshacer, solo en tu turno (ajustes del GM), elegir
      ficha, la TV sigue la ficha.
 7. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
