@@ -1,0 +1,143 @@
+<div class="bhd-sheet">
+  {{#if choices}}
+  <label class="bhd-select">
+    <span>{{localize "BHD.Sheet.ChooseCharacter"}}</span>
+    <select data-bhd-character-select>
+      {{#each choices}}
+      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+      {{/each}}
+    </select>
+  </label>
+  {{/if}}
+
+  {{#if sheet}}
+  {{!-- Retrato, nombre, clase e inspiración --}}
+  <section class="bhd-hero">
+    <img class="bhd-hero-portrait" src="{{sheet.img}}" alt="">
+    <div class="bhd-hero-info">
+      <h2 class="bhd-hero-name">{{sheet.name}}</h2>
+      {{#if sheet.classLabel}}<span class="bhd-hero-class">{{sheet.classLabel}}</span>{{/if}}
+      <span class="bhd-hero-level">{{localize "BHD.Sheet.Level" level=sheet.level}}</span>
+    </div>
+    <button type="button" class="bhd-inspiration {{#if sheet.inspiration}}bhd-on{{/if}}" data-action="toggleInspiration"
+            aria-pressed="{{sheet.inspiration}}">
+      <i class="fa-solid fa-star" aria-hidden="true"></i>
+      <span>{{localize "BHD.Sheet.Inspiration"}}</span>
+    </button>
+  </section>
+
+  {{!-- Puntos de golpe --}}
+  <section class="bhd-card bhd-hp">
+    <div class="bhd-hp-numbers">
+      <span class="bhd-hp-title">{{localize "BHD.Sheet.HP.Label"}}</span>
+      <span class="bhd-hp-value"><strong>{{sheet.hp.value}}</strong> / {{sheet.hp.max}}</span>
+      {{#if sheet.hp.temp}}
+      <span class="bhd-hp-temp"><i class="fa-solid fa-shield-heart" aria-hidden="true"></i> +{{sheet.hp.temp}} {{localize "BHD.Sheet.HP.TempShort"}}</span>
+      {{/if}}
+    </div>
+    <div class="bhd-hp-bar" role="progressbar" aria-valuemin="0" aria-valuemax="{{sheet.hp.max}}" aria-valuenow="{{sheet.hp.value}}">
+      <div class="bhd-hp-fill bhd-hp-{{sheet.hp.level}}" style="width: {{sheet.hp.pct}}%"></div>
+    </div>
+    <div class="bhd-hp-amount">
+      <button type="button" class="bhd-step" data-action="hpStep" data-step="-1" aria-label="-1">
+        <i class="fa-solid fa-minus" aria-hidden="true"></i>
+      </button>
+      <input type="number" inputmode="numeric" min="0" step="1" name="bhdHpAmount" data-bhd-hp-amount value="{{hpAmount}}"
+             placeholder="0" aria-label="{{localize 'BHD.Sheet.HP.Amount'}}">
+      <button type="button" class="bhd-step" data-action="hpStep" data-step="1" aria-label="+1">
+        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="bhd-hp-buttons">
+      <button type="button" class="bhd-hp-btn bhd-damage" data-action="hpApply" data-mode="damage">
+        <i class="fa-solid fa-heart-crack" aria-hidden="true"></i> {{localize "BHD.Sheet.HP.Damage"}}
+      </button>
+      <button type="button" class="bhd-hp-btn bhd-heal" data-action="hpApply" data-mode="heal">
+        <i class="fa-solid fa-heart-pulse" aria-hidden="true"></i> {{localize "BHD.Sheet.HP.Heal"}}
+      </button>
+      <button type="button" class="bhd-hp-btn bhd-temp" data-action="hpApply" data-mode="temp">
+        <i class="fa-solid fa-shield-heart" aria-hidden="true"></i> {{localize "BHD.Sheet.HP.Temp"}}
+      </button>
+    </div>
+  </section>
+
+  {{!-- CA, iniciativa, velocidad, competencia --}}
+  <section class="bhd-stats">
+    <div class="bhd-stat">
+      <span class="bhd-stat-label">{{localize "BHD.Sheet.AC"}}</span>
+      <span class="bhd-stat-value"><i class="fa-solid fa-shield" aria-hidden="true"></i> {{sheet.ac}}</span>
+    </div>
+    <button type="button" class="bhd-stat bhd-rollable" data-action="roll" data-type="initiative"
+            data-label="{{localize 'BHD.Sheet.Initiative'}}">
+      <span class="bhd-stat-label">{{localize "BHD.Sheet.Initiative"}}</span>
+      <span class="bhd-stat-value">{{sheet.initiative}}</span>
+    </button>
+    <div class="bhd-stat">
+      <span class="bhd-stat-label">{{localize "BHD.Sheet.Speed"}}</span>
+      <span class="bhd-stat-value">{{sheet.speed.walk}}</span>
+    </div>
+    <div class="bhd-stat">
+      <span class="bhd-stat-label">{{localize "BHD.Sheet.Proficiency"}}</span>
+      <span class="bhd-stat-value">{{sheet.prof}}</span>
+    </div>
+  </section>
+  {{#if sheet.speed.others}}<p class="bhd-speed-others">{{sheet.speed.others}}</p>{{/if}}
+
+  {{!-- Condiciones activas --}}
+  {{#if sheet.conditions.length}}
+  <section class="bhd-conditions">
+    {{#each sheet.conditions}}
+    <span class="bhd-condition"><img src="{{img}}" alt=""> {{label}}</span>
+    {{/each}}
+  </section>
+  {{/if}}
+
+  {{!-- Características --}}
+  <h3 class="bhd-section-title">{{localize "BHD.Sheet.Abilities"}}</h3>
+  <section class="bhd-abilities">
+    {{#each sheet.abilities}}
+    <button type="button" class="bhd-ability bhd-rollable" data-action="roll" data-type="ability" data-key="{{key}}"
+            data-label="{{label}}">
+      <span class="bhd-ability-abbr">{{abbr}}</span>
+      <span class="bhd-ability-mod">{{mod}}</span>
+      <span class="bhd-ability-score">{{value}}</span>
+    </button>
+    {{/each}}
+  </section>
+
+  {{!-- Salvaciones --}}
+  <h3 class="bhd-section-title">{{localize "BHD.Sheet.Saves"}}</h3>
+  <section class="bhd-saves">
+    {{#each sheet.abilities}}
+    <button type="button" class="bhd-row bhd-rollable" data-action="roll" data-type="save" data-key="{{key}}"
+            data-label="{{localize 'BHD.Sheet.SaveLabel' ability=label}}">
+      <i class="bhd-prof {{#if saveProficient}}bhd-prof-proficient{{else}}bhd-prof-none{{/if}}" aria-hidden="true"></i>
+      <span class="bhd-row-label">{{label}}</span>
+      <span class="bhd-row-value">{{save}}</span>
+    </button>
+    {{/each}}
+  </section>
+
+  {{!-- Habilidades --}}
+  <h3 class="bhd-section-title">{{localize "BHD.Sheet.Skills"}}</h3>
+  <section class="bhd-skills">
+    {{#each sheet.skills}}
+    <button type="button" class="bhd-row bhd-rollable" data-action="roll" data-type="skill" data-key="{{key}}"
+            data-label="{{label}}">
+      <i class="bhd-prof bhd-prof-{{prof}}" aria-hidden="true"></i>
+      <span class="bhd-row-label">{{label}} <small>{{abbr}}</small></span>
+      <span class="bhd-row-value">{{total}}</span>
+    </button>
+    {{/each}}
+  </section>
+  <p class="bhd-tap-hint">{{localize "BHD.Sheet.TapToRoll"}}</p>
+
+  {{else}}
+  {{!-- Sin personaje --}}
+  <div class="bhd-placeholder">
+    <i class="fa-solid fa-user-slash" aria-hidden="true"></i>
+    <h2>{{localize "BHD.NoCharacter"}}</h2>
+    <p>{{localize "BHD.Sheet.AskGM"}}</p>
+  </div>
+  {{/if}}
+</div>

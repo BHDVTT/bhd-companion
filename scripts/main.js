@@ -7,6 +7,7 @@ import { registerSettings } from "./settings.js";
 import { canUseMobileView, shouldUseMobileView } from "./device.js";
 import { enterMobileMode } from "./mobile-mode.js";
 import { BHDMobileApp } from "./apps/mobile-app.js";
+import { getCharacterChoices } from "./apps/character-data.js";
 
 /** ¿Este cliente está en vista móvil? Se decide una sola vez al cargar. */
 let mobileView = false;
@@ -37,12 +38,40 @@ function openMobileView() {
   app.render({ force: true });
   game.modules.get(MODULE_ID).api = { app };
 
+  // Varios cambios seguidos (p. ej. el GM aplica daño y un estado) producen un solo redibujado.
+  const refresh = foundry.utils.debounce(() => app.render(), 50);
+
+  /** ¿Este personaje aparece en la vista (el que se muestra o uno del selector)? */
+  const isShown = actor => (actor?.type === "character")
+    && ((actor === app.actor) || getCharacterChoices().includes(actor));
+
   Hooks.on("updateUser", (user, changes) => {
-    if ( user.isSelf && ("character" in changes) ) app.render();
+    if ( user.isSelf && ("character" in changes) ) refresh();
   });
-  Hooks.on("updateActor", actor => {
-    if ( actor === game.user.character ) app.render({ parts: ["header"] });
+
+  // Personajes: vida, características, permisos (si el GM da o quita un personaje), etc.
+  Hooks.on("updateActor", (actor, changes) => {
+    if ( isShown(actor) || ("ownership" in changes) ) refresh();
   });
+  Hooks.on("createActor", actor => {
+    if ( actor.type === "character" ) refresh();
+  });
+  Hooks.on("deleteActor", actor => {
+    if ( actor.type === "character" ) refresh();
+  });
+
+  // Objetos (clases, armaduras...) y efectos (condiciones, bonificadores) del personaje.
+  const onItem = item => {
+    if ( item.parent === app.actor ) refresh();
+  };
+  const onEffect = effect => {
+    const owner = (effect.parent instanceof Actor) ? effect.parent : effect.parent?.parent;
+    if ( owner === app.actor ) refresh();
+  };
+  for ( const action of ["create", "update", "delete"] ) {
+    Hooks.on(`${action}Item`, onItem);
+    Hooks.on(`${action}ActiveEffect`, onEffect);
+  }
 }
 
 /**

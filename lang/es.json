@@ -10,6 +10,31 @@
     },
     "ComingSoon": "Próximamente",
     "NoCharacter": "Sin personaje asignado",
+    "Sheet": {
+      "AskGM": "Pídele al DM que te asigne un personaje. Aparecerá aquí automáticamente.",
+      "ChooseCharacter": "Personaje",
+      "Level": "Nivel {level}",
+      "Inspiration": "Inspiración",
+      "HP": {
+        "Label": "Puntos de golpe",
+        "TempShort": "temp.",
+        "Amount": "Cantidad",
+        "Damage": "Daño",
+        "Heal": "Curar",
+        "Temp": "Temporal",
+        "TempNotHigher": "Ya tienes esa vida temporal o más. La vida temporal no se acumula."
+      },
+      "AC": "CA",
+      "Initiative": "Iniciativa",
+      "InitiativeRoll": "Tirada de iniciativa",
+      "Speed": "Velocidad",
+      "Proficiency": "Competencia",
+      "Abilities": "Características",
+      "Saves": "Tiradas de salvación",
+      "SaveLabel": "Salvación de {ability}",
+      "Skills": "Habilidades",
+      "TapToRoll": "Toca cualquier valor para tirarlo. El resultado sale en el chat."
+    },
     "Exit": {
       "Button": "Volver a la interfaz normal de Foundry",
       "Title": "¿Volver a la interfaz normal?",

@@ -10,6 +10,31 @@
     },
     "ComingSoon": "Coming soon",
     "NoCharacter": "No character assigned",
+    "Sheet": {
+      "AskGM": "Ask the DM to assign you a character. It will show up here automatically.",
+      "ChooseCharacter": "Character",
+      "Level": "Level {level}",
+      "Inspiration": "Inspiration",
+      "HP": {
+        "Label": "Hit points",
+        "TempShort": "temp",
+        "Amount": "Amount",
+        "Damage": "Damage",
+        "Heal": "Heal",
+        "Temp": "Temporary",
+        "TempNotHigher": "You already have that much temporary HP or more. Temporary HP doesn't stack."
+      },
+      "AC": "AC",
+      "Initiative": "Initiative",
+      "InitiativeRoll": "Initiative roll",
+      "Speed": "Speed",
+      "Proficiency": "Proficiency",
+      "Abilities": "Abilities",
+      "Saves": "Saving throws",
+      "SaveLabel": "{ability} save",
+      "Skills": "Skills",
+      "TapToRoll": "Tap any value to roll it. The result goes to chat."
+    },
     "Exit": {
       "Button": "Return to the normal Foundry interface",
       "Title": "Return to the normal interface?",

@@ -51,8 +51,9 @@ scripts/constants.js         MODULE_ID y rutas
 scripts/settings.js          configuraciones del módulo
 scripts/device.js            decide si este cliente usa la vista móvil
 scripts/mobile-mode.js       prepara el cliente para la vista móvil (sin mapa, avisos)
-scripts/apps/mobile-app.js   BHDMobileApp (ApplicationV2) — la vista móvil
-templates/mobile/*.hbs       partes de la vista: header, main, nav
+scripts/apps/mobile-app.js   BHDMobileApp (ApplicationV2) — la vista móvil, acciones (tiradas, vida)
+scripts/apps/character-data.js  elegir personaje y preparar sus datos para las plantillas
+templates/mobile/*.hbs       partes de la vista: header, main, nav; character.hbs (parcial de la pestaña)
 styles/bhd-companion.css     estilos
 lang/es.json, en.json        traducciones
 ```
@@ -79,6 +80,23 @@ lang/es.json, en.json        traducciones
   "Vista móvil" que lo revierte.
 - Los CSS del núcleo de Foundry están en `@layer`, así que los estilos del módulo ganan.
 
+## Hoja de personaje (decisiones de la etapa 2)
+
+- **Qué personaje:** `game.user.character`; si no hay, el primero de tipo `character` del que el
+  usuario es dueño. Con más de uno aparece un selector que hace `game.user.update({character})`
+  (los jugadores pueden cambiar su propio `character`).
+- **Datos:** solo valores ya calculados por dnd5e (`system.attributes.*`, `abilities[k].mod`,
+  `abilities[k].save.value`, `skills[k].total`); formato con `dnd5e.utils.formatNumber/formatLength`.
+- **Tiradas:** `rollAbilityCheck` / `rollSavingThrow` / `rollSkill` con `{ configure: false }`
+  (un toque = tirada normal, sin ventana; ventaja/desventaja queda para la etapa 3).
+  Iniciativa: si el personaje está en el combate sin iniciativa → `combat.rollInitiative([id])`;
+  si no → `actor.getInitiativeRoll()` + `toMessage` (evita `rollInitiativeDialog`, que sin
+  mapa crearía combatientes sin ficha). El resultado se muestra unos segundos en el teléfono
+  (`.bhd-toast`); el mensaje completo va al chat.
+- **Vida:** `actor.applyDamage(n)` / `applyDamage(-n)` / `applyTempHP(n)` (la temporal no se acumula).
+- **Tiempo real:** hooks de `updateActor`, `create/deleteActor`, `*Item`, `*ActiveEffect`, `updateUser`
+  con un `render()` agrupado (debounce 50 ms). `ui.notifications` sí se ve en móvil (va en `<body>`).
+
 ## Entorno local
 
 - Datos de Foundry: `C:\Users\Frulo\AppData\Local\FoundryVTT\Data`
@@ -95,7 +113,7 @@ lang/es.json, en.json        traducciones
    vista a pantalla completa sin mapa, encabezado con el personaje, barra de pestañas
    (Personaje, Acciones, Combate, Inventario, Notas), ajustes del GM (`enabled`, `forceAll`),
    botón para volver a la interfaz normal.
-2. **Hoja de personaje (lectura)** — encabezado (nombre, retrato, PG, CA, velocidad,
+2. **Hoja de personaje** 🧪 (hecha, falta probar en Foundry; incluye tiradas con un toque y botones de vida) — encabezado (nombre, retrato, PG, CA, velocidad,
    iniciativa), características, salvaciones, habilidades; pestañas inferiores estilo
    D&D Beyond. Se actualiza sola con `updateActor` / `updateItem`.
 3. **Tiradas** — tocar una característica, salvación o habilidad tira con dnd5e; ventaja /

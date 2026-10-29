@@ -284,3 +284,495 @@ body.bhd-mobile {
   white-space: nowrap;
   cursor: pointer;
 }
+
+/* ------------------------------------------ */
+/*  Hoja de personaje                          */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+/* :where() para que estas reglas base no ganen a las de cada botón */
+#bhd-mobile-app .bhd-sheet :where(button) {
+  margin: 0;
+  box-shadow: none;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+#bhd-mobile-app .bhd-card {
+  padding: 12px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-surface);
+}
+
+/* Selector de personaje */
+#bhd-mobile-app .bhd-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--bhd-text-muted);
+  font-size: 14px;
+}
+
+#bhd-mobile-app .bhd-select select {
+  flex: 1;
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 10px;
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text);
+  font-size: 16px;
+}
+
+/* Retrato, nombre y clase */
+#bhd-mobile-app .bhd-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#bhd-mobile-app .bhd-hero-portrait {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border: 2px solid var(--bhd-gold);
+  border-radius: 12px;
+  object-fit: cover;
+  object-position: top;
+  background: var(--bhd-surface-2);
+}
+
+#bhd-mobile-app .bhd-hero-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#bhd-mobile-app .bhd-hero-name {
+  margin: 0;
+  border: none;
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--bhd-gold);
+  overflow-wrap: anywhere;
+}
+
+#bhd-mobile-app .bhd-hero-class {
+  font-size: 14px;
+}
+
+#bhd-mobile-app .bhd-hero-level {
+  font-size: 13px;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-inspiration {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 64px;
+  height: 64px;
+  padding: 4px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-surface);
+  color: var(--bhd-text-muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+#bhd-mobile-app .bhd-inspiration i {
+  margin: 0;
+  font-size: 22px;
+}
+
+#bhd-mobile-app .bhd-inspiration.bhd-on {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold-soft);
+  color: var(--bhd-gold);
+}
+
+/* Puntos de golpe */
+#bhd-mobile-app .bhd-hp {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#bhd-mobile-app .bhd-hp-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+#bhd-mobile-app .bhd-hp-title {
+  width: 100%;
+  font-size: 12px;
+  color: var(--bhd-text-muted);
+  text-transform: uppercase;
+}
+
+#bhd-mobile-app .bhd-hp-value {
+  font-size: 18px;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-hp-value strong {
+  font-size: 32px;
+  color: var(--bhd-text);
+}
+
+#bhd-mobile-app .bhd-hp-temp {
+  font-size: 16px;
+  font-weight: bold;
+  color: #6fb3e6;
+}
+
+#bhd-mobile-app .bhd-hp-bar {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--bhd-surface-2);
+}
+
+#bhd-mobile-app .bhd-hp-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+#bhd-mobile-app .bhd-hp-high { background: #3f9a4a; }
+#bhd-mobile-app .bhd-hp-mid { background: #d4a646; }
+#bhd-mobile-app .bhd-hp-low { background: var(--bhd-red-bright); }
+
+#bhd-mobile-app .bhd-hp-amount {
+  display: flex;
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-hp-amount input {
+  flex: 1;
+  min-width: 0;
+  height: var(--bhd-touch);
+  padding: 0 8px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 10px;
+  background: var(--bhd-bg);
+  color: var(--bhd-text);
+  font-size: 22px;
+  text-align: center;
+}
+
+#bhd-mobile-app .bhd-step {
+  flex: none;
+  width: var(--bhd-touch);
+  height: var(--bhd-touch);
+  padding: 0;
+  border: 1px solid var(--bhd-border);
+  border-radius: 10px;
+  background: var(--bhd-surface-2);
+  font-size: 18px;
+}
+
+#bhd-mobile-app .bhd-hp-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-hp-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--bhd-touch);
+  padding: 0 4px;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-hp-btn i { margin: 0; }
+#bhd-mobile-app .bhd-damage { background: var(--bhd-red); }
+#bhd-mobile-app .bhd-heal { background: #2f7d3a; }
+#bhd-mobile-app .bhd-temp { background: #2c5f8a; }
+
+#bhd-mobile-app .bhd-hp-btn:active,
+#bhd-mobile-app .bhd-step:active {
+  filter: brightness(1.3);
+}
+
+/* CA, iniciativa, velocidad, competencia */
+#bhd-mobile-app .bhd-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 6px 2px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-surface);
+  text-align: center;
+}
+
+#bhd-mobile-app .bhd-stat-label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  color: var(--bhd-text-muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#bhd-mobile-app .bhd-stat-value {
+  font-size: 18px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+#bhd-mobile-app .bhd-stat-value i {
+  font-size: 14px;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-speed-others {
+  margin: -4px 0 0;
+  font-size: 13px;
+  color: var(--bhd-text-muted);
+  text-align: center;
+}
+
+/* Condiciones */
+#bhd-mobile-app .bhd-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#bhd-mobile-app .bhd-condition {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid var(--bhd-red);
+  border-radius: 16px;
+  background: rgba(179, 32, 42, 0.2);
+  font-size: 14px;
+}
+
+#bhd-mobile-app .bhd-condition img {
+  width: 22px;
+  height: 22px;
+  border: none;
+}
+
+/* Títulos de sección */
+#bhd-mobile-app .bhd-section-title {
+  margin: 8px 0 -4px;
+  border: none;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--bhd-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Elementos que se tiran al tocarlos */
+#bhd-mobile-app .bhd-rollable:active {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold-soft);
+}
+
+#bhd-mobile-app .bhd-rollable.bhd-rolling {
+  opacity: 0.6;
+}
+
+/* Características */
+#bhd-mobile-app .bhd-abilities {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-ability {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 8px 4px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-surface);
+}
+
+#bhd-mobile-app .bhd-ability-abbr {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-ability-mod {
+  font-size: 26px;
+  font-weight: bold;
+  line-height: 1.1;
+}
+
+#bhd-mobile-app .bhd-ability-score {
+  min-width: 32px;
+  padding: 0 6px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 10px;
+  background: var(--bhd-bg);
+  font-size: 13px;
+}
+
+/* Listas: salvaciones y habilidades */
+#bhd-mobile-app .bhd-saves,
+#bhd-mobile-app .bhd-skills {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-surface);
+}
+
+#bhd-mobile-app .bhd-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--bhd-touch);
+  padding: 0 14px;
+  border: none;
+  border-bottom: 1px solid var(--bhd-border);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+#bhd-mobile-app .bhd-row:last-child {
+  border-bottom: none;
+}
+
+#bhd-mobile-app .bhd-row-label {
+  flex: 1;
+  min-width: 0;
+}
+
+#bhd-mobile-app .bhd-row-label small {
+  font-size: 11px;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-row-value {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+/* Indicador de competencia: vacío, medio, lleno, doble */
+#bhd-mobile-app .bhd-prof {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--bhd-text-muted);
+  border-radius: 50%;
+}
+
+#bhd-mobile-app .bhd-prof-half {
+  border-color: var(--bhd-gold);
+  background: linear-gradient(90deg, var(--bhd-gold) 50%, transparent 50%);
+}
+
+#bhd-mobile-app .bhd-prof-proficient {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-prof-expert {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold);
+  box-shadow: 0 0 0 2px var(--bhd-surface), 0 0 0 4px var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-tap-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bhd-text-muted);
+  text-align: center;
+}
+
+/* ------------------------------------------ */
+/*  Resultado de la tirada (aviso flotante)    */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--bhd-nav-height) + 16px + env(safe-area-inset-bottom, 0px));
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100% - 32px);
+  padding: 10px 20px;
+  transform: translateX(-50%);
+  border: 2px solid var(--bhd-gold);
+  border-radius: 16px;
+  background: var(--bhd-surface-2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  animation: bhd-toast-in 0.2s ease-out;
+}
+
+#bhd-mobile-app .bhd-toast[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-toast-label {
+  overflow: hidden;
+  font-size: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#bhd-mobile-app .bhd-toast-total {
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-toast.bhd-crit { border-color: #3f9a4a; }
+#bhd-mobile-app .bhd-toast.bhd-crit .bhd-toast-total { color: #5fd16c; }
+#bhd-mobile-app .bhd-toast.bhd-fumble { border-color: var(--bhd-red-bright); }
+#bhd-mobile-app .bhd-toast.bhd-fumble .bhd-toast-total { color: var(--bhd-red-bright); }
+
+@keyframes bhd-toast-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
