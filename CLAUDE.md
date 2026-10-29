@@ -58,7 +58,10 @@ scripts/apps/combat-data.js     datos de la pestaña Combate (turnos, vida aprox
 scripts/apps/inventory-data.js  datos de la pestaña Inventario (objetos, contenedores, monedas, peso)
 scripts/apps/notes-data.js      datos de la pestaña Notas (notas personales, personalidad, biografía)
 scripts/apps/move-data.js       datos de la pestaña Mover (ficha, pies usados / restantes, cruceta)
+scripts/apps/combat-hud-data.js datos del HUD de combate (bloques, opciones por bloque, tarjetas de objetivos)
 scripts/movement.js          mover fichas desde el teléfono: reglas, canal del módulo, lado del DM, seguir en la TV
+scripts/economy.js           acción / adicional / reacción / Correr usados en el turno (flag del combatiente)
+scripts/targets.js           objetivos sin mapa: game.user.targets con PhoneTarget y aviso a la TV
 scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
 scripts/connection.js        reconexión sin límite y aviso "Sin conexión" en vista móvil
@@ -68,7 +71,7 @@ icons/icon-{180,192,512}.png icono de la app (generado con System.Drawing de Pow
 templates/mobile/*.hbs       partes de la vista: header, main, turn, nav; parciales de pestaña:
                              character.hbs, actions.hbs, action-row.hbs, combat.hbs, death-saves.hbs,
                              inventory.hbs, inventory-row.hbs, inventory-container.hbs, notes.hbs, move.hbs;
-                             settings.hbs (panel de ajustes, se dibuja con renderTemplate)
+                             settings.hbs y target-picker.hbs (se dibujan con renderTemplate)
 styles/bhd-companion.css     estilos
 lang/es.json, en.json        traducciones
 ```
@@ -276,6 +279,46 @@ lang/es.json, en.json        traducciones
   Redibuja con `*Token` de fichas propias de la escena activa, `updateScene` (active/grid) y `pauseGame`,
   solo con la pestaña abierta (`app.activeTab`).
 
+## HUD de combate (decisiones de la etapa 6E)
+
+- **Diseño** (`combat.hbs`): arriba, `.bhd-hud-order` con la ronda y una fila horizontal de retratos
+  (`.bhd-hud-strip`, en `scrollable` de la parte main; se centra en quien va ahora solo cuando cambia
+  el turno, `#syncCombatHud`). Abajo, barra de objetivos, resultado del último uso (`#hudResult`),
+  4 bloques (`.bhd-hud-block`, 2 × 2; 4 en fila desde 700 px) y el panel del bloque abierto
+  (`#hudBlock`). Colores por bloque con variables `--bhd-block*` en `.bhd-hud-<id>` (sin `color-mix`,
+  por iPads viejos). Movimiento lleva a la pestaña Mover.
+- **Usado en el turno** (`economy.js`): flag del combatiente `flags.bhd-companion.economy =
+  { key, action, bonus, reaction, dash }` (los jugadores pueden cambiar los flags de su combatiente).
+  `key` = `combatId.ronda` de su último inicio de turno, igual que el conteo de Mover. Se marca en el
+  hook `dnd5e.postUseActivity` (es `Hooks.call`: no devolver `false`) con el tipo de activación de la
+  actividad, desde cualquier pestaña; desde el HUD manda el bloque tocado (`#hudUse`: el ataque de
+  oportunidad gasta la reacción). "Marcar usada / No la usé" lo cambia a mano. Correr pone `dash`
+  y `move-data` dobla la velocidad. Esquivar pone el estado `dodging` y se quita al empezar el
+  siguiente turno (no al abrir la vista: `#combatChecked`).
+- **Opciones de un bloque** (`combat-hud-data.js`): objetos con actividades de ese
+  `activation.type` (armas equipadas, hechizos con `isSpellShown`, rasgos, consumibles, otros
+  equipados) reutilizando `prepareRow` y `action-row.hbs` (con `row.hudBlock` → `bhdHudUse`; el toque
+  largo y "Más opciones" también pasan por el HUD con `data-hud-block`). Si solo hay una actividad
+  de ese tipo se usa `activity.use()` (sin preguntar cuál). Acciones básicas en `BASIC_ACTIONS`:
+  mensaje al chat + tirada (Esconderse = Sigilo, Buscar = Percepción) + marcar acción.
+- **Objetivos sin mapa** (`targets.js`): `game.user.targets` se llena con `PhoneTarget` (id, name,
+  actor, document, x/y/w/h, center, `hasDynamicRing: false` porque dnd5e lo lee en `targetToken`).
+  dnd5e solo usa `name` y `actor` (`getTargetDescriptors`). Se avisa a las demás pantallas con
+  `broadcastActivity({ sceneId, targets })` (sin `sceneId` la TV los ignora, ver
+  `Users#handleUserActivity`); se reenvía al reconectar. `pruneTargets` con `deleteToken` y cambio
+  de escena activa. Midi QOL lee `game.user.targets` en el cliente que usa el objeto (el teléfono,
+  sin mapa): **no probado** (Midi no está instalado en local).
+- **¿Necesita objetivo?** (`getTargetNeed`): no si la actividad tiene área (`target.template.type`)
+  o `affects.type` es `self` / `space`; sí si es ataque o tiene `affects.type`; cuántos =
+  `affects.count` (con `simplifyBonus`) o 1. El selector (`#pickTargets`, `.bhd-picker`, z-index 4)
+  devuelve ids, `[]` (sin objetivo) o `null` (cancelar). Con 1 objetivo, tocar la tarjeta ya elige.
+  Tarjetas: fichas de la escena activa no ocultas (sin mapa no hay visión), distancia de casilla a
+  casilla con `grid.getOffsetRange` + `measurePath` (regla de diagonales de la escena; sin cuadrícula
+  o hex, de centro a centro), orden por cercanía, derrotados y uno mismo al final.
+- **Resultado:** `#hudResult` se crea en `onPostUseActivity` y se completa en `onActivityRoll`
+  (ataque: total, crítico / pifia y por objetivo impacta o falla como la tarjeta de dnd5e; daño:
+  total). Impacta / falla solo con el ajuste de mundo `showAttackResult` (nunca se muestra la CA).
+
 ## Entorno local
 
 - Datos de Foundry: `C:\Users\Frulo\AppData\Local\FoundryVTT\Data`
@@ -316,6 +359,10 @@ lang/es.json, en.json        traducciones
    - **6D. Mover desde el teléfono** (0.7.1, probado en iPad: la ficha se mueve; falta probar el resto) — pestaña Mover con cruceta de 8 direcciones,
      paredes y puertas, pies usados / restantes, Deshacer, solo en tu turno (ajustes del GM), elegir
      ficha, la TV sigue la ficha.
+   - **6E. HUD de combate** (0.8.0, sin probar) — pestaña Combate rediseñada: retratos en fila,
+     bloques Acción / Adicional / Reacción / Movimiento con "usado en este turno", opciones por
+     bloque, acciones básicas, selector de objetivos (cercanía, distancia, varios), objetivos de
+     Foundry visibles en la TV, resultado impacta / falla y daño.
 7. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
 8. **Publicación** — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y

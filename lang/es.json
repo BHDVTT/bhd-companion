@@ -85,7 +85,7 @@
       "NextBadge": "Sigue",
       "YourTurn": "¡Es tu turno!",
       "YourTurnAlert": "¡Es tu turno!",
-      "YourTurnHint": "Usa tus acciones en la pestaña Acciones. Cuando acabes, toca «Terminar turno».",
+      "YourTurnHint": "Elige tu acción, adicional y movimiento en la pestaña Combate. Cuando acabes, toca «Terminar turno».",
       "YourTurnDying": "Estás a 0 de vida: tira tu salvación de muerte y luego termina el turno.",
       "LetsGo": "¡Vamos!",
       "EndTurn": "Terminar turno",
@@ -111,6 +111,85 @@
         "Dead": "Tu personaje ha muerto."
       }
     },
+    "Hud": {
+      "Title": "Tu turno",
+      "Block": {
+        "action": "Acción",
+        "bonus": "Adicional",
+        "reaction": "Reacción",
+        "move": "Movimiento"
+      },
+      "Ready": "Disponible",
+      "Used": "Usada",
+      "NoToken": "Sin ficha",
+      "MarkUsed": "Marcar usada",
+      "MarkReady": "No la usé",
+      "AlreadyUsed": "Ya la usaste en este turno. Si el DM lo permite, puedes usar algo igualmente.",
+      "Basics": "Acciones básicas",
+      "Items": "Objetos",
+      "Opportunity": "Ataque de oportunidad",
+      "OpportunityHint": "Cuando un enemigo sale de tu alcance, atácalo con tu reacción.",
+      "Empty": "No tienes nada de este tipo.",
+      "Hint": "Toca un bloque para ver tus opciones. Toca un retrato de arriba para marcarlo como objetivo.",
+      "NoTargets": "Sin objetivo",
+      "ChooseTargets": "Elegir",
+      "ClearTargets": "Quitar objetivos",
+      "TargetsTitle": "Objetivos",
+      "Result": {
+        "Hit": "¡Impacta!",
+        "Miss": "Falla",
+        "Critical": "¡Crítico!",
+        "Fumble": "Pifia",
+        "DamageHint": "Toca «Daño» (o «Curación») en la tarjeta de abajo para tirarlo."
+      },
+      "Picker": {
+        "One": "Toca a quién apuntas. Se verá en la TV.",
+        "Many": "Elige hasta {max} objetivos y confirma.",
+        "ManualHint": "Toca para marcar o desmarcar. Se ven en la TV.",
+        "None": "Sin objetivo",
+        "Confirm": "Listo ({count})",
+        "ConfirmMax": "Listo ({count}/{max})",
+        "Full": "Como mucho {max} objetivos. Desmarca uno primero.",
+        "Empty": "No hay criaturas visibles en la escena de la TV."
+      },
+      "Basic": {
+        "dodge": {
+          "Name": "Esquivar",
+          "Hint": "Ataques contra ti con desventaja",
+          "Chat": "Hasta su próximo turno, los ataques contra este personaje tienen desventaja (si puede ver al atacante) y tiene ventaja en las salvaciones de Destreza."
+        },
+        "dash": {
+          "Name": "Correr",
+          "Hint": "Dobla tu movimiento",
+          "Chat": "Gana movimiento extra igual a su velocidad en este turno."
+        },
+        "disengage": {
+          "Name": "Destrabarse",
+          "Hint": "Sin ataques de oportunidad",
+          "Chat": "Su movimiento no provoca ataques de oportunidad durante el resto del turno."
+        },
+        "help": {
+          "Name": "Ayudar",
+          "Hint": "Ventaja para un aliado",
+          "Chat": "Ayuda: el siguiente ataque de un aliado contra el objetivo (o la siguiente prueba de un aliado) tiene ventaja."
+        },
+        "hide": {
+          "Name": "Esconderse",
+          "Hint": "Tira Sigilo",
+          "Chat": "Intenta esconderse."
+        },
+        "search": {
+          "Name": "Buscar",
+          "Hint": "Tira Percepción",
+          "Chat": "Busca algo a su alrededor."
+        },
+        "ready": {
+          "Name": "Preparar",
+          "Hint": "Actúa con tu reacción después",
+          "Chat": "Prepara una acción: la hará con su reacción cuando ocurra lo que ha dicho."
+        }
+      }
+    },
     "Rest": {
       "Title": "Descanso",
       "HitDice": "Dados de golpe",
@@ -128,6 +207,7 @@
       "Extra": "De más",
       "TurnHint": "El conteo vuelve a cero al empezar tu turno.",
       "FreeHint": "Fuera de combate puedes moverte libremente.",
+      "DashHint": "Usaste Correr: tu velocidad se dobla en este turno.",
       "OverHint": "Ya usaste toda tu velocidad (¿Correr?). El DM decide.",
       "Undo": "Deshacer",
       "Reset": "Poner a cero",
@@ -253,6 +333,10 @@
       "ShowEnemyHealth": {
         "Name": "Mostrar estado de vida de los enemigos",
         "Hint": "En la pestaña Combate del teléfono, los jugadores ven un estado aproximado de cada enemigo (Sano, Herido, Ensangrentado, Casi muerto), nunca los números. Desmárcalo para ocultarlo."
+      },
+      "ShowAttackResult": {
+        "Name": "Decir a los jugadores si su ataque impacta",
+        "Hint": "En el HUD de combate del teléfono, tras un ataque se muestra «¡Impacta!» o «Falla» para cada objetivo (nunca su CA). Desmárcalo si prefieres anunciarlo tú."
       },
       "LockMovement": {
         "Name": "Bloquear el movimiento desde los teléfonos",

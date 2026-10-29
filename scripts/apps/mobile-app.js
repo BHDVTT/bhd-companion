@@ -2,6 +2,9 @@ import { MODULE_ID, TEMPLATE_PATH } from "../constants.js";
 import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "./character-data.js";
 import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.js";
 import { getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
+import { BASIC_ACTIONS, getBlockActivities, getTargetNeed, prepareHud, prepareTargetCards, prepareTargetChips } from "./combat-hud-data.js";
+import { ECONOMY_BLOCKS, getEconomy, getOwnCombatant, setEconomy } from "../economy.js";
+import { setTargets, toggleTarget } from "../targets.js";
 import { prepareInventory } from "./inventory-data.js";
 import { getMoveToken, prepareMovement } from "./move-data.js";
 import { requestMovement } from "../movement.js";
@@ -98,7 +101,19 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       bhdInstall: BHDMobileApp.#onInstall,
       bhdMove: BHDMobileApp.#onMove,
       bhdMoveUndo: BHDMobileApp.#onMoveUndo,
-      bhdMoveReset: BHDMobileApp.#onMoveReset
+      bhdMoveReset: BHDMobileApp.#onMoveReset,
+      bhdHudBlock: BHDMobileApp.#onHudBlock,
+      bhdHudUse: BHDMobileApp.#onHudUse,
+      bhdHudBasic: BHDMobileApp.#onHudBasic,
+      bhdHudMark: BHDMobileApp.#onHudMark,
+      bhdHudCloseResult: BHDMobileApp.#onHudCloseResult,
+      bhdTarget: BHDMobileApp.#onTarget,
+      bhdPickTargets: BHDMobileApp.#onPickTargets,
+      bhdClearTargets: BHDMobileApp.#onClearTargets,
+      bhdPickToggle: BHDMobileApp.#onPickToggle,
+      bhdPickConfirm: BHDMobileApp.#onPickConfirm,
+      bhdPickNone: BHDMobileApp.#onPickNone,
+      bhdPickCancel: BHDMobileApp.#onPickCancel
     }
   };
 
@@ -117,9 +132,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         `${TEMPLATE_PATH}/mobile/inventory-row.hbs`,
         `${TEMPLATE_PATH}/mobile/inventory-container.hbs`,
         `${TEMPLATE_PATH}/mobile/notes.hbs`,
-        `${TEMPLATE_PATH}/mobile/settings.hbs`
+        `${TEMPLATE_PATH}/mobile/settings.hbs`,
+        `${TEMPLATE_PATH}/mobile/target-picker.hbs`
       ],
-      scrollable: [""]
+      // La fila de retratos del combate conserva su desplazamiento lateral al redibujar.
+      scrollable: ["", ".bhd-hud-strip"]
     },
     turn: { template: `${TEMPLATE_PATH}/mobile/turn.hbs` },
     nav: { template: `${TEMPLATE_PATH}/mobile/nav.hbs` }
@@ -232,6 +249,37 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Sube cada vez que un paso falla: los pasos que ya estaban en cola se descartan. */
   #moveGeneration = 0;
 
+  /** Bloque del HUD de combate abierto: "action", "bonus", "reaction" o null. */
+  #hudBlock = null;
+
+  /** ¿Hay que desplazar la vista hasta los bloques del HUD en el próximo dibujo? */
+  #scrollToHud = false;
+
+  /**
+   * Objeto que se acaba de usar desde el HUD y bloque del turno que gasta (un arma usada como
+   * ataque de oportunidad gasta la reacción, no la acción).
+   * @type {{itemId: string, block: string}|null}
+   */
+  #hudUse = null;
+
+  /**
+   * Resultado del último uso desde el HUD: nombre, ataque, impactó o falló, daño.
+   * @type {object|null}
+   */
+  #hudResult = null;
+
+  /**
+   * Selector de objetivos abierto.
+   * @type {{resolve: Function, max: number, multi: boolean, selected: Set<string>}|null}
+   */
+  #picker = null;
+
+  /** Turno en el que se centró la fila de retratos (se vuelve a centrar cuando cambia). */
+  #stripTurn = null;
+
+  /** ¿Ya se revisó el combate una vez? (para no quitar Esquivar al recargar la página) */
+  #combatChecked = false;
+
   /** Pestaña visible ahora mismo. */
   get activeTab() {
     return this.tabGroups.primary;
@@ -271,6 +319,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     // El combate se prepara siempre: la barra de pestañas y la barra "Es tu turno" lo usan.
     context.combat = prepareCombat(actor);
     context.deathSaves = prepareDeathSaves(actor);
+    context.hud = (actor && (tab === "combat")) ? prepareHud(actor, this.#hudBlock) : null;
+    context.hudResult = (tab === "combat") ? this.#hudResult : null;
     context.move = (tab === "move") ? prepareMovement(actor, this.#moveTokenId) : null;
     context.inventory = (actor && (tab === "inventory")) ? prepareInventory(actor, this.#openContainers) : null;
     const draft = (this.#notesDraft?.actorId === actor?.id) ? this.#notesDraft.text : null;
@@ -343,6 +393,12 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     settings.hidden = true;
     this.element.append(settings);
 
+    // Selector de objetivos del HUD de combate.
+    const picker = document.createElement("div");
+    picker.className = "bhd-picker";
+    picker.hidden = true;
+    this.element.append(picker);
+
     // Notas que no se llegaron a guardar antes de una recarga (p. ej. se cayó el Wi-Fi).
     const actor = this.actor;
     const unsaved = actor ? localNotesDraft(actor.id) : null;
@@ -400,6 +456,29 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#notesTimeout = setTimeout(() => this.#saveNotes(), NOTES_SAVE_DELAY);
     });
     notes?.addEventListener("change", () => this.#saveNotes());
+
+    this.#syncCombatHud(context);
+  }
+
+  /**
+   * Pestaña Combate tras dibujar: centra la fila de retratos en quien va ahora (solo cuando cambia
+   * el turno o la fila es nueva, para no mover la fila mientras el jugador la desplaza) y, si se
+   * acaba de abrir un bloque, desplaza la vista para que se vean los bloques y sus opciones.
+   * @param {object} context
+   */
+  #syncCombatHud(context) {
+    const strip = this.element.querySelector("[data-bhd-strip]");
+    const current = strip?.querySelector(".bhd-current");
+    const turnKey = context.combat ? `${context.combat.id}.${context.combat.round}.${context.combat.current?.id}` : null;
+    if ( current && ((turnKey !== this.#stripTurn) || (strip.scrollLeft === 0)) ) {
+      strip.scrollLeft = current.offsetLeft - ((strip.clientWidth - current.offsetWidth) / 2);
+    }
+    this.#stripTurn = turnKey;
+
+    if ( this.#scrollToHud ) {
+      this.#scrollToHud = false;
+      this.element.querySelector(".bhd-hud-blocks")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
   }
 
   /** @override */
@@ -574,7 +653,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     press.timer = setTimeout(() => {
       press.fired = true;
       navigator.vibrate?.(20);
-      this.#openChooser(target.dataset.itemId);
+      this.#openChooser(target.dataset.itemId, target.dataset.hudBlock);
     }, LONG_PRESS_MS);
   }
 
@@ -594,14 +673,16 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /**
    * Muestra el menú del toque largo para un objeto.
    * @param {string} itemId
+   * @param {string} [hudBlock]  Bloque del HUD de combate desde el que se usa (pasa por el selector de objetivos).
    */
-  #openChooser(itemId) {
+  #openChooser(itemId, hudBlock) {
     const item = this.actor?.items.get(itemId);
     const chooser = this.element.querySelector(".bhd-chooser");
     if ( !item || !chooser ) return;
     const hasAttack = !!item.system.activities?.getByType("attack").length;
+    const block = hudBlock ? ` data-hud-block="${hudBlock}"` : "";
     const button = (mode, icon, label, cssClass) => `
-      <button type="button" class="${cssClass}" data-action="chooseUse" data-mode="${mode}" data-item-id="${item.id}">
+      <button type="button" class="${cssClass}" data-action="chooseUse" data-mode="${mode}" data-item-id="${item.id}"${block}>
         <i class="${icon}" aria-hidden="true"></i><span>${game.i18n.localize(label)}</span>
       </button>`;
     chooser.innerHTML = `
@@ -634,8 +715,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    *   los demás saltan las ventanas cuando el uso es sencillo y tiran directo.
    * @param {PointerEvent} event
    * @param {HTMLElement} [target]  Fila tocada, para marcarla mientras se usa.
+   * @param {Activity} [activity]   Actividad concreta que usar (si no, dnd5e pregunta cuál si hay varias).
    */
-  async #useItem(item, mode, event, target) {
+  async #useItem(item, mode, event, target, activity) {
     if ( this.#using ) return;
     const quick = mode !== "full";
     this.#using = true;
@@ -644,7 +726,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#pendingAttack = quick ? { itemId: item.id, mode } : null;
     target?.classList.add("bhd-rolling");
     try {
-      const result = await item.use({ event });
+      const result = await (activity ?? item).use({ event });
       const message = result?.message ?? result;
       if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
     } finally {
@@ -765,13 +847,229 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const actor = this.actor;
     if ( !actor || !rolls?.length || (subject?.actor !== actor) ) return;
     const name = subject.item?.name ?? "";
+    const result = (this.#hudResult?.itemId === subject.item?.id) ? this.#hudResult : null;
     if ( type === "attack" ) {
-      this.#showRollResult(`${name}: ${game.i18n.localize("BHD.Actions.Attack")}`, rolls[0]);
+      const roll = rolls[0];
+      this.#showRollResult(`${name}: ${game.i18n.localize("BHD.Actions.Attack")}`, roll);
+      if ( result ) {
+        result.attack = { total: roll.total, crit: !!roll.isCritical, fumble: !!roll.isFumble };
+        result.verdicts = this.#getAttackVerdicts(roll);
+        this.#renderCombatTab();
+      }
       return;
     }
     const total = rolls.reduce((sum, roll) => sum + (roll.total ?? 0), 0);
     const label = subject.damageFlavor ?? game.i18n.localize("BHD.Actions.Damage");
     this.#showRollResult(`${name}: ${label}`, { total });
+    if ( result ) {
+      result.damage = { total, label };
+      result.hint = null;
+      this.#renderCombatTab();
+    }
+  }
+
+  /* -------------------------------------------- */
+  /*  HUD de combate                              */
+  /* -------------------------------------------- */
+
+  /**
+   * Usa un objeto desde un bloque del HUD: si hace falta, primero abre el selector de objetivos
+   * y los marca (los recibe dnd5e, Midi QOL y se ven en la TV); después, el uso normal.
+   * @param {Item} item
+   * @param {string} block  "action", "bonus", "reaction" u "opportunity" (ataque de oportunidad).
+   * @param {"normal"|"advantage"|"disadvantage"|"full"} mode
+   * @param {PointerEvent} event
+   * @param {HTMLElement} [target]
+   */
+  async #hudUseItem(item, block, mode, event, target) {
+    if ( this.#using ) return;
+    const activities = getBlockActivities(item, block);
+    const activity = (activities.length === 1) ? activities[0] : null;
+    const need = getTargetNeed(activities.length ? activities : (item.system.activities?.contents ?? []));
+    if ( need ) {
+      const ids = await this.#pickTargets({ title: item.name, img: item.img, max: need.max });
+      if ( ids === null ) return;
+      setTargets(ids);
+    }
+    this.#hudUse = { itemId: item.id, block: (block === "opportunity") ? "reaction" : block };
+    try {
+      await this.#useItem(item, mode, event, target, activity);
+    } finally {
+      this.#hudUse = null;
+    }
+  }
+
+  /**
+   * Hook `dnd5e.postUseActivity`: el personaje usó algo (desde el HUD, la pestaña Acciones o la
+   * hoja). En combate, marca como usado el bloque de su tipo de acción; si fue desde el HUD,
+   * empieza a mostrar el resultado.
+   * @param {Activity} activity
+   */
+  onPostUseActivity(activity) {
+    if ( activity.actor !== this.actor ) return;
+    const hud = (this.#hudUse?.itemId === activity.item.id) ? this.#hudUse : null;
+    const block = hud?.block ?? activity.activation?.type;
+    const own = getOwnCombatant(this.actor);
+    if ( own && ECONOMY_BLOCKS.includes(block) ) {
+      setEconomy(own.combat, own.combatant, { [block]: true }).catch(err => {
+        console.error("BHD Companion | No se pudo marcar la acción como usada", err);
+      });
+    }
+    if ( !hud ) return;
+    const hasDamage = !!activity.damage?.parts?.length || (activity.type === "heal");
+    this.#hudResult = {
+      itemId: activity.item.id,
+      name: activity.item.name,
+      img: activity.item.img,
+      attack: null,
+      verdicts: [],
+      damage: null,
+      hint: hasDamage ? game.i18n.localize("BHD.Hud.Result.DamageHint") : null
+    };
+    this.#renderCombatTab();
+  }
+
+  /**
+   * ¿Impactó o falló a cada objetivo? Igual que la tarjeta de ataque de dnd5e: un crítico siempre
+   * impacta, una pifia siempre falla y, si no, el total contra la CA. Al jugador no se le dice la CA.
+   * @param {Roll} roll
+   * @returns {{id: string, name: string, label: string}[]}
+   */
+  #getAttackVerdicts(roll) {
+    if ( !game.settings.get(MODULE_ID, "showAttackResult") ) return [];
+    return dnd5e.utils.getTargetDescriptors().map(({ name, ac }) => {
+      let hit;
+      if ( roll.isCritical ) hit = true;
+      else if ( roll.isFumble ) hit = false;
+      else if ( Number.isFinite(ac) ) hit = roll.total >= ac;
+      else return null; // CA desconocida (p. ej. cobertura total)
+      return { id: hit ? "hit" : "miss", name, label: game.i18n.localize(hit ? "BHD.Hud.Result.Hit" : "BHD.Hud.Result.Miss") };
+    }).filter(v => v);
+  }
+
+  /** Vuelve a dibujar el contenido si se está viendo la pestaña Combate. */
+  #renderCombatTab() {
+    if ( this.activeTab === "combat" ) this.render({ parts: ["main"] });
+  }
+
+  /**
+   * Acción básica (Esquivar, Correr, Destrabarse, Ayudar, Esconderse, Buscar, Preparar):
+   * la anuncia en el chat (la ve el DM en la TV), tira la habilidad si corresponde, pone el
+   * estado "Esquivando" y marca la acción como usada. Correr además dobla la velocidad del turno.
+   * @param {object} basic  Entrada de BASIC_ACTIONS.
+   * @param {PointerEvent} event
+   */
+  async #useBasicAction(basic, event) {
+    const actor = this.actor;
+    if ( !actor || this.#using ) return;
+    const label = game.i18n.localize(`BHD.Hud.Basic.${basic.id}.Name`);
+    if ( basic.target ) {
+      const ids = await this.#pickTargets({ title: label, max: 1 });
+      if ( ids === null ) return;
+      setTargets(ids);
+    }
+    this.#using = true;
+    try {
+      await this.#postBasicAction(actor, basic, label);
+      if ( basic.status && CONFIG.statusEffects.some(e => e.id === basic.status) ) {
+        await actor.toggleStatusEffect(basic.status, { active: true });
+      }
+      if ( basic.skill ) {
+        const rolls = await actor.rollSkill({ skill: basic.skill, event }, { configure: false });
+        this.#showRollResult(label, rolls?.[0]);
+      }
+      else this.#showRollResult(label, { total: "✓" });
+      const own = getOwnCombatant(actor);
+      if ( own ) await setEconomy(own.combat, own.combatant, { action: true, ...(basic.id === "dash" ? { dash: true } : {}) });
+    } finally {
+      this.#using = false;
+    }
+  }
+
+  /**
+   * Mensaje del chat que anuncia una acción básica (con su objetivo, si tiene).
+   * @param {Actor} actor
+   * @param {object} basic
+   * @param {string} label
+   */
+  async #postBasicAction(actor, basic, label) {
+    const escape = foundry.utils.escapeHTML;
+    const targets = basic.target ? prepareTargetChips().map(t => t.name).join(", ") : "";
+    const content = `
+      <div class="bhd-chat-basic">
+        <p><strong>${escape(label)}</strong></p>
+        <p>${escape(game.i18n.localize(`BHD.Hud.Basic.${basic.id}.Chat`))}</p>
+        ${targets ? `<p><i class="fa-solid fa-crosshairs" aria-hidden="true"></i> ${escape(targets)}</p>` : ""}
+      </div>`;
+    await ChatMessage.implementation.create({
+      speaker: ChatMessage.implementation.getSpeaker({ actor }),
+      content
+    });
+  }
+
+  /* -------------------------------------------- */
+  /*  Selector de objetivos                       */
+  /* -------------------------------------------- */
+
+  /**
+   * Abre el selector de objetivos y espera a que el jugador elija.
+   * Con un solo objetivo, tocar una tarjeta ya lo elige; con varios, se marcan y se confirma.
+   * @param {object} options
+   * @param {string} options.title
+   * @param {string} [options.img]
+   * @param {number} [options.max=1]      Objetivos como mucho (0 = sin límite).
+   * @param {boolean} [options.manual]    Abierto con "Elegir" (sin usar nada después).
+   * @returns {Promise<string[]|null>}  Ids de las fichas elegidas, [] sin objetivo, null si se canceló.
+   */
+  async #pickTargets({ title, img, max=1, manual=false }) {
+    const element = this.element.querySelector(".bhd-picker");
+    if ( !element ) return null;
+    this.#closePicker(null);
+    const cards = prepareTargetCards(this.actor);
+    const multi = manual || (max !== 1);
+    // Con más objetivos marcados de los que se pueden elegir, se empieza de cero.
+    let selected = cards.filter(c => c.selected).map(c => c.id);
+    if ( max && (selected.length > max) ) selected = [];
+    for ( const card of cards ) card.selected = selected.includes(card.id);
+
+    let subtitle;
+    if ( manual ) subtitle = game.i18n.localize("BHD.Hud.Picker.ManualHint");
+    else if ( max === 1 ) subtitle = game.i18n.localize("BHD.Hud.Picker.One");
+    else subtitle = game.i18n.format("BHD.Hud.Picker.Many", { max });
+
+    element.innerHTML = await foundry.applications.handlebars.renderTemplate(`${TEMPLATE_PATH}/mobile/target-picker.hbs`, {
+      title, img, subtitle, cards, multi,
+      noneLabel: game.i18n.localize(manual ? "BHD.Hud.ClearTargets" : "BHD.Hud.Picker.None")
+    });
+    const promise = new Promise(resolve => {
+      this.#picker = { resolve, max, multi, selected: new Set(selected) };
+    });
+    this.#updatePickerConfirm();
+    element.hidden = false;
+    return promise;
+  }
+
+  /**
+   * Cierra el selector de objetivos y devuelve lo elegido a quien lo abrió.
+   * @param {string[]|null} result
+   */
+  #closePicker(result) {
+    const picker = this.#picker;
+    this.#picker = null;
+    const element = this.element?.querySelector(".bhd-picker");
+    if ( element ) element.hidden = true;
+    picker?.resolve(result);
+  }
+
+  /** Texto del botón Confirmar: cuántos objetivos van marcados. */
+  #updatePickerConfirm() {
+    const picker = this.#picker;
+    const button = this.element.querySelector("[data-bhd-pick-confirm]");
+    if ( !picker || !button ) return;
+    const count = picker.selected.size;
+    button.textContent = picker.max
+      ? game.i18n.format("BHD.Hud.Picker.ConfirmMax", { count, max: picker.max })
+      : game.i18n.format("BHD.Hud.Picker.Confirm", { count });
   }
 
   /* -------------------------------------------- */
@@ -835,6 +1133,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   onCombatUpdate() {
     const combat = getActiveCombat();
     const actor = this.actor;
+    const firstCheck = !this.#combatChecked;
+    this.#combatChecked = true;
     if ( !isActorTurn(combat, actor) ) {
       this.#hideTurnAlert();
       return;
@@ -843,6 +1143,13 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( key === this.#alertedTurn ) return;
     this.#alertedTurn = key;
     this.#showTurnAlert(combat, actor);
+    // Esquivar dura hasta el principio del siguiente turno. Al abrir la vista no se quita:
+    // puede que el jugador haya recargado la página en el mismo turno en que esquivó.
+    if ( !firstCheck && actor.statuses.has("dodging") ) {
+      actor.toggleStatusEffect("dodging", { active: false }).catch(err => {
+        console.error("BHD Companion | No se pudo quitar Esquivar", err);
+      });
+    }
   }
 
   /**
@@ -954,8 +1261,16 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       main?.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    // Solo la pestaña visible tiene contenido (ver _prepareContext): hay que dibujar la nueva.
-    this.tabGroups[group] = tab;
+    await this.#switchTab(tab);
+  }
+
+  /**
+   * Muestra otra pestaña. Solo la pestaña visible tiene contenido (ver _prepareContext):
+   * hay que dibujar la nueva.
+   * @param {string} tab
+   */
+  async #switchTab(tab) {
+    this.tabGroups.primary = tab;
     await this.render({ parts: ["main", "nav"] });
     if ( this.parts?.main ) this.parts.main.scrollTop = 0;
   }
@@ -1061,7 +1376,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onChooseUse(event, target) {
     this.#closeChooser();
     const item = this.actor?.items.get(target.dataset.itemId);
-    if ( item ) await this.#useItem(item, target.dataset.mode, event);
+    if ( !item ) return;
+    const block = target.dataset.hudBlock;
+    if ( block ) await this.#hudUseItem(item, block, target.dataset.mode, event);
+    else await this.#useItem(item, target.dataset.mode, event);
   }
 
   /**
@@ -1259,6 +1577,154 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static #onMoveReset() {
     this.#queueMovement("reset");
+  }
+
+  /**
+   * Toca un bloque del HUD: abre o cierra sus opciones. Movimiento lleva a la pestaña Mover.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onHudBlock(event, target) {
+    const block = target.dataset.block;
+    if ( block === "move" ) {
+      await this.#switchTab("move");
+      return;
+    }
+    this.#hudBlock = (this.#hudBlock === block) ? null : block;
+    this.#scrollToHud = !!this.#hudBlock;
+    await this.render({ parts: ["main"] });
+  }
+
+  /**
+   * Toca una opción de un bloque del HUD (ataque, hechizo, rasgo, objeto).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onHudUse(event, target) {
+    // Al soltar un toque largo también llega un clic: ese ya abrió el menú.
+    if ( this.#longPress?.fired && (this.#longPress.target === target) ) {
+      this.#longPress = null;
+      return;
+    }
+    const item = this.actor?.items.get(target.dataset.itemId);
+    if ( item ) await this.#hudUseItem(item, target.dataset.hudBlock, "normal", event, target);
+  }
+
+  /**
+   * Toca una acción básica del bloque Acción (Esquivar, Correr...).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onHudBasic(event, target) {
+    const basic = BASIC_ACTIONS.find(b => b.id === target.dataset.basic);
+    if ( basic ) await this.#useBasicAction(basic, event);
+  }
+
+  /**
+   * Marca a mano un bloque como usado o disponible (por si algo se marcó por error,
+   * o el DM permite repetir, p. ej. con Oleada de acción).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onHudMark(event, target) {
+    const own = getOwnCombatant(this.actor);
+    const block = target.dataset.block;
+    if ( !own || !ECONOMY_BLOCKS.includes(block) ) return;
+    const used = getEconomy(own.combat, own.combatant)[block];
+    await setEconomy(own.combat, own.combatant, { [block]: !used });
+  }
+
+  /**
+   * Cierra el resultado del último uso desde el HUD.
+   * @this {BHDMobileApp}
+   */
+  static #onHudCloseResult() {
+    this.#hudResult = null;
+    this.#renderCombatTab();
+  }
+
+  /**
+   * Toca un retrato del orden de iniciativa: marca o desmarca esa criatura como objetivo.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onTarget(event, target) {
+    const tokenId = target.dataset.tokenId;
+    if ( !tokenId ) return;
+    toggleTarget(tokenId);
+    navigator.vibrate?.(15);
+  }
+
+  /**
+   * Botón "Elegir" de la barra de objetivos: abre el selector sin usar nada después.
+   * @this {BHDMobileApp}
+   */
+  static async #onPickTargets() {
+    const ids = await this.#pickTargets({ title: game.i18n.localize("BHD.Hud.TargetsTitle"), max: 0, manual: true });
+    if ( ids !== null ) setTargets(ids);
+  }
+
+  /**
+   * Quita todos los objetivos.
+   * @this {BHDMobileApp}
+   */
+  static #onClearTargets() {
+    setTargets([]);
+  }
+
+  /**
+   * Toca una tarjeta del selector: con un solo objetivo la elige ya; con varios, la marca o desmarca.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onPickToggle(event, target) {
+    const picker = this.#picker;
+    const tokenId = target.dataset.tokenId;
+    if ( !picker || !tokenId ) return;
+    if ( !picker.multi ) {
+      this.#closePicker([tokenId]);
+      return;
+    }
+    const selected = picker.selected;
+    if ( selected.has(tokenId) ) selected.delete(tokenId);
+    else if ( picker.max && (selected.size >= picker.max) ) {
+      ui.notifications.info(game.i18n.format("BHD.Hud.Picker.Full", { max: picker.max }));
+      return;
+    }
+    else selected.add(tokenId);
+    target.classList.toggle("bhd-on", selected.has(tokenId));
+    target.setAttribute("aria-pressed", String(selected.has(tokenId)));
+    this.#updatePickerConfirm();
+  }
+
+  /**
+   * Confirma los objetivos marcados en el selector.
+   * @this {BHDMobileApp}
+   */
+  static #onPickConfirm() {
+    if ( this.#picker ) this.#closePicker([...this.#picker.selected]);
+  }
+
+  /**
+   * Sigue sin objetivo (o, con "Elegir", quita todos).
+   * @this {BHDMobileApp}
+   */
+  static #onPickNone() {
+    this.#closePicker([]);
+  }
+
+  /**
+   * Cierra el selector sin usar nada.
+   * @this {BHDMobileApp}
+   */
+  static #onPickCancel() {
+    this.#closePicker(null);
   }
 
   /* -------------------------------------------- */

@@ -1,0 +1,42 @@
+{{!-- Selector de objetivos (HUD de combate). Se dibuja con renderTemplate fuera de las partes de la vista. --}}
+<div class="bhd-chooser-backdrop" data-action="bhdPickCancel"></div>
+<section class="bhd-picker-sheet" role="dialog" aria-modal="true">
+  <header class="bhd-chooser-header">
+    {{#if img}}<img src="{{img}}" alt="">{{/if}}
+    <span class="bhd-picker-titles">
+      <span class="bhd-chooser-name">{{title}}</span>
+      <span class="bhd-picker-sub">{{subtitle}}</span>
+    </span>
+  </header>
+
+  {{#if cards.length}}
+  <div class="bhd-picker-cards">
+    {{#each cards}}
+    <button type="button" class="bhd-picker-card {{#if selected}}bhd-on{{/if}} {{#if defeated}}bhd-defeated{{/if}} {{#if mine}}bhd-mine{{/if}}"
+            data-action="bhdPickToggle" data-token-id="{{id}}" aria-pressed="{{selected}}">
+      <span class="bhd-picker-img">
+        <img src="{{img}}" alt="">
+        <i class="fa-solid fa-crosshairs bhd-picker-mark" aria-hidden="true"></i>
+      </span>
+      <span class="bhd-picker-text">
+        <span class="bhd-picker-name">{{name}}{{#if mine}} <span class="bhd-tag">{{localize "BHD.Combat.You"}}</span>{{/if}}</span>
+        <span class="bhd-picker-meta">
+          {{#if distanceLabel}}<span class="bhd-picker-distance"><i class="fa-solid fa-ruler" aria-hidden="true"></i> {{distanceLabel}}</span>{{/if}}
+          {{#if health}}<span class="bhd-health bhd-health-{{health.id}}">{{health.label}}</span>{{/if}}
+        </span>
+      </span>
+    </button>
+    {{/each}}
+  </div>
+  {{else}}
+  <p class="bhd-combat-note">{{localize "BHD.Hud.Picker.Empty"}}</p>
+  {{/if}}
+
+  <div class="bhd-picker-actions">
+    {{#if multi}}
+    <button type="button" class="bhd-picker-confirm" data-action="bhdPickConfirm" data-bhd-pick-confirm>{{confirmLabel}}</button>
+    {{/if}}
+    <button type="button" class="bhd-picker-none" data-action="bhdPickNone">{{noneLabel}}</button>
+    <button type="button" class="bhd-chooser-cancel" data-action="bhdPickCancel">{{localize "BHD.Actions.Cancel"}}</button>
+  </div>
+</section>

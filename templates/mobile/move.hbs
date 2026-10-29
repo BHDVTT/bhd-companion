@@ -36,6 +36,7 @@
     {{/if}}
     <p class="bhd-move-hint">
       {{#if move.over}}{{localize "BHD.Move.OverHint"}}
+      {{else if move.dashed}}{{localize "BHD.Move.DashHint"}}
       {{else if move.inCombat}}{{localize "BHD.Move.TurnHint"}}
       {{else}}{{localize "BHD.Move.FreeHint"}}{{/if}}
     </p>

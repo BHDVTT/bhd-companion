@@ -34,6 +34,15 @@ export function registerSettings() {
     onChange: () => game.modules.get(MODULE_ID).api?.app?.render()
   });
 
+  // HUD de combate: decir al jugador si su ataque impactó o falló (nunca la CA del objetivo).
+  game.settings.register(MODULE_ID, "showAttackResult", {
+    name: "BHD.Settings.ShowAttackResult.Name",
+    hint: "BHD.Settings.ShowAttackResult.Hint",
+    scope: "world",
+    config: true,
+    type: new foundry.data.fields.BooleanField({ initial: true })
+  });
+
   // Pestaña Mover: bloquear el movimiento desde los teléfonos para todos.
   game.settings.register(MODULE_ID, "lockMovement", {
     name: "BHD.Settings.LockMovement.Name",

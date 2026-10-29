@@ -4,6 +4,7 @@
  */
 
 import { canUndoMovement, getMovementBlock, getMovementState, getMovementUsed, getTokenCombat } from "../movement.js";
+import { hasDashed } from "../economy.js";
 
 /** Botones de la cruceta, en orden de la cuadrícula 3 × 3 (null = centro, el retrato). */
 const PAD = [
@@ -55,7 +56,9 @@ export function prepareMovement(actor, selectedId) {
   const { formatNumber } = dnd5e.utils;
   const units = scene.grid.units || "";
   const used = Math.round(getMovementUsed(token) * 10) / 10;
-  const speed = getSpeed(token);
+  // Correr (desde el HUD de combate) dobla la velocidad en este turno.
+  const dashed = hasDashed(token);
+  const speed = getSpeed(token) * (dashed ? 2 : 1);
   const remaining = speed - used;
   const block = getMovementBlock(token, game.user);
   const inCombat = !!getTokenCombat(token);
@@ -72,6 +75,7 @@ export function prepareMovement(actor, selectedId) {
     extra: formatNumber(Math.max(-remaining, 0)),
     percent: speed ? Math.min(Math.round((used / speed) * 100), 100) : 0,
     units,
+    dashed,
     inCombat,
     block: block ? `BHD.Move.Reason.${block}` : null,
     pad: PAD.map(button => button && { ...button, disabled: !!block || (button.diagonal && noDiagonals) }),
@@ -85,7 +89,7 @@ export function prepareMovement(actor, selectedId) {
  * @param {TokenDocument} token
  * @returns {number}
  */
-function getSpeed(token) {
+export function getSpeed(token) {
   const movement = token.actor?.system.attributes?.movement ?? {};
   const speed = movement[token.movementAction] ?? movement.walk;
   return Number(speed) || 0;

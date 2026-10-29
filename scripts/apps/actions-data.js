@@ -141,7 +141,7 @@ function prepareSpellbook(actor, spells) {
  * @param {Actor} actor
  * @returns {boolean}
  */
-function isSpellShown(spell, actor) {
+export function isSpellShown(spell, actor) {
   const system = spell.system;
   if ( !(system.level > 0) || system.prepared || !system.canPrepare ) return true;
   const config = CONFIG.DND5E.spellcasting[system.method];
@@ -163,7 +163,7 @@ function isSpellShown(spell, actor) {
  * @param {boolean} [options.showLevel]  Mostrar el nivel del hechizo ("Nv. 1") junto al nombre.
  * @returns {object}
  */
-function prepareRow(item, { showLevel=false }={}) {
+export function prepareRow(item, { showLevel=false }={}) {
   const system = item.system;
   const labels = item.labels ?? {};
   const activities = system.activities?.filter(a => a.canUse) ?? [];

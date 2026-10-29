@@ -4,6 +4,7 @@
  */
 
 import { MODULE_ID } from "../constants.js";
+import { getTargetIds } from "../targets.js";
 
 /**
  * Estado aproximado de vida: Sano con la vida completa, Herido por encima de la mitad,
@@ -55,15 +56,17 @@ export function isActorTurn(combat, actor) {
 export function prepareCombat(actor) {
   const combat = getActiveCombat();
   if ( !combat ) return null;
-  const showEnemyHealth = game.settings.get(MODULE_ID, "showEnemyHealth");
   const visible = combat.turns.filter(c => isVisible(c, actor));
   const current = combat.started ? combat.combatant : null;
   const next = current ? findNext(combat, current, visible) : null;
 
+  const scene = game.scenes.active;
+  const targets = new Set(getTargetIds());
   const turns = visible.map(combatant => {
     const mine = isActorCombatant(combatant, actor);
-    const isEnemy = !combatant.hasPlayerOwner;
     const defeated = combatant.isDefeated;
+    // Solo se puede marcar como objetivo a quien tiene ficha en la escena de la TV.
+    const token = (combatant.token?.parent === scene) ? combatant.token : null;
     return {
       id: combatant.id,
       name: combatant.name,
@@ -73,8 +76,10 @@ export function prepareCombat(actor) {
       next: combatant === next,
       mine,
       defeated,
+      tokenId: token?.id ?? null,
+      targeted: !!token && targets.has(token.id),
       // El jugador ve su vida exacta en la hoja; aquí, el estado aproximado de los demás.
-      health: (mine || (isEnemy && !showEnemyHealth)) ? null : getHealthState(combatant.actor, defeated)
+      health: describeHealth(combatant.actor, { mine, isEnemy: !combatant.hasPlayerOwner, defeated })
     };
   });
 
@@ -136,6 +141,21 @@ function formatInitiative(initiative) {
   if ( !Number.isFinite(initiative) ) return null;
   if ( Number.isInteger(initiative) ) return String(initiative);
   return initiative.toFixed(CONFIG.Combat.initiative.decimals);
+}
+
+/**
+ * Estado aproximado de vida que puede ver el jugador: el de los demás (el suyo lo ve exacto en
+ * la hoja). El de los enemigos, solo si el DM lo permite con el ajuste "showEnemyHealth".
+ * @param {Actor|null} actor
+ * @param {object} options
+ * @param {boolean} options.mine      ¿Es el personaje del propio jugador?
+ * @param {boolean} options.isEnemy   ¿No tiene ningún jugador dueño?
+ * @param {boolean} options.defeated  ¿Está marcado como derrotado?
+ * @returns {{id: string, label: string}|null}
+ */
+export function describeHealth(actor, { mine, isEnemy, defeated }) {
+  if ( mine || (isEnemy && !game.settings.get(MODULE_ID, "showEnemyHealth")) ) return null;
+  return getHealthState(actor, defeated);
 }
 
 /**

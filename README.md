@@ -21,9 +21,19 @@ Versión actual: **0.7.0**
   consumibles. Filtros (acción / adicional / reacción) y buscador de hechizos.
   Toque = usar y tirar directo. Mantener presionado = ventaja, desventaja o más opciones.
   Las áreas (bola de fuego…) se colocan sobre la ficha del personaje y el DM las mueve en la TV.
-- **Combate** — ronda, orden de iniciativa con retratos, quién va ahora y quién sigue, botón
-  de iniciativa, aviso a pantalla completa **«¡Es tu turno!»** (con vibración en Android),
-  **Terminar turno**, estado aproximado de vida de los enemigos y salvaciones de muerte.
+- **Combate** — HUD del turno: arriba, el orden de iniciativa en una fila de retratos (quién va
+  ahora, iniciativa, estado aproximado de vida); abajo, cuatro bloques **Acción**, **Adicional**,
+  **Reacción** y **Movimiento** que se marcan como usados en el turno. Al tocar un bloque se ven
+  solo sus opciones (ataques, hechizos, rasgos, objetos y acciones básicas: Esquivar, Correr,
+  Destrabarse, Ayudar, Esconderse, Buscar, Preparar; en Reacción, el ataque de oportunidad).
+  Si algo necesita objetivo, se abre un **selector de objetivos** con tarjetas grandes ordenadas
+  por cercanía y su distancia en pies (uno o varios, según el hechizo); también se marca un
+  objetivo tocando su retrato. Los objetivos son los de Foundry: se resaltan en la TV y los
+  reciben dnd5e (y Midi QOL). Tras usar algo, el HUD muestra si **impactó o falló** y el daño.
+  Además: botón de iniciativa, aviso **«¡Es tu turno!»** (con vibración en Android),
+  **Terminar turno** y salvaciones de muerte.
+- **Mover** — cruceta para mover la ficha casilla a casilla en la TV, respetando paredes y
+  puertas, con pies usados / restantes (dobles si usaste Correr) y Deshacer.
 - **Inventario** — objetos por tipo, contenedores, equipar, sintonizar, cantidades, monedas y peso.
 - **Notas** — notas personales del jugador (se guardan solas), personalidad y biografía.
 
@@ -56,7 +66,9 @@ En **Configure Settings → BHD Companion**:
 - **Forzar vista móvil en cualquier dispositivo (pruebas)** — los jugadores la ven aunque
   usen una computadora.
 - **Mostrar estado de vida de los enemigos** — Sano / Herido / Ensangrentado / Casi muerto en la
-  pestaña Combate (nunca los números).
+  pestaña Combate y en el selector de objetivos (nunca los números).
+- **Decir a los jugadores si su ataque impacta** — «¡Impacta!» / «Falla» en el HUD de combate
+  (nunca la CA del objetivo).
 - **Usar la interfaz normal en este dispositivo** — ajuste de cada navegador.
 
 ## Requisitos

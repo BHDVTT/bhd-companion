@@ -1,5 +1,7 @@
+{{!-- Fila de un objeto usable. En el HUD de combate (row.hudBlock) pasa por el selector de objetivos. --}}
 <div class="bhd-action" data-activation="{{row.activation}}" data-search="{{row.search}}">
-  <button type="button" class="bhd-action-use" data-action="useItem" data-item-id="{{row.id}}">
+  <button type="button" class="bhd-action-use" data-item-id="{{row.id}}"
+          {{#if row.hudBlock}}data-action="bhdHudUse" data-hud-block="{{row.hudBlock}}"{{else}}data-action="useItem"{{/if}}>
     <img class="bhd-action-img" src="{{row.img}}" alt="">
     <span class="bhd-action-text">
       <span class="bhd-action-name">

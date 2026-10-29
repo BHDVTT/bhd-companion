@@ -85,7 +85,7 @@
       "NextBadge": "Next",
       "YourTurn": "It's your turn!",
       "YourTurnAlert": "It's your turn!",
-      "YourTurnHint": "Use your actions in the Actions tab. When you're done, tap “End turn”.",
+      "YourTurnHint": "Pick your action, bonus action and movement in the Combat tab. When you're done, tap “End turn”.",
       "YourTurnDying": "You're at 0 HP: roll your death saving throw, then end your turn.",
       "LetsGo": "Let's go!",
       "EndTurn": "End turn",
@@ -111,6 +111,85 @@
         "Dead": "Your character has died."
       }
     },
+    "Hud": {
+      "Title": "Your turn",
+      "Block": {
+        "action": "Action",
+        "bonus": "Bonus",
+        "reaction": "Reaction",
+        "move": "Movement"
+      },
+      "Ready": "Available",
+      "Used": "Used",
+      "NoToken": "No token",
+      "MarkUsed": "Mark used",
+      "MarkReady": "I didn't use it",
+      "AlreadyUsed": "You already used it this turn. If the DM allows it, you can still use something.",
+      "Basics": "Basic actions",
+      "Items": "Items",
+      "Opportunity": "Opportunity attack",
+      "OpportunityHint": "When an enemy leaves your reach, attack it with your reaction.",
+      "Empty": "You have nothing of this kind.",
+      "Hint": "Tap a block to see your options. Tap a portrait above to mark it as a target.",
+      "NoTargets": "No target",
+      "ChooseTargets": "Choose",
+      "ClearTargets": "Clear targets",
+      "TargetsTitle": "Targets",
+      "Result": {
+        "Hit": "Hit!",
+        "Miss": "Miss",
+        "Critical": "Critical!",
+        "Fumble": "Fumble",
+        "DamageHint": "Tap “Damage” (or “Healing”) on the card below to roll it."
+      },
+      "Picker": {
+        "One": "Tap who you're aiming at. It shows on the TV.",
+        "Many": "Pick up to {max} targets and confirm.",
+        "ManualHint": "Tap to mark or unmark. They show on the TV.",
+        "None": "No target",
+        "Confirm": "Done ({count})",
+        "ConfirmMax": "Done ({count}/{max})",
+        "Full": "At most {max} targets. Unmark one first.",
+        "Empty": "There are no visible creatures in the TV scene."
+      },
+      "Basic": {
+        "dodge": {
+          "Name": "Dodge",
+          "Hint": "Attacks against you have disadvantage",
+          "Chat": "Until the start of their next turn, attacks against this character have disadvantage (if they can see the attacker), and they have advantage on Dexterity saving throws."
+        },
+        "dash": {
+          "Name": "Dash",
+          "Hint": "Double your movement",
+          "Chat": "Gains extra movement equal to their speed this turn."
+        },
+        "disengage": {
+          "Name": "Disengage",
+          "Hint": "No opportunity attacks",
+          "Chat": "Their movement doesn't provoke opportunity attacks for the rest of the turn."
+        },
+        "help": {
+          "Name": "Help",
+          "Hint": "Advantage for an ally",
+          "Chat": "Help: an ally's next attack against the target (or an ally's next check) has advantage."
+        },
+        "hide": {
+          "Name": "Hide",
+          "Hint": "Roll Stealth",
+          "Chat": "Tries to hide."
+        },
+        "search": {
+          "Name": "Search",
+          "Hint": "Roll Perception",
+          "Chat": "Searches their surroundings."
+        },
+        "ready": {
+          "Name": "Ready",
+          "Hint": "Act later with your reaction",
+          "Chat": "Readies an action: they'll take it with their reaction when the stated trigger happens."
+        }
+      }
+    },
     "Rest": {
       "Title": "Rest",
       "HitDice": "Hit dice",
@@ -128,6 +207,7 @@
       "Extra": "Extra",
       "TurnHint": "The count resets when your turn starts.",
       "FreeHint": "Outside combat you can move freely.",
+      "DashHint": "You used Dash: your speed is doubled this turn.",
       "OverHint": "You've used all your speed (Dash?). The GM decides.",
       "Undo": "Undo",
       "Reset": "Reset",
@@ -253,6 +333,10 @@
       "ShowEnemyHealth": {
         "Name": "Show enemy health status",
         "Hint": "In the phone's Combat tab, players see an approximate status for each enemy (Healthy, Hurt, Bloodied, Near death), never the numbers. Uncheck to hide it."
+      },
+      "ShowAttackResult": {
+        "Name": "Tell players whether their attack hits",
+        "Hint": "In the phone's combat HUD, after an attack it shows “Hit!” or “Miss” for each target (never their AC). Uncheck it if you'd rather announce it yourself."
       },
       "LockMovement": {
         "Name": "Lock movement from phones",

@@ -12,6 +12,7 @@ import { getActiveCombat } from "./apps/combat-data.js";
 import { watchConnection } from "./connection.js";
 import { updateWakeLock } from "./wake-lock.js";
 import { registerMovementSocket } from "./movement.js";
+import { broadcastTargets, pruneTargets } from "./targets.js";
 
 /** ¿Este cliente está en vista móvil? Se decide una sola vez al cargar. */
 let mobileView = false;
@@ -107,19 +108,37 @@ function openMobileView() {
     Hooks.on(`${action}ChatMessage`, message => app.onChatMessage(message, action));
   }
 
-  // Pestaña Mover: fichas del jugador en la escena de la TV (posición, pies recorridos),
-  // cambio de escena activa y pausa. Solo importa si la pestaña está abierta.
+  // Pestañas Mover y Combate (bloque Movimiento): fichas del jugador en la escena de la TV
+  // (posición, pies recorridos), cambio de escena activa y pausa. Solo si la pestaña está abierta.
   const onMoveChange = () => {
-    if ( app.activeTab === "move" ) refresh();
+    if ( ["move", "combat"].includes(app.activeTab) ) refresh();
   };
   const onToken = token => {
     if ( (token.parent === game.scenes.active) && token.isOwner ) onMoveChange();
   };
   for ( const action of ["create", "update", "delete"] ) Hooks.on(`${action}Token`, onToken);
+  // Objetivos: si su ficha desaparece o el DM cambia de escena, dejan de ser objetivos.
+  Hooks.on("deleteToken", () => pruneTargets());
   Hooks.on("updateScene", (scene, changes) => {
+    if ( "active" in changes ) pruneTargets();
     if ( ("active" in changes) || ("grid" in changes) ) onMoveChange();
   });
   Hooks.on("pauseGame", onMoveChange);
+
+  // HUD de combate: objetivos marcados (retratos con mirilla, barra de objetivos).
+  Hooks.on("targetToken", user => {
+    if ( user.isSelf && (app.activeTab === "combat") ) refresh();
+  });
+  // Si se cortó la conexión, la TV olvidó los objetivos de este jugador: se le vuelven a mandar.
+  game.socket.io?.on("reconnect", () => {
+    if ( game.user.targets.size ) broadcastTargets();
+  });
+
+  // HUD de combate: marcar como usada la acción, adicional o reacción de lo que se use.
+  // (Es un Hooks.call de dnd5e: devolver false cortaría el uso, así que no se devuelve nada.)
+  Hooks.on("dnd5e.postUseActivity", activity => {
+    app.onPostUseActivity(activity);
+  });
 
   // Toque rápido: usar y tirar sin ventanas; toque largo: ventaja / desventaja.
   Hooks.on("dnd5e.preUseActivity", (activity, usage, dialog) => app.onPreUseActivity(activity, usage, dialog));

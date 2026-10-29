@@ -1,28 +1,43 @@
+{{!-- Pestaña Combate: orden de iniciativa arriba y HUD del turno abajo. Recibe combat, hud, hudResult, deathSaves. --}}
 <div class="bhd-sheet bhd-combat">
   {{#if combat}}
-  {{!-- Ronda y turno actual --}}
-  <section class="bhd-card bhd-combat-status {{#if combat.isMyTurn}}bhd-my-turn{{/if}}">
-    {{#if combat.started}}
-    <span class="bhd-combat-round">{{localize "BHD.Combat.Round" round=combat.round}}</span>
-    {{#if combat.isMyTurn}}
-    <strong class="bhd-combat-now">{{localize "BHD.Combat.YourTurn"}}</strong>
-    {{else if combat.current}}
-    <span class="bhd-combat-now">{{localize "BHD.Combat.Now"}} <strong>{{combat.current.name}}</strong></span>
-    {{/if}}
-    {{#if combat.next}}
-    <span class="bhd-combat-next">{{localize "BHD.Combat.Next"}} <strong>{{#if combat.next.mine}}{{localize "BHD.Combat.You"}}{{else}}{{combat.next.name}}{{/if}}</strong></span>
-    {{/if}}
-    {{else}}
-    <strong class="bhd-combat-now">{{localize "BHD.Combat.NotStarted"}}</strong>
-    <span class="bhd-combat-next">{{localize "BHD.Combat.NotStartedHint"}}</span>
-    {{/if}}
+  {{!-- Orden de iniciativa: retratos en fila. Tocar una criatura la marca como objetivo. --}}
+  <section class="bhd-hud-order {{#if combat.isMyTurn}}bhd-my-turn{{/if}}">
+    <header class="bhd-hud-order-head">
+      {{#if combat.started}}
+      <span class="bhd-combat-round">{{localize "BHD.Combat.Round" round=combat.round}}</span>
+      {{#if combat.isMyTurn}}
+      <strong class="bhd-hud-now">{{localize "BHD.Combat.YourTurn"}}</strong>
+      {{else if combat.current}}
+      <span class="bhd-hud-now">{{localize "BHD.Combat.Now"}} <strong>{{combat.current.name}}</strong></span>
+      {{/if}}
+      {{#if combat.next}}
+      <span class="bhd-combat-next">{{localize "BHD.Combat.Next"}} <strong>{{#if combat.next.mine}}{{localize "BHD.Combat.You"}}{{else}}{{combat.next.name}}{{/if}}</strong></span>
+      {{/if}}
+      {{else}}
+      <strong class="bhd-hud-now">{{localize "BHD.Combat.NotStarted"}}</strong>
+      <span class="bhd-combat-next">{{localize "BHD.Combat.NotStartedHint"}}</span>
+      {{/if}}
+    </header>
+    <ol class="bhd-hud-strip" data-bhd-strip>
+      {{#each combat.turns}}
+      <li class="bhd-hud-face {{#if current}}bhd-current{{/if}} {{#if mine}}bhd-mine{{/if}} {{#if defeated}}bhd-defeated{{/if}} {{#if targeted}}bhd-targeted{{/if}}">
+        <button type="button" data-action="bhdTarget" data-token-id="{{tokenId}}" aria-pressed="{{targeted}}"
+                aria-label="{{name}}" {{#unless tokenId}}disabled{{/unless}}>
+          <span class="bhd-hud-face-ring">
+            <img src="{{img}}" alt="">
+            {{#if targeted}}<i class="fa-solid fa-crosshairs bhd-hud-face-target" aria-hidden="true"></i>{{/if}}
+            {{#if defeated}}<i class="fa-solid fa-skull bhd-hud-face-dead" aria-hidden="true"></i>{{/if}}
+            <span class="bhd-hud-face-init">{{#if initiative}}{{initiative}}{{else}}—{{/if}}</span>
+          </span>
+          {{#if current}}<span class="bhd-turn-badge">{{localize "BHD.Combat.NowBadge"}}</span>{{/if}}
+          <span class="bhd-hud-face-name">{{#if mine}}{{localize "BHD.Combat.You"}}{{else}}{{name}}{{/if}}</span>
+          {{#if health}}<span class="bhd-health bhd-health-{{health.id}}">{{health.label}}</span>{{/if}}
+        </button>
+      </li>
+      {{/each}}
+    </ol>
   </section>
-
-  {{#if combat.isMyTurn}}
-  <button type="button" class="bhd-big-btn bhd-end-turn" data-action="endTurn">
-    <i class="fa-solid fa-flag-checkered" aria-hidden="true"></i> {{localize "BHD.Combat.EndTurn"}}
-  </button>
-  {{/if}}
 
   {{#if combat.needsInitiative}}
   <button type="button" class="bhd-big-btn bhd-roll-init bhd-rollable" data-action="roll" data-type="initiative"
@@ -35,23 +50,129 @@
 
   {{#if deathSaves}}{{> "modules/bhd-companion/templates/mobile/death-saves.hbs" deathSaves=deathSaves}}{{/if}}
 
-  {{!-- Orden de iniciativa --}}
-  <h3 class="bhd-section-title">{{localize "BHD.Combat.Order"}}</h3>
-  <ol class="bhd-turns">
-    {{#each combat.turns}}
-    <li class="bhd-turn {{#if current}}bhd-current{{/if}} {{#if next}}bhd-next{{/if}} {{#if mine}}bhd-mine{{/if}} {{#if defeated}}bhd-defeated{{/if}}">
-      <span class="bhd-turn-init">{{#if initiative}}{{initiative}}{{else}}—{{/if}}</span>
-      <img class="bhd-turn-img" src="{{img}}" alt="">
-      <span class="bhd-turn-text">
-        <span class="bhd-turn-name">{{name}}</span>
-        {{#if current}}<span class="bhd-turn-badge">{{localize "BHD.Combat.NowBadge"}}</span>
-        {{else if next}}<span class="bhd-turn-badge bhd-badge-next">{{localize "BHD.Combat.NextBadge"}}</span>{{/if}}
+  {{#if hud}}
+  {{!-- Objetivos marcados (se ven resaltados en la TV) --}}
+  <section class="bhd-hud-targets {{#if hud.targets.length}}bhd-has-targets{{/if}}">
+    <i class="fa-solid fa-crosshairs bhd-hud-targets-icon" aria-hidden="true"></i>
+    {{#if hud.targets.length}}
+    <span class="bhd-hud-target-list">
+      {{#each hud.targets}}<span class="bhd-hud-chip"><img src="{{img}}" alt="">{{name}}</span>{{/each}}
+    </span>
+    <button type="button" class="bhd-hud-clear" data-action="bhdClearTargets" aria-label="{{localize 'BHD.Hud.ClearTargets'}}">
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+    </button>
+    {{else}}
+    <span class="bhd-hud-target-none">{{localize "BHD.Hud.NoTargets"}}</span>
+    {{/if}}
+    <button type="button" class="bhd-hud-pick" data-action="bhdPickTargets">{{localize "BHD.Hud.ChooseTargets"}}</button>
+  </section>
+
+  {{!-- Resultado del último uso desde el HUD --}}
+  {{#if hudResult}}
+  <section class="bhd-hud-result" role="status">
+    <img class="bhd-hud-result-img" src="{{hudResult.img}}" alt="">
+    <div class="bhd-hud-result-body">
+      <strong class="bhd-hud-result-name">{{hudResult.name}}</strong>
+      {{#if hudResult.attack}}
+      <span class="bhd-hud-result-line {{#if hudResult.attack.crit}}bhd-crit{{/if}} {{#if hudResult.attack.fumble}}bhd-fumble{{/if}}">
+        <i class="fa-solid fa-dice-d20" aria-hidden="true"></i> {{localize "BHD.Actions.Attack"}}: <strong>{{hudResult.attack.total}}</strong>
+        {{#if hudResult.attack.crit}}<span class="bhd-hud-result-tag">{{localize "BHD.Hud.Result.Critical"}}</span>{{/if}}
+        {{#if hudResult.attack.fumble}}<span class="bhd-hud-result-tag">{{localize "BHD.Hud.Result.Fumble"}}</span>{{/if}}
       </span>
-      {{#if health}}<span class="bhd-health bhd-health-{{health.id}}">{{health.label}}</span>
-      {{else if defeated}}<i class="fa-solid fa-skull bhd-turn-dead" aria-label="{{localize 'BHD.Combat.Health.defeated'}}"></i>{{/if}}
-    </li>
+      {{/if}}
+      {{#each hudResult.verdicts}}
+      <span class="bhd-hud-verdict bhd-{{id}}">
+        <i class="fa-solid {{#if (eq id 'hit')}}fa-check{{else}}fa-xmark{{/if}}" aria-hidden="true"></i> {{name}}: <strong>{{label}}</strong>
+      </span>
+      {{/each}}
+      {{#if hudResult.damage}}
+      <span class="bhd-hud-result-line bhd-hud-result-damage">
+        <i class="fa-solid fa-burst" aria-hidden="true"></i> {{hudResult.damage.label}}: <strong>{{hudResult.damage.total}}</strong>
+      </span>
+      {{/if}}
+      {{#if hudResult.hint}}<span class="bhd-hud-result-hint">{{hudResult.hint}}</span>{{/if}}
+    </div>
+    <button type="button" class="bhd-hud-result-close" data-action="bhdHudCloseResult" aria-label="{{localize 'BHD.Actions.Close'}}">
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+    </button>
+  </section>
+  {{/if}}
+
+  {{!-- Bloques del turno --}}
+  <section class="bhd-hud-blocks" aria-label="{{localize 'BHD.Hud.Title'}}">
+    {{#each hud.blocks}}
+    <button type="button" class="bhd-hud-block bhd-hud-{{id}} {{#if used}}bhd-used{{/if}} {{#if open}}bhd-open{{/if}}"
+            data-action="bhdHudBlock" data-block="{{id}}" aria-expanded="{{open}}">
+      <span class="bhd-hud-block-icon"><i class="{{icon}}" aria-hidden="true"></i></span>
+      <span class="bhd-hud-block-label">{{label}}</span>
+      {{#if move}}
+      {{#if move.none}}
+      <span class="bhd-hud-block-state">{{localize "BHD.Hud.NoToken"}}</span>
+      {{else}}
+      <span class="bhd-hud-block-state">
+        {{#if move.dashed}}<i class="fa-solid fa-angles-right" aria-label="{{localize 'BHD.Hud.Basic.dash.Name'}}"></i>{{/if}}
+        <strong>{{move.used}}</strong>{{#if move.speed}} / {{move.speed}}{{/if}} {{move.units}}
+      </span>
+      {{#if move.speed}}<span class="bhd-hud-block-bar {{#if move.over}}bhd-over{{/if}}"><span style="width: {{move.percent}}%"></span></span>{{/if}}
+      {{/if}}
+      {{else}}
+      <span class="bhd-hud-block-state">
+        {{#if used}}<i class="fa-solid fa-check" aria-hidden="true"></i> {{localize "BHD.Hud.Used"}}{{else}}{{localize "BHD.Hud.Ready"}}{{/if}}
+      </span>
+      {{/if}}
+    </button>
     {{/each}}
-  </ol>
+  </section>
+
+  {{!-- Opciones del bloque abierto --}}
+  {{#if hud.panel}}
+  <section class="bhd-hud-panel bhd-hud-{{hud.panel.id}}" data-bhd-hud-panel>
+    <header class="bhd-hud-panel-head">
+      <span class="bhd-hud-panel-title"><i class="{{hud.panel.icon}}" aria-hidden="true"></i> {{hud.panel.label}}</span>
+      <button type="button" class="bhd-hud-mark" data-action="bhdHudMark" data-block="{{hud.panel.id}}">
+        {{#if hud.panel.used}}
+        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> {{localize "BHD.Hud.MarkReady"}}
+        {{else}}
+        <i class="fa-solid fa-check" aria-hidden="true"></i> {{localize "BHD.Hud.MarkUsed"}}
+        {{/if}}
+      </button>
+    </header>
+    {{#if hud.panel.used}}<p class="bhd-hud-warning">{{localize "BHD.Hud.AlreadyUsed"}}</p>{{/if}}
+
+    {{#each hud.panel.sections}}
+    <section class="bhd-action-group">
+      <h3 class="bhd-section-title">{{localize label}}</h3>
+      {{#if hint}}<p class="bhd-hud-section-hint">{{localize hint}}</p>{{/if}}
+      <div class="bhd-action-list">
+        {{#each rows}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
+      </div>
+    </section>
+    {{/each}}
+
+    {{#if hud.panel.basics.length}}
+    <h3 class="bhd-section-title">{{localize "BHD.Hud.Basics"}}</h3>
+    <div class="bhd-hud-basics">
+      {{#each hud.panel.basics}}
+      <button type="button" class="bhd-hud-basic" data-action="bhdHudBasic" data-basic="{{id}}">
+        <i class="{{icon}}" aria-hidden="true"></i>
+        <span class="bhd-hud-basic-name">{{label}}</span>
+        <span class="bhd-hud-basic-hint">{{hint}}</span>
+      </button>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if hud.panel.empty}}<p class="bhd-combat-note">{{localize "BHD.Hud.Empty"}}</p>{{/if}}
+  </section>
+  {{/if}}
+
+  {{#if combat.isMyTurn}}
+  <button type="button" class="bhd-big-btn bhd-end-turn" data-action="endTurn">
+    <i class="fa-solid fa-flag-checkered" aria-hidden="true"></i> {{localize "BHD.Combat.EndTurn"}}
+  </button>
+  {{/if}}
+  <p class="bhd-tap-hint">{{localize "BHD.Hud.Hint"}}</p>
+  {{/if}}
 
   {{else}}
   {{#if deathSaves}}{{> "modules/bhd-companion/templates/mobile/death-saves.hbs" deathSaves=deathSaves}}{{/if}}
