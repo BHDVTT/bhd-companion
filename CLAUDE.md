@@ -379,5 +379,5 @@ lang/es.json, en.json        traducciones
      Foundry visibles en la TV, resultado impacta / falla y daño.
 7. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
-8. **Publicación** — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
+8. **Publicación** (0.8.1 publicada en GitHub; falta instalar en The Forge y probar con 5 jugadores) — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
    `download` en `module.json` para instalar en The Forge.
