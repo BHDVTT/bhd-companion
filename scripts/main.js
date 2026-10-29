@@ -71,7 +71,13 @@ function openMobileView() {
   for ( const action of ["create", "update", "delete"] ) {
     Hooks.on(`${action}Item`, onItem);
     Hooks.on(`${action}ActiveEffect`, onEffect);
+    // Panel de resultados de la pestaña Acciones (tarjeta del objeto usado y sus tiradas).
+    Hooks.on(`${action}ChatMessage`, message => app.onChatMessage(message, action));
   }
+
+  // Total de ataques y daños en el teléfono (el mensaje completo va al chat).
+  Hooks.on("dnd5e.rollAttackV2", (rolls, { subject }={}) => app.onActivityRoll("attack", rolls, subject));
+  Hooks.on("dnd5e.rollDamageV2", (rolls, { subject }={}) => app.onActivityRoll("damage", rolls, subject));
 }
 
 /**

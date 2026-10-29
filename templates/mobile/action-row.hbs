@@ -1,0 +1,22 @@
+<div class="bhd-action" data-activation="{{row.activation}}" data-search="{{row.search}}">
+  <button type="button" class="bhd-action-use" data-action="useItem" data-item-id="{{row.id}}">
+    <img class="bhd-action-img" src="{{row.img}}" alt="">
+    <span class="bhd-action-text">
+      <span class="bhd-action-name">
+        {{row.name}}
+        {{#each row.tags}}<span class="bhd-tag">{{this}}</span>{{/each}}
+      </span>
+      {{#if row.subtitle}}<span class="bhd-action-sub">{{row.subtitle}}</span>{{/if}}
+    </span>
+    {{#if row.roll}}<span class="bhd-action-roll">{{row.roll}}</span>{{/if}}
+    {{#if row.uses}}
+    <span class="bhd-uses {{#if row.uses.empty}}bhd-empty{{/if}}" aria-label="{{localize 'BHD.Actions.Uses'}}">
+      {{row.uses.value}}/{{row.uses.max}}
+    </span>
+    {{/if}}
+  </button>
+  <button type="button" class="bhd-action-info" data-action="itemInfo" data-item-id="{{row.id}}"
+          aria-label="{{localize 'BHD.Actions.Info'}}">
+    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+  </button>
+</div>

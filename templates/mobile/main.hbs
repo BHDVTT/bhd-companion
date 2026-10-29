@@ -3,6 +3,8 @@
   <section class="tab bhd-tab {{tab.cssClass}}" data-group="{{tab.group}}" data-tab="{{tab.id}}">
     {{#if (eq tab.id "character")}}
     {{> "modules/bhd-companion/templates/mobile/character.hbs" sheet=@root.sheet choices=@root.choices hpAmount=@root.hpAmount}}
+    {{else if (eq tab.id "actions")}}
+    {{> "modules/bhd-companion/templates/mobile/actions.hbs" actions=@root.actions filters=@root.actionFilters spellSearch=@root.spellSearch}}
     {{else}}
     <div class="bhd-placeholder">
       <i class="{{tab.icon}}" aria-hidden="true"></i>

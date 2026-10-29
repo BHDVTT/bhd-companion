@@ -1,3 +1,5 @@
+import { patchAbilityTemplates } from "./mobile-templates.js";
+
 /**
  * Avisos de Foundry que no tienen sentido en la vista móvil:
  * - "Resolución demasiado baja" (Foundry pide pantallas de PC).
@@ -18,6 +20,7 @@ export function enterMobileMode() {
   document.body.classList.add("bhd-mobile");
   disableCanvas();
   silenceDesktopNotifications();
+  patchAbilityTemplates();
 }
 
 /**

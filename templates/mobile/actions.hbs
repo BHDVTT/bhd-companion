@@ -1,0 +1,93 @@
+<div class="bhd-sheet bhd-actions">
+  {{#if actions}}
+  {{!-- Filtros por tipo de activación --}}
+  <div class="bhd-filters" role="group" aria-label="{{localize 'BHD.Actions.Filter'}}">
+    {{#each filters}}
+    <button type="button" class="bhd-chip {{#if active}}bhd-on{{/if}}" data-action="actionFilter" data-filter="{{id}}"
+            aria-pressed="{{active}}">{{label}}</button>
+    {{/each}}
+  </div>
+
+  {{!-- Ataques con armas --}}
+  {{#if actions.attacks.length}}
+  <section class="bhd-action-group">
+    <h3 class="bhd-section-title">{{localize "BHD.Actions.Attacks"}}</h3>
+    <div class="bhd-action-list">
+      {{#each actions.attacks}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
+    </div>
+  </section>
+  {{/if}}
+
+  {{!-- Hechizos por nivel --}}
+  {{#if actions.spellbook.length}}
+  <section class="bhd-action-group bhd-spells">
+    <h3 class="bhd-section-title">{{localize "BHD.Actions.Spells"}}</h3>
+    {{#if actions.spellcasting}}
+    <p class="bhd-spellcasting">
+      {{#if actions.spellcasting.dc}}<span>{{localize "BHD.Actions.SpellDC"}} <strong>{{actions.spellcasting.dc}}</strong></span>{{/if}}
+      {{#if actions.spellcasting.attack}}<span>{{localize "BHD.Actions.SpellAttack"}} <strong>{{actions.spellcasting.attack}}</strong></span>{{/if}}
+    </p>
+    {{/if}}
+    <label class="bhd-search">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input type="search" name="bhdSpellSearch" data-bhd-spell-search value="{{spellSearch}}" autocomplete="off"
+             placeholder="{{localize 'BHD.Actions.SearchSpells'}}" aria-label="{{localize 'BHD.Actions.SearchSpells'}}">
+    </label>
+    {{#each actions.spellbook}}
+    <div class="bhd-action-group bhd-spell-level" data-spell-section>
+      <div class="bhd-spell-level-header">
+        <span class="bhd-spell-level-label">{{label}}</span>
+        {{#if slots}}
+        <span class="bhd-slots" aria-label="{{localize 'BHD.Actions.Slots' value=slots.value max=slots.max}}">
+          {{#each slots.pips}}<i class="bhd-pip {{#if filled}}bhd-filled{{/if}} {{#if temp}}bhd-temp-pip{{/if}}" aria-hidden="true"></i>{{/each}}
+          <span class="bhd-slots-count">{{slots.value}}/{{slots.max}}</span>
+        </span>
+        {{/if}}
+      </div>
+      <div class="bhd-action-list">
+        {{#each items}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
+      </div>
+    </div>
+    {{/each}}
+    <p class="bhd-no-results" data-bhd-no-spells hidden>{{localize "BHD.Actions.NoSpellsFound"}}</p>
+  </section>
+  {{/if}}
+
+  {{!-- Rasgos y habilidades --}}
+  {{#if actions.features.length}}
+  <section class="bhd-action-group">
+    <h3 class="bhd-section-title">{{localize "BHD.Actions.Features"}}</h3>
+    <div class="bhd-action-list">
+      {{#each actions.features}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
+    </div>
+  </section>
+  {{/if}}
+
+  {{!-- Consumibles --}}
+  {{#if actions.consumables.length}}
+  <section class="bhd-action-group">
+    <h3 class="bhd-section-title">{{localize "BHD.Actions.Consumables"}}</h3>
+    <div class="bhd-action-list">
+      {{#each actions.consumables}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
+    </div>
+  </section>
+  {{/if}}
+
+  {{#if actions.isEmpty}}
+  <div class="bhd-placeholder">
+    <i class="fa-solid fa-hand-fist" aria-hidden="true"></i>
+    <p>{{localize "BHD.Actions.Empty"}}</p>
+  </div>
+  {{else}}
+  <p class="bhd-no-results" data-bhd-no-actions hidden>{{localize "BHD.Actions.NoneForFilter"}}</p>
+  <p class="bhd-tap-hint">{{localize "BHD.Actions.TapToUse"}}</p>
+  {{/if}}
+
+  {{else}}
+  <div class="bhd-placeholder">
+    <i class="fa-solid fa-user-slash" aria-hidden="true"></i>
+    <h2>{{localize "BHD.NoCharacter"}}</h2>
+    <p>{{localize "BHD.Sheet.AskGM"}}</p>
+  </div>
+  {{/if}}
+</div>

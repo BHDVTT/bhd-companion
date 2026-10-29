@@ -53,7 +53,10 @@ scripts/device.js            decide si este cliente usa la vista móvil
 scripts/mobile-mode.js       prepara el cliente para la vista móvil (sin mapa, avisos)
 scripts/apps/mobile-app.js   BHDMobileApp (ApplicationV2) — la vista móvil, acciones (tiradas, vida)
 scripts/apps/character-data.js  elegir personaje y preparar sus datos para las plantillas
-templates/mobile/*.hbs       partes de la vista: header, main, nav; character.hbs (parcial de la pestaña)
+scripts/apps/actions-data.js    datos de la pestaña Acciones (ataques, hechizos, rasgos, consumibles)
+scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
+templates/mobile/*.hbs       partes de la vista: header, main, nav; parciales de pestaña:
+                             character.hbs, actions.hbs, action-row.hbs
 styles/bhd-companion.css     estilos
 lang/es.json, en.json        traducciones
 ```
@@ -100,6 +103,34 @@ lang/es.json, en.json        traducciones
 - **Tiempo real:** hooks de `updateActor`, `create/deleteActor`, `*Item`, `*ActiveEffect`, `updateUser`
   con un `render()` agrupado (debounce 50 ms). `ui.notifications` sí se ve en móvil (va en `<body>`).
 
+## Pestaña Acciones (decisiones de la etapa 3)
+
+- **Datos** (`scripts/apps/actions-data.js`): armas con `system.equipped`; hechizos agrupados con la
+  misma lógica que `_prepareSpellbook` de la hoja de dnd5e (`CONFIG.DND5E.spellcasting[*]`,
+  `getSpellSlotKey`, `getAvailableLevels`); se ocultan los que se pueden preparar y no están
+  preparados; rasgos (`feat`) con actividades; consumibles con cantidad > 0, sin munición.
+  Resumen con `item.labels` (activation, range, damages, toHit), CD de la actividad `save`,
+  usos de `system.uses` o de la primera actividad con usos.
+- **Filtros y buscador:** se aplican en `#applyActionFilters` ocultando filas con `hidden`
+  (sin volver a dibujar). Cada fila lleva `data-activation` (tipos de activación del objeto y sus
+  actividades) y `data-search` (nombre sin acentos). El buscador solo afecta a hechizos.
+- **Usar:** `item.use({ event })`, flujo normal de dnd5e (elegir actividad, ventana de espacio de
+  conjuro, gasto, ataque automático con su ventana de ventaja/desventaja). La tarjeta del chat se
+  muestra en un panel inferior (`.bhd-tray`, fuera de las partes de la plantilla) con
+  `message.renderHTML()`, que trae los botones de dnd5e ya conectados (daño, curación...). Los
+  mensajes con `flags.dnd5e.originatingMessage` de esa tarjeta se añaden al panel (hooks
+  `create/update/deleteChatMessage`). El total de ataque/daño sale en el aviso
+  (hooks `dnd5e.rollAttackV2` / `dnd5e.rollDamageV2`).
+- **Áreas sin mapa** (`scripts/mobile-templates.js`): en vista móvil se sustituye
+  `dnd5e.canvas.AbilityTemplate.fromActivity`; captura los datos con el hook
+  `dnd5e.preCreateActivityTemplate` (devolviendo `false`) y crea el `MeasuredTemplate` en
+  `game.scenes.active`, centrado en la ficha del personaje. El DM la mueve en la TV.
+  Requiere el permiso `TEMPLATE_CREATE` (los jugadores lo tienen por defecto).
+- **Ventanas en el teléfono:** CSS `body.bhd-mobile .application:has(> .window-header)` las pone
+  abajo, a lo ancho, con `!important` sobre la posición que Foundry escribe en línea.
+- Los clics dentro del panel con `data-action` desconocido llegan también a `BHDMobileApp`, que
+  los ignora; no usar en la app nombres de acción que use dnd5e en sus tarjetas.
+
 ## Entorno local
 
 - Datos de Foundry: `C:\Users\Frulo\AppData\Local\FoundryVTT\Data`
@@ -119,10 +150,11 @@ lang/es.json, en.json        traducciones
 2. **Hoja de personaje** ✅ (probada; incluye tiradas con un toque y botones de vida; 0.3.1 arregla el diseño en iPad) — encabezado (nombre, retrato, PG, CA, velocidad,
    iniciativa), características, salvaciones, habilidades; pestañas inferiores estilo
    D&D Beyond. Se actualiza sola con `updateActor` / `updateItem`.
-3. **Tiradas** — tocar una característica, salvación o habilidad tira con dnd5e; ventaja /
-   desventaja adaptadas al móvil; resultados al chat (visibles en la TV).
-4. **Acciones** — ataques, armas, hechizos y rasgos usando `item.use()`; espacios de hechizo
-   y usos limitados.
+3. **Acciones** (0.4.0, pendiente de probar) — pestaña Acciones: ataques con armas equipadas,
+   hechizos por nivel con espacios, rasgos con usos, consumibles; filtros acción / adicional /
+   reacción; buscador de hechizos; `item.use()`; panel con la tarjeta del chat; áreas sin mapa.
+4. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
+   habilidades (los ataques ya la tienen con la ventana de dnd5e).
 5. **Combate en tiempo real** — orden de iniciativa, aviso "¡Es tu turno!", terminar turno,
    PG propios (daño/curación), condiciones; escuchando hooks de `Combat`.
 6. **Inventario y descansos** — objetos, monedas, descanso corto/largo.

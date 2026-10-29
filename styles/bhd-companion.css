@@ -809,3 +809,436 @@ body.bhd-mobile {
   from { opacity: 0; transform: translate(-50%, 12px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* El aviso de tirada va por encima del panel de resultados */
+#bhd-mobile-app .bhd-toast {
+  z-index: 2;
+}
+
+/* ------------------------------------------ */
+/*  Pestaña Acciones                           */
+/* ------------------------------------------ */
+
+/* Filtros: se quedan arriba al desplazarse */
+#bhd-mobile-app .bhd-filters {
+  position: sticky;
+  top: -16px;
+  z-index: 1;
+  display: flex;
+  gap: 6px;
+  margin: -16px -16px 0;
+  padding: 12px 16px 8px;
+  overflow-x: auto;
+  background: var(--bhd-bg);
+  scrollbar-width: none;
+}
+
+#bhd-mobile-app .bhd-chip {
+  flex: none;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 20px;
+  background: var(--bhd-surface);
+  color: var(--bhd-text-muted);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+#bhd-mobile-app .bhd-chip.bhd-on {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold-soft);
+  color: var(--bhd-gold);
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-action-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-action-group[hidden],
+#bhd-mobile-app .bhd-action[hidden],
+#bhd-mobile-app .bhd-no-results[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-action-list {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-surface);
+}
+
+#bhd-mobile-app .bhd-action {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--bhd-border);
+}
+
+#bhd-mobile-app .bhd-action:last-child {
+  border-bottom: none;
+}
+
+#bhd-mobile-app .bhd-action-use {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 8px 4px 8px 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+#bhd-mobile-app .bhd-action-use:active {
+  background: var(--bhd-gold-soft);
+}
+
+#bhd-mobile-app .bhd-action-use.bhd-rolling {
+  opacity: 0.6;
+}
+
+#bhd-mobile-app .bhd-action-img {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+#bhd-mobile-app .bhd-action-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#bhd-mobile-app .bhd-action-name {
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+#bhd-mobile-app .bhd-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--bhd-text-muted);
+  vertical-align: middle;
+}
+
+#bhd-mobile-app .bhd-action-sub {
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--bhd-text-muted);
+  overflow-wrap: anywhere;
+}
+
+#bhd-mobile-app .bhd-action-roll {
+  flex: none;
+  min-width: 40px;
+  font-size: 17px;
+  font-weight: bold;
+  text-align: center;
+  white-space: nowrap;
+}
+
+#bhd-mobile-app .bhd-uses {
+  flex: none;
+  min-width: 44px;
+  padding: 2px 6px;
+  border: 1px solid var(--bhd-gold);
+  border-radius: 10px;
+  background: var(--bhd-gold-soft);
+  color: var(--bhd-gold);
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  white-space: nowrap;
+}
+
+#bhd-mobile-app .bhd-uses.bhd-empty {
+  border-color: var(--bhd-border);
+  background: transparent;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-action-info {
+  flex: none;
+  width: var(--bhd-touch);
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--bhd-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--bhd-text-muted);
+  font-size: 18px;
+}
+
+#bhd-mobile-app .bhd-action-info:active {
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text);
+}
+
+/* Hechizos */
+#bhd-mobile-app .bhd-spellcasting {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-spellcasting strong {
+  color: var(--bhd-text);
+  font-size: 16px;
+}
+
+#bhd-mobile-app .bhd-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 10px;
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-search input {
+  flex: 1;
+  height: var(--bhd-touch);
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--bhd-text);
+  font-size: 16px; /* 16px o más: iOS no hace zoom al escribir */
+}
+
+#bhd-mobile-app .bhd-spell-level {
+  gap: 6px;
+  margin-top: 4px;
+}
+
+#bhd-mobile-app .bhd-spell-level-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 0 4px;
+}
+
+#bhd-mobile-app .bhd-spell-level-label {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-slots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Rombos: espacio disponible (relleno) o gastado (vacío) */
+#bhd-mobile-app .bhd-pip {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--bhd-gold);
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+#bhd-mobile-app .bhd-pip.bhd-filled {
+  background: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-pip.bhd-temp-pip {
+  border-color: #6fb3e6;
+}
+
+#bhd-mobile-app .bhd-pip.bhd-temp-pip.bhd-filled {
+  background: #6fb3e6;
+}
+
+#bhd-mobile-app .bhd-slots-count {
+  margin-left: 2px;
+  font-size: 13px;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-no-results {
+  margin: 0;
+  padding: 12px;
+  color: var(--bhd-text-muted);
+  text-align: center;
+}
+
+/* ------------------------------------------ */
+/*  Panel de resultados (último objeto usado)  */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-tray {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--bhd-nav-height) + env(safe-area-inset-bottom, 0px));
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  max-height: 60%;
+  border-top: 2px solid var(--bhd-gold);
+  border-radius: 16px 16px 0 0;
+  background: var(--bhd-surface);
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.6);
+  animation: bhd-tray-in 0.2s ease-out;
+}
+
+#bhd-mobile-app .bhd-tray[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-tray-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 4px 16px;
+  border-bottom: 1px solid var(--bhd-border);
+}
+
+#bhd-mobile-app .bhd-tray-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--bhd-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#bhd-mobile-app .bhd-tray-close {
+  width: var(--bhd-touch);
+  height: var(--bhd-touch);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--bhd-text-muted);
+  font-size: 22px;
+}
+
+#bhd-mobile-app .bhd-tray-log {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  user-select: text;
+}
+
+/* Botones de las tarjetas de dnd5e más fáciles de tocar */
+#bhd-mobile-app .bhd-tray-log .card-buttons button {
+  min-height: 44px;
+  font-size: 15px;
+}
+
+/* Con el panel abierto, el aviso de la tirada sale arriba para no taparlo */
+#bhd-mobile-app .bhd-tray:not([hidden]) ~ .bhd-toast {
+  top: calc(84px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+}
+
+@keyframes bhd-tray-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ------------------------------------------ */
+/*  Ventanas de Foundry/dnd5e en el teléfono   */
+/* ------------------------------------------ */
+
+/* Las ventanas (opciones de tirada, espacio de conjuro, elegir actividad...) se colocan
+   abajo y a lo ancho de la pantalla, como en una app. Solo en vista móvil. */
+body.bhd-mobile .application:has(> .window-header) {
+  top: auto !important;
+  right: 0;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+  left: 0 !important;
+  width: calc(100vw - 16px) !important;
+  max-width: 640px;
+  height: auto !important;
+  max-height: calc(100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+  margin: 0 auto;
+  transform: none !important;
+  font-size: 16px;
+}
+
+body.bhd-mobile .application:has(> .window-header) > .window-header {
+  min-height: 48px;
+  font-size: 16px;
+}
+
+body.bhd-mobile .application:has(> .window-header) > .window-header button {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+body.bhd-mobile .application:has(> .window-header) > .window-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+body.bhd-mobile .application:has(> .window-header) .window-resize-handle {
+  display: none;
+}
+
+body.bhd-mobile .application:has(> .window-header) :is(.form-footer, footer) button {
+  min-height: 48px;
+  font-size: 16px;
+}
+
+/* Campos de 16px o más: iOS no hace zoom al tocarlos */
+body.bhd-mobile .application:has(> .window-header) :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+  min-height: 40px;
+  font-size: 16px;
+}
+
+body.bhd-mobile .application:has(> .window-header) :is(input[type="checkbox"], input[type="radio"]) {
+  width: 22px;
+  height: 22px;
+}
+
+/* Ventana con la descripción de un objeto */
+body.bhd-mobile .bhd-dialog > .window-content {
+  max-height: 70dvh;
+}
+
+body.bhd-mobile .bhd-item-info {
+  font-size: 15px;
+  line-height: 1.45;
+  user-select: text;
+}
+
+body.bhd-mobile .bhd-item-info-sub {
+  margin-top: 0;
+  font-style: italic;
+  opacity: 0.8;
+}
