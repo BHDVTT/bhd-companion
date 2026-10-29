@@ -1,0 +1,13 @@
+# Sistema operativo / editores
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+
+# Paquetes generados para publicar
+*.zip
+dist/
+
+# Configuración local de Claude Code
+.claude/settings.local.json

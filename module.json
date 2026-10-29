@@ -1,0 +1,45 @@
+{
+  "id": "bhd-companion",
+  "title": "BHD Companion",
+  "description": "Vista móvil para jugadores de Battlehammer's Dungeon: hoja de personaje, tiradas y combate en tiempo real desde el teléfono.",
+  "version": "0.1.0",
+  "authors": [
+    {
+      "name": "Battlehammer's Dungeon"
+    }
+  ],
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "5.0.0"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/bhd-companion.css"
+  ],
+  "languages": [
+    {
+      "lang": "es",
+      "name": "Español",
+      "path": "lang/es.json"
+    },
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "socket": true
+}
