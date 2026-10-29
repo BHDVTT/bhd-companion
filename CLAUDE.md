@@ -57,6 +57,8 @@ scripts/apps/actions-data.js    datos de la pestaña Acciones (ataques, hechizos
 scripts/apps/combat-data.js     datos de la pestaña Combate (turnos, vida aproximada, salvaciones de muerte)
 scripts/apps/inventory-data.js  datos de la pestaña Inventario (objetos, contenedores, monedas, peso)
 scripts/apps/notes-data.js      datos de la pestaña Notas (notas personales, personalidad, biografía)
+scripts/apps/move-data.js       datos de la pestaña Mover (ficha, pies usados / restantes, cruceta)
+scripts/movement.js          mover fichas desde el teléfono: reglas, canal del módulo, lado del DM, seguir en la TV
 scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
 scripts/connection.js        reconexión sin límite y aviso "Sin conexión" en vista móvil
@@ -65,7 +67,7 @@ scripts/home-screen.js       manifiesto de app web y etiquetas apple-* (añadir 
 icons/icon-{180,192,512}.png icono de la app (generado con System.Drawing de PowerShell)
 templates/mobile/*.hbs       partes de la vista: header, main, turn, nav; parciales de pestaña:
                              character.hbs, actions.hbs, action-row.hbs, combat.hbs, death-saves.hbs,
-                             inventory.hbs, inventory-row.hbs, inventory-container.hbs, notes.hbs;
+                             inventory.hbs, inventory-row.hbs, inventory-container.hbs, notes.hbs, move.hbs;
                              settings.hbs (panel de ajustes, se dibuja con renderTemplate)
 styles/bhd-companion.css     estilos
 lang/es.json, en.json        traducciones
@@ -244,6 +246,33 @@ lang/es.json, en.json        traducciones
 - **Consola:** la vibración del aviso de turno solo con `navigator.userActivation.hasBeenActive`
   (si no, Chrome avisa en la consola).
 
+## Pestaña Mover (decisiones de la etapa 6D)
+
+- **Quién mueve:** el teléfono no tiene mapa (`token.object` no existe y `TokenDocument#_preUpdate` solo
+  aplica paredes si `this.rendered`), así que cada toque manda `moveRequest` por `module.bhd-companion`
+  solo al DM activo (`recipients`). El servidor añade el id real del remitente como 2.º argumento del
+  listener. El DM (cola en serie `gmQueue`) valida con `getMovementBlock`, calcula la casilla con
+  `token.object._getShiftedPosition` (igual que las flechas del teclado), comprueba bordes y
+  `checkCollision` (tipo de pared de `CONFIG.Token.movement.actions[action].walls`; puertas cerradas
+  bloquean) y mueve con `token.move(waypoint, { method: "keyboard" })`. Responde `moveResult` solo al
+  jugador; sin respuesta en 5 s → aviso. Requiere que el DM esté conectado y viendo esa escena.
+- **Reglas** (`getMovementBlock`, comunes a teléfono y DM): dueño de la ficha, ajuste de mundo
+  `lockMovement`, pausa, ficha bloqueada (`token.locked`) y, en combate empezado con esa ficha, solo en su
+  turno salvo ajuste `moveOutsideTurn`.
+- **Conteo:** flag de la ficha `flags.bhd-companion.movement = { key, path }`. `key` = `combatId.ronda` de
+  su último inicio de turno (o `"free"` fuera de combate); si no coincide, el conteo es 0. Pies =
+  `token.measureMovementPath(path).distance` (regla de diagonales de la escena). Si el DM movió la ficha a
+  mano, se anota un punto con `action: "displace"` (no mide). Velocidad: `movement[token.movementAction]`
+  o `walk`. Pasar de la velocidad se permite (Correr), en rojo.
+- **Deshacer:** vuelve al punto anterior con `action: "displace"` (sin animación ni paredes) y quita el
+  paso; solo si el último punto es un paso y la ficha sigue ahí. Fuera de combate, "Poner a cero".
+- **TV:** tras cada paso el DM emite `follow`; los clientes con mapa de esa escena y ajuste de cliente
+  `followMoves` (true) hacen `canvas.animatePan` a la ficha.
+- **Teléfono:** pestaña `move` (cruceta 3 × 3, `bhdMove` / `bhdMoveUndo` / `bhdMoveReset`), hasta 3 pasos en
+  cola; si uno falla se descartan los demás. Pared → aviso, `navigator.vibrate` y `.bhd-shake`.
+  Redibuja con `*Token` de fichas propias de la escena activa, `updateScene` (active/grid) y `pauseGame`,
+  solo con la pestaña abierta (`app.activeTab`).
+
 ## Entorno local
 
 - Datos de Foundry: `C:\Users\Frulo\AppData\Local\FoundryVTT\Data`
@@ -281,6 +310,9 @@ lang/es.json, en.json        traducciones
 6. **Uso real en la tienda** ✅ (0.7.0, probada; el usuario la pidió antes que
    las tiradas) — rendimiento en teléfonos viejos, textos es/en revisados, pantalla encendida,
    reconexión automática, letra grande, añadir a la pantalla de inicio, avisos de consola, README.
+   - **6D. Mover desde el teléfono** (0.7.1, sin probar) — pestaña Mover con cruceta de 8 direcciones,
+     paredes y puertas, pies usados / restantes, Deshacer, solo en tu turno (ajustes del GM), elegir
+     ficha, la TV sigue la ficha.
 7. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
 8. **Publicación** — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y

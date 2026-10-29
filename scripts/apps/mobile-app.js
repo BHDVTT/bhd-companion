@@ -3,6 +3,8 @@ import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "
 import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.js";
 import { getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
 import { prepareInventory } from "./inventory-data.js";
+import { getMoveToken, prepareMovement } from "./move-data.js";
+import { requestMovement } from "../movement.js";
 import { getSavedNotes, localNotesDraft, NOTES_FLAG, prepareNotes } from "./notes-data.js";
 import { applyLargeText, syncPlaylistSounds } from "../mobile-mode.js";
 import { canKeepAwake, updateWakeLock } from "../wake-lock.js";
@@ -93,7 +95,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       bhdSettings: BHDMobileApp.#onOpenSettings,
       bhdCloseSettings: BHDMobileApp.#onCloseSettings,
       bhdToggleSetting: BHDMobileApp.#onToggleSetting,
-      bhdInstall: BHDMobileApp.#onInstall
+      bhdInstall: BHDMobileApp.#onInstall,
+      bhdMove: BHDMobileApp.#onMove,
+      bhdMoveUndo: BHDMobileApp.#onMoveUndo,
+      bhdMoveReset: BHDMobileApp.#onMoveReset
     }
   };
 
@@ -107,6 +112,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         `${TEMPLATE_PATH}/mobile/action-row.hbs`,
         `${TEMPLATE_PATH}/mobile/combat.hbs`,
         `${TEMPLATE_PATH}/mobile/death-saves.hbs`,
+        `${TEMPLATE_PATH}/mobile/move.hbs`,
         `${TEMPLATE_PATH}/mobile/inventory.hbs`,
         `${TEMPLATE_PATH}/mobile/inventory-row.hbs`,
         `${TEMPLATE_PATH}/mobile/inventory-container.hbs`,
@@ -127,6 +133,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         { id: "character", icon: "fa-solid fa-user" },
         { id: "actions", icon: "fa-solid fa-hand-fist" },
         { id: "combat", icon: "fa-solid fa-swords" },
+        { id: "move", icon: "fa-solid fa-arrows-up-down-left-right" },
         { id: "inventory", icon: "fa-solid fa-sack" },
         { id: "notes", icon: "fa-solid fa-scroll" }
       ]
@@ -213,6 +220,23 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Posición del cursor en las notas, para recuperarla si la vista se redibuja mientras se escribe. */
   #notesSelection = null;
 
+  /** Ficha elegida en el selector de la pestaña Mover (si el jugador controla varias). */
+  #moveTokenId = null;
+
+  /** Pasos tocados que esperan su turno: se mandan al DM de uno en uno. */
+  #moveQueue = Promise.resolve();
+
+  /** Cuántos pasos hay en cola (los toques de más se ignoran para no acumular). */
+  #moveQueued = 0;
+
+  /** Sube cada vez que un paso falla: los pasos que ya estaban en cola se descartan. */
+  #moveGeneration = 0;
+
+  /** Pestaña visible ahora mismo. */
+  get activeTab() {
+    return this.tabGroups.primary;
+  }
+
   /**
    * Personaje que se muestra ahora mismo.
    * @type {Actor|null}
@@ -247,6 +271,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     // El combate se prepara siempre: la barra de pestañas y la barra "Es tu turno" lo usan.
     context.combat = prepareCombat(actor);
     context.deathSaves = prepareDeathSaves(actor);
+    context.move = (tab === "move") ? prepareMovement(actor, this.#moveTokenId) : null;
     context.inventory = (actor && (tab === "inventory")) ? prepareInventory(actor, this.#openContainers) : null;
     const draft = (this.#notesDraft?.actorId === actor?.id) ? this.#notesDraft.text : null;
     context.notes = (actor && (tab === "notes")) ? await prepareNotes(actor, draft) : null;
@@ -338,6 +363,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     amount?.addEventListener("input", event => this.#hpAmount = event.currentTarget.value);
     const select = this.element.querySelector("[data-bhd-character-select]");
     select?.addEventListener("change", event => game.user.update({ character: event.currentTarget.value }));
+    const moveSelect = this.element.querySelector("[data-bhd-move-token]");
+    moveSelect?.addEventListener("change", event => {
+      this.#moveTokenId = event.currentTarget.value;
+      this.render({ parts: ["main"] });
+    });
     const search = this.element.querySelector("[data-bhd-spell-search]");
     search?.addEventListener("input", event => {
       this.#spellSearch = event.currentTarget.value;
@@ -742,6 +772,56 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const total = rolls.reduce((sum, roll) => sum + (roll.total ?? 0), 0);
     const label = subject.damageFlavor ?? game.i18n.localize("BHD.Actions.Damage");
     this.#showRollResult(`${name}: ${label}`, { total });
+  }
+
+  /* -------------------------------------------- */
+  /*  Pestaña Mover                               */
+  /* -------------------------------------------- */
+
+  /**
+   * Manda al DM un paso, deshacer o reiniciar, de uno en uno y en el orden en que se tocaron.
+   * Si uno falla (pared, no es tu turno...), los que esperaban en cola se descartan.
+   * @param {"step"|"undo"|"reset"} action
+   * @param {string} [direction]
+   */
+  #queueMovement(action, direction) {
+    const token = getMoveToken(this.actor, this.#moveTokenId);
+    if ( !token || (this.#moveQueued >= 3) ) return;
+    this.#moveQueued++;
+    const generation = this.#moveGeneration;
+    this.#moveQueue = this.#moveQueue.then(async () => {
+      try {
+        if ( generation !== this.#moveGeneration ) return;
+        const result = await requestMovement(action, token, direction);
+        if ( !result.ok ) {
+          this.#moveGeneration++;
+          this.#onMoveFailed(result.reason);
+        }
+      } catch(err) {
+        console.error("BHD Companion | No se pudo mover la ficha", err);
+      } finally {
+        this.#moveQueued--;
+      }
+    });
+  }
+
+  /**
+   * Explica por qué no se movió la ficha. Si chocó con una pared o puerta, además vibra
+   * y la cruceta tiembla (los iPhone no vibran).
+   * @param {string} reason  Clave de BHD.Move.Reason.*
+   */
+  #onMoveFailed(reason) {
+    ui.notifications.warn(`BHD.Move.Reason.${reason}`, { localize: true });
+    if ( reason !== "Wall" ) return;
+    try {
+      if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([80, 60, 80]);
+    } catch(err) {}
+    const pad = this.element?.querySelector("[data-bhd-dpad]");
+    if ( !pad ) return;
+    pad.classList.remove("bhd-shake");
+    void pad.offsetWidth; // reinicia la animación si ya estaba temblando
+    pad.classList.add("bhd-shake");
+    pad.addEventListener("animationend", () => pad.classList.remove("bhd-shake"), { once: true });
   }
 
   /* -------------------------------------------- */
@@ -1153,6 +1233,32 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     } finally {
       this.#resting = false;
     }
+  }
+
+  /**
+   * Flecha de la cruceta: mueve la ficha una casilla en esa dirección.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onMove(event, target) {
+    this.#queueMovement("step", target.dataset.direction);
+  }
+
+  /**
+   * Deshace el último paso.
+   * @this {BHDMobileApp}
+   */
+  static #onMoveUndo() {
+    this.#queueMovement("undo");
+  }
+
+  /**
+   * Pone a cero los pies recorridos (solo fuera de combate).
+   * @this {BHDMobileApp}
+   */
+  static #onMoveReset() {
+    this.#queueMovement("reset");
   }
 
   /* -------------------------------------------- */

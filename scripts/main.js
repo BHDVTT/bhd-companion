@@ -11,6 +11,7 @@ import { getCharacterChoices } from "./apps/character-data.js";
 import { getActiveCombat } from "./apps/combat-data.js";
 import { watchConnection } from "./connection.js";
 import { updateWakeLock } from "./wake-lock.js";
+import { registerMovementSocket } from "./movement.js";
 
 /** ¿Este cliente está en vista móvil? Se decide una sola vez al cargar. */
 let mobileView = false;
@@ -27,6 +28,8 @@ Hooks.once("setup", () => {
 });
 
 Hooks.once("ready", () => {
+  // Pestaña Mover: el DM mueve las fichas que piden los teléfonos y la TV las sigue.
+  registerMovementSocket();
   if ( mobileView ) openMobileView();
   else if ( canUseMobileView() ) addReturnToMobileButton();
 });
@@ -103,6 +106,20 @@ function openMobileView() {
     // Panel de resultados de la pestaña Acciones (tarjeta del objeto usado y sus tiradas).
     Hooks.on(`${action}ChatMessage`, message => app.onChatMessage(message, action));
   }
+
+  // Pestaña Mover: fichas del jugador en la escena de la TV (posición, pies recorridos),
+  // cambio de escena activa y pausa. Solo importa si la pestaña está abierta.
+  const onMoveChange = () => {
+    if ( app.activeTab === "move" ) refresh();
+  };
+  const onToken = token => {
+    if ( (token.parent === game.scenes.active) && token.isOwner ) onMoveChange();
+  };
+  for ( const action of ["create", "update", "delete"] ) Hooks.on(`${action}Token`, onToken);
+  Hooks.on("updateScene", (scene, changes) => {
+    if ( ("active" in changes) || ("grid" in changes) ) onMoveChange();
+  });
+  Hooks.on("pauseGame", onMoveChange);
 
   // Toque rápido: usar y tirar sin ventanas; toque largo: ventaja / desventaja.
   Hooks.on("dnd5e.preUseActivity", (activity, usage, dialog) => app.onPreUseActivity(activity, usage, dialog));

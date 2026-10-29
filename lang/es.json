@@ -5,6 +5,7 @@
       "character": "Personaje",
       "actions": "Acciones",
       "combat": "Combate",
+      "move": "Mover",
       "inventory": "Inventario",
       "notes": "Notas"
     },
@@ -120,6 +121,46 @@
       "LongDone": "Descanso largo terminado",
       "Healed": "+{hp} PG"
     },
+    "Move": {
+      "ChooseToken": "Ficha",
+      "Used": "Usados",
+      "Remaining": "Quedan",
+      "Extra": "De más",
+      "TurnHint": "El conteo vuelve a cero al empezar tu turno.",
+      "FreeHint": "Fuera de combate puedes moverte libremente.",
+      "OverHint": "Ya usaste toda tu velocidad (¿Correr?). El DM decide.",
+      "Undo": "Deshacer",
+      "Reset": "Poner a cero",
+      "Hint": "Cada toque mueve tu ficha una casilla en la TV.",
+      "NoTokenTitle": "Sin ficha en el mapa",
+      "NoToken": "Tu personaje no tiene ficha en la escena de la TV. Pídele al DM que la ponga.",
+      "NoScene": "El DM aún no ha activado ninguna escena.",
+      "Dir": {
+        "up-left": "Arriba a la izquierda",
+        "up": "Arriba",
+        "up-right": "Arriba a la derecha",
+        "left": "Izquierda",
+        "right": "Derecha",
+        "down-left": "Abajo a la izquierda",
+        "down": "Abajo",
+        "down-right": "Abajo a la derecha"
+      },
+      "Reason": {
+        "NoToken": "No hay ficha que mover.",
+        "NotOwner": "Esa ficha no es tuya.",
+        "Locked": "El DM ha bloqueado el movimiento.",
+        "Paused": "El juego está en pausa.",
+        "TokenLocked": "El DM ha bloqueado tu ficha.",
+        "NotYourTurn": "Espera tu turno para moverte.",
+        "Wall": "¡No puedes pasar por ahí!",
+        "NoDiagonal": "En este mapa no se puede mover en diagonal.",
+        "NothingToUndo": "No hay ningún paso que deshacer.",
+        "GMNotViewing": "El DM no está viendo esta escena en su Foundry.",
+        "NoGM": "El DM no está conectado: hace falta para moverse.",
+        "NoResponse": "El DM no responde. Inténtalo de nuevo.",
+        "Error": "No se pudo mover la ficha."
+      }
+    },
     "Inventory": {
       "Currency": "Monedas",
       "CurrencyHint": "Toca una moneda para escribir la cantidad nueva.",
@@ -212,6 +253,18 @@
       "ShowEnemyHealth": {
         "Name": "Mostrar estado de vida de los enemigos",
         "Hint": "En la pestaña Combate del teléfono, los jugadores ven un estado aproximado de cada enemigo (Sano, Herido, Ensangrentado, Casi muerto), nunca los números. Desmárcalo para ocultarlo."
+      },
+      "LockMovement": {
+        "Name": "Bloquear el movimiento desde los teléfonos",
+        "Hint": "Nadie puede mover su ficha desde la pestaña Mover del teléfono (por ejemplo, durante una escena de diálogo)."
+      },
+      "MoveOutsideTurn": {
+        "Name": "En combate, moverse fuera del propio turno",
+        "Hint": "Normalmente, en combate cada jugador solo puede mover su ficha desde el teléfono durante su turno. Márcalo para permitirlo siempre."
+      },
+      "FollowMoves": {
+        "Name": "Seguir las fichas movidas desde un teléfono",
+        "Hint": "En esta pantalla (por ejemplo, la TV), el mapa se centra en la ficha que un jugador mueve desde su teléfono."
       },
       "PreferNormal": {
         "Name": "Usar la interfaz normal en este dispositivo",

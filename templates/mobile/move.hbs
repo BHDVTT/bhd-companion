@@ -1,0 +1,82 @@
+{{!-- Pestaña Mover: cruceta para mover la ficha casilla a casilla. Recibe move. --}}
+<div class="bhd-sheet bhd-move">
+  {{#if move.token}}
+  {{#if move.choices}}
+  <label class="bhd-select">
+    <span>{{localize "BHD.Move.ChooseToken"}}</span>
+    <select data-bhd-move-token>
+      {{#each move.choices}}
+      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+      {{/each}}
+    </select>
+  </label>
+  {{/if}}
+
+  {{!-- Pies usados y restantes --}}
+  <section class="bhd-card bhd-move-count {{#if move.over}}bhd-over{{/if}}">
+    <div class="bhd-move-numbers">
+      <span class="bhd-move-used">
+        <span class="bhd-move-label">{{localize "BHD.Move.Used"}}</span>
+        <strong>{{move.used}}</strong>{{#if move.speed}} / {{move.speed}}{{/if}} {{move.units}}
+      </span>
+      {{#if move.speed}}
+      <span class="bhd-move-left">
+        {{#if move.over}}
+        <span class="bhd-move-label">{{localize "BHD.Move.Extra"}}</span>
+        <strong>+{{move.extra}}</strong> {{move.units}}
+        {{else}}
+        <span class="bhd-move-label">{{localize "BHD.Move.Remaining"}}</span>
+        <strong>{{move.remaining}}</strong> {{move.units}}
+        {{/if}}
+      </span>
+      {{/if}}
+    </div>
+    {{#if move.speed}}
+    <div class="bhd-move-bar"><div class="bhd-move-fill" style="width: {{move.percent}}%"></div></div>
+    {{/if}}
+    <p class="bhd-move-hint">
+      {{#if move.over}}{{localize "BHD.Move.OverHint"}}
+      {{else if move.inCombat}}{{localize "BHD.Move.TurnHint"}}
+      {{else}}{{localize "BHD.Move.FreeHint"}}{{/if}}
+    </p>
+  </section>
+
+  {{#if move.block}}
+  <p class="bhd-move-block"><i class="fa-solid fa-hand" aria-hidden="true"></i> {{localize move.block}}</p>
+  {{/if}}
+
+  {{!-- Cruceta --}}
+  <div class="bhd-dpad {{#if move.block}}bhd-dpad-off{{/if}}" data-bhd-dpad>
+    {{#each move.pad}}
+    {{#if this}}
+    <button type="button" class="bhd-dpad-btn {{#if diagonal}}bhd-dpad-diag{{/if}}" data-action="bhdMove"
+            data-direction="{{direction}}" aria-label="{{localize (concat 'BHD.Move.Dir.' direction)}}"
+            {{#if disabled}}disabled{{/if}}>
+      <i class="fa-solid {{icon}}" aria-hidden="true"></i>
+    </button>
+    {{else}}
+    <div class="bhd-dpad-center"><img src="{{@root.move.token.img}}" alt="{{@root.move.token.name}}"></div>
+    {{/if}}
+    {{/each}}
+  </div>
+
+  <div class="bhd-move-buttons">
+    <button type="button" class="bhd-rest-btn" data-action="bhdMoveUndo" {{#unless move.canUndo}}disabled{{/unless}}>
+      <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> {{localize "BHD.Move.Undo"}}
+    </button>
+    {{#unless move.inCombat}}
+    <button type="button" class="bhd-rest-btn" data-action="bhdMoveReset" {{#unless move.canReset}}disabled{{/unless}}>
+      <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> {{localize "BHD.Move.Reset"}}
+    </button>
+    {{/unless}}
+  </div>
+  <p class="bhd-tap-hint">{{localize "BHD.Move.Hint"}}</p>
+
+  {{else}}
+  <div class="bhd-placeholder">
+    <i class="fa-solid fa-chess-pawn" aria-hidden="true"></i>
+    <h2>{{localize "BHD.Move.NoTokenTitle"}}</h2>
+    <p>{{localize (ifThen move.noScene "BHD.Move.NoScene" "BHD.Move.NoToken")}}</p>
+  </div>
+  {{/if}}
+</div>

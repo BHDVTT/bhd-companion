@@ -5,6 +5,7 @@
       "character": "Character",
       "actions": "Actions",
       "combat": "Combat",
+      "move": "Move",
       "inventory": "Inventory",
       "notes": "Notes"
     },
@@ -120,6 +121,46 @@
       "LongDone": "Long rest finished",
       "Healed": "+{hp} HP"
     },
+    "Move": {
+      "ChooseToken": "Token",
+      "Used": "Used",
+      "Remaining": "Left",
+      "Extra": "Extra",
+      "TurnHint": "The count resets when your turn starts.",
+      "FreeHint": "Outside combat you can move freely.",
+      "OverHint": "You've used all your speed (Dash?). The GM decides.",
+      "Undo": "Undo",
+      "Reset": "Reset",
+      "Hint": "Each tap moves your token one square on the TV.",
+      "NoTokenTitle": "No token on the map",
+      "NoToken": "Your character has no token in the TV's scene. Ask the GM to place it.",
+      "NoScene": "The GM hasn't activated a scene yet.",
+      "Dir": {
+        "up-left": "Up and left",
+        "up": "Up",
+        "up-right": "Up and right",
+        "left": "Left",
+        "right": "Right",
+        "down-left": "Down and left",
+        "down": "Down",
+        "down-right": "Down and right"
+      },
+      "Reason": {
+        "NoToken": "There's no token to move.",
+        "NotOwner": "That token isn't yours.",
+        "Locked": "The GM has locked movement.",
+        "Paused": "The game is paused.",
+        "TokenLocked": "The GM has locked your token.",
+        "NotYourTurn": "Wait for your turn to move.",
+        "Wall": "You can't go that way!",
+        "NoDiagonal": "Diagonal movement isn't allowed on this map.",
+        "NothingToUndo": "There's no step to undo.",
+        "GMNotViewing": "The GM isn't viewing this scene in Foundry.",
+        "NoGM": "The GM isn't connected: they're needed to move.",
+        "NoResponse": "The GM isn't responding. Try again.",
+        "Error": "The token couldn't be moved."
+      }
+    },
     "Inventory": {
       "Currency": "Currency",
       "CurrencyHint": "Tap a coin to type the new amount.",
@@ -212,6 +253,18 @@
       "ShowEnemyHealth": {
         "Name": "Show enemy health status",
         "Hint": "In the phone's Combat tab, players see an approximate status for each enemy (Healthy, Hurt, Bloodied, Near death), never the numbers. Uncheck to hide it."
+      },
+      "LockMovement": {
+        "Name": "Lock movement from phones",
+        "Hint": "Nobody can move their token from the phone's Move tab (for example, during a dialogue scene)."
+      },
+      "MoveOutsideTurn": {
+        "Name": "In combat, allow moving outside your own turn",
+        "Hint": "Normally, in combat each player can only move their token from the phone during their turn. Check this to always allow it."
+      },
+      "FollowMoves": {
+        "Name": "Follow tokens moved from a phone",
+        "Hint": "On this screen (for example, the TV), the map centers on the token a player moves from their phone."
       },
       "PreferNormal": {
         "Name": "Use the normal interface on this device",

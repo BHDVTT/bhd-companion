@@ -34,6 +34,35 @@ export function registerSettings() {
     onChange: () => game.modules.get(MODULE_ID).api?.app?.render()
   });
 
+  // Pestaña Mover: bloquear el movimiento desde los teléfonos para todos.
+  game.settings.register(MODULE_ID, "lockMovement", {
+    name: "BHD.Settings.LockMovement.Name",
+    hint: "BHD.Settings.LockMovement.Hint",
+    scope: "world",
+    config: true,
+    type: new foundry.data.fields.BooleanField({ initial: false }),
+    onChange: () => game.modules.get(MODULE_ID).api?.app?.render()
+  });
+
+  // Pestaña Mover: en combate, dejar moverse también fuera del propio turno.
+  game.settings.register(MODULE_ID, "moveOutsideTurn", {
+    name: "BHD.Settings.MoveOutsideTurn.Name",
+    hint: "BHD.Settings.MoveOutsideTurn.Hint",
+    scope: "world",
+    config: true,
+    type: new foundry.data.fields.BooleanField({ initial: false }),
+    onChange: () => game.modules.get(MODULE_ID).api?.app?.render()
+  });
+
+  // En las pantallas con mapa (la TV): centrar la vista en la ficha que se mueve desde un teléfono.
+  game.settings.register(MODULE_ID, "followMoves", {
+    name: "BHD.Settings.FollowMoves.Name",
+    hint: "BHD.Settings.FollowMoves.Hint",
+    scope: "client",
+    config: true,
+    type: new foundry.data.fields.BooleanField({ initial: true })
+  });
+
   // Preferencia de cada dispositivo: usar la interfaz normal de Foundry en lugar de la vista móvil.
   game.settings.register(MODULE_ID, "preferNormal", {
     name: "BHD.Settings.PreferNormal.Name",
