@@ -91,7 +91,7 @@ lang/es.json, en.json        traducciones
 ## Plan por etapas
 
 0. **Esqueleto** ✅ — `module.json`, estructura, `main.js` imprime "BHD Companion cargado".
-1. **Detección y contenedor móvil** ✅ (código listo, pendiente de prueba del usuario) —
+1. **Detección y contenedor móvil** ✅ (probado en PC con "forzar" y en iPad como jugador) —
    vista a pantalla completa sin mapa, encabezado con el personaje, barra de pestañas
    (Personaje, Acciones, Combate, Inventario, Notas), ajustes del GM (`enabled`, `forceAll`),
    botón para volver a la interfaz normal.
