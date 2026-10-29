@@ -1,5 +1,34 @@
 {
   "BHD": {
-    "Title": "BHD Companion"
+    "Title": "BHD Companion",
+    "Tabs": {
+      "character": "Personaje",
+      "actions": "Acciones",
+      "combat": "Combate",
+      "inventory": "Inventario",
+      "notes": "Notas"
+    },
+    "ComingSoon": "Próximamente",
+    "NoCharacter": "Sin personaje asignado",
+    "Exit": {
+      "Button": "Volver a la interfaz normal de Foundry",
+      "Title": "¿Volver a la interfaz normal?",
+      "Content": "Se recargará la página con la interfaz normal de Foundry en este dispositivo. Podrás volver a la vista móvil con el botón «Vista móvil»."
+    },
+    "ReturnMobile": "Vista móvil",
+    "Settings": {
+      "Enabled": {
+        "Name": "Activar vista móvil",
+        "Hint": "Los jugadores que entren desde un teléfono o pantalla pequeña verán la vista móvil de BHD Companion en lugar de la interfaz normal. No afecta al GM."
+      },
+      "ForceAll": {
+        "Name": "Forzar vista móvil en cualquier dispositivo (pruebas)",
+        "Hint": "Muestra la vista móvil a todos los jugadores aunque usen una computadora. Útil para probar. No afecta al GM."
+      },
+      "PreferNormal": {
+        "Name": "Usar la interfaz normal en este dispositivo",
+        "Hint": "Si está marcado, este navegador no mostrará la vista móvil aunque sea un teléfono."
+      }
+    }
   }
 }

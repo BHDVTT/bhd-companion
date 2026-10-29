@@ -1,5 +1,34 @@
 {
   "BHD": {
-    "Title": "BHD Companion"
+    "Title": "BHD Companion",
+    "Tabs": {
+      "character": "Character",
+      "actions": "Actions",
+      "combat": "Combat",
+      "inventory": "Inventory",
+      "notes": "Notes"
+    },
+    "ComingSoon": "Coming soon",
+    "NoCharacter": "No character assigned",
+    "Exit": {
+      "Button": "Return to the normal Foundry interface",
+      "Title": "Return to the normal interface?",
+      "Content": "The page will reload with the normal Foundry interface on this device. You can switch back with the \"Mobile view\" button."
+    },
+    "ReturnMobile": "Mobile view",
+    "Settings": {
+      "Enabled": {
+        "Name": "Enable mobile view",
+        "Hint": "Players joining from a phone or small screen see the BHD Companion mobile view instead of the normal interface. Does not affect the GM."
+      },
+      "ForceAll": {
+        "Name": "Force mobile view on any device (testing)",
+        "Hint": "Shows the mobile view to every player, even on a computer. Useful for testing. Does not affect the GM."
+      },
+      "PreferNormal": {
+        "Name": "Use the normal interface on this device",
+        "Hint": "When checked, this browser will not show the mobile view even on a phone."
+      }
+    }
   }
 }

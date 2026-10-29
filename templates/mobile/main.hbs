@@ -1,0 +1,11 @@
+<main class="bhd-main">
+  {{#each tabs as |tab|}}
+  <section class="tab bhd-tab {{tab.cssClass}}" data-group="{{tab.group}}" data-tab="{{tab.id}}">
+    <div class="bhd-placeholder">
+      <i class="{{tab.icon}}" aria-hidden="true"></i>
+      <h2>{{localize tab.label}}</h2>
+      <p>{{localize "BHD.ComingSoon"}}</p>
+    </div>
+  </section>
+  {{/each}}
+</main>

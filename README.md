@@ -10,8 +10,23 @@ combate en tiempo real.
 
 ## Estado actual
 
-Versión 0.1.0 — **esqueleto**. Por ahora el módulo solo escribe `BHD Companion cargado` en la
-consola del navegador para confirmar que se instala y carga bien.
+Versión 0.2.0 — **vista móvil base**.
+
+- Los jugadores (no el GM) que entran desde un teléfono o pantalla pequeña ven una vista
+  móvil a pantalla completa en lugar de la interfaz normal. El mapa no se dibuja en el
+  teléfono, para ahorrar batería y memoria.
+- Barra de pestañas abajo: Personaje, Acciones, Combate, Inventario, Notas (todavía vacías).
+- Botón pequeño (icono de pantalla, arriba a la derecha) para volver a la interfaz normal de
+  Foundry en ese dispositivo. Desde la interfaz normal, el botón rojo **Vista móvil** la
+  devuelve.
+
+### Configuración (solo el GM)
+
+En **Configure Settings → BHD Companion**:
+
+- **Activar vista móvil**: enciende o apaga la vista móvil para todos.
+- **Forzar vista móvil en cualquier dispositivo (pruebas)**: los jugadores la ven aunque
+  usen una computadora.
 
 ## Requisitos
 

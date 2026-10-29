@@ -1,2 +1,286 @@
 /* BHD Companion — estilos de la vista móvil.
    Regla: todas las clases empiezan con .bhd- para no afectar la interfaz normal de Foundry. */
+
+/* ------------------------------------------ */
+/*  Ocultar la interfaz normal en vista móvil  */
+/* ------------------------------------------ */
+
+body.bhd-mobile #interface,
+body.bhd-mobile #board,
+body.bhd-mobile #hud,
+body.bhd-mobile #camera-views,
+body.bhd-mobile #pause {
+  display: none !important;
+}
+
+body.bhd-mobile {
+  background: #121015;
+}
+
+/* ------------------------------------------ */
+/*  Contenedor principal                       */
+/* ------------------------------------------ */
+
+#bhd-mobile-app {
+  --bhd-bg: #121015;
+  --bhd-surface: #1d1a21;
+  --bhd-surface-2: #27232c;
+  --bhd-border: #3a333f;
+  --bhd-text: #ece6dc;
+  --bhd-text-muted: #9d95a3;
+  --bhd-red: #b3202a;
+  --bhd-red-bright: #d93641;
+  --bhd-gold: #d4a646;
+  --bhd-gold-soft: rgba(212, 166, 70, 0.15);
+  --bhd-nav-height: 68px;
+  --bhd-touch: 48px;
+
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--bhd-bg);
+  color: var(--bhd-text);
+  font-family: var(--font-body, "Signika"), sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#bhd-mobile-app button {
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* ------------------------------------------ */
+/*  Encabezado                                 */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  background: linear-gradient(180deg, #2a1418 0%, var(--bhd-surface) 100%);
+  border-bottom: 2px solid var(--bhd-red);
+}
+
+#bhd-mobile-app .bhd-portrait {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border: 2px solid var(--bhd-gold);
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  background: var(--bhd-surface-2);
+}
+
+#bhd-mobile-app .bhd-portrait-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bhd-text-muted);
+  font-size: 22px;
+}
+
+#bhd-mobile-app .bhd-identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#bhd-mobile-app .bhd-name {
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--bhd-gold);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#bhd-mobile-app .bhd-player {
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--bhd-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Botón pequeño para volver a la interfaz normal */
+#bhd-mobile-app .bhd-exit {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--bhd-border);
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--bhd-text-muted);
+  font-size: 16px;
+}
+
+#bhd-mobile-app .bhd-exit:active {
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text);
+}
+
+/* ------------------------------------------ */
+/*  Contenido de las pestañas                  */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+}
+
+#bhd-mobile-app .bhd-tab {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-tab.active {
+  display: block;
+}
+
+#bhd-mobile-app .bhd-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 15vh;
+  text-align: center;
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-placeholder i {
+  font-size: 48px;
+  color: var(--bhd-red);
+}
+
+#bhd-mobile-app .bhd-placeholder h2 {
+  margin: 0;
+  border: none;
+  font-size: 24px;
+  color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-placeholder p {
+  margin: 0;
+}
+
+/* ------------------------------------------ */
+/*  Barra de pestañas inferior                 */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-nav {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border: none;
+  border-top: 1px solid var(--bhd-border);
+  background: var(--bhd-surface);
+}
+
+#bhd-mobile-app .bhd-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  height: var(--bhd-nav-height);
+  min-height: var(--bhd-touch);
+  margin: 0;
+  padding: 6px 2px;
+  border: none;
+  border-top: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--bhd-text-muted);
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+#bhd-mobile-app .bhd-nav-btn i {
+  margin: 0;
+  font-size: 22px;
+}
+
+#bhd-mobile-app .bhd-nav-btn span {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#bhd-mobile-app .bhd-nav-btn.active {
+  border-top-color: var(--bhd-red);
+  background: var(--bhd-gold-soft);
+  color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-nav-btn:active {
+  background: var(--bhd-surface-2);
+}
+
+/* ------------------------------------------ */
+/*  Botón "Vista móvil" en la interfaz normal  */
+/* ------------------------------------------ */
+
+.bhd-return-mobile {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: 40px;
+  margin: 0;
+  padding: 0 16px;
+  transform: translateX(-50%);
+  border: 1px solid #d4a646;
+  border-radius: 20px;
+  background: #b3202a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  white-space: nowrap;
+  cursor: pointer;
+}

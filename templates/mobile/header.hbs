@@ -1,0 +1,18 @@
+<header class="bhd-header">
+  {{#if character}}
+  <img class="bhd-portrait" src="{{character.img}}" alt="">
+  <div class="bhd-identity">
+    <span class="bhd-name">{{character.name}}</span>
+    <span class="bhd-player">{{userName}}</span>
+  </div>
+  {{else}}
+  <div class="bhd-portrait bhd-portrait-empty"><i class="fa-solid fa-user" aria-hidden="true"></i></div>
+  <div class="bhd-identity">
+    <span class="bhd-name">{{localize "BHD.NoCharacter"}}</span>
+    <span class="bhd-player">{{userName}}</span>
+  </div>
+  {{/if}}
+  <button type="button" class="bhd-exit" data-action="exitMobile" aria-label="{{localize 'BHD.Exit.Button'}}">
+    <i class="fa-solid fa-display" aria-hidden="true"></i>
+  </button>
+</header>
