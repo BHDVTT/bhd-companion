@@ -1,4 +1,5 @@
 import { patchAbilityTemplates } from "./mobile-templates.js";
+import { registerCompactDialogs } from "./mobile-dialogs.js";
 
 /**
  * Avisos de Foundry que no tienen sentido en la vista móvil:
@@ -21,6 +22,7 @@ export function enterMobileMode() {
   disableCanvas();
   silenceDesktopNotifications();
   patchAbilityTemplates();
+  registerCompactDialogs();
 }
 
 /**

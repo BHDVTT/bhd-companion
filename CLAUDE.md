@@ -55,6 +55,7 @@ scripts/apps/mobile-app.js   BHDMobileApp (ApplicationV2) — la vista móvil, a
 scripts/apps/character-data.js  elegir personaje y preparar sus datos para las plantillas
 scripts/apps/actions-data.js    datos de la pestaña Acciones (ataques, hechizos, rasgos, consumibles)
 scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
+scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
 templates/mobile/*.hbs       partes de la vista: header, main, nav; parciales de pestaña:
                              character.hbs, actions.hbs, action-row.hbs
 styles/bhd-companion.css     estilos
@@ -127,7 +128,22 @@ lang/es.json, en.json        traducciones
   `game.scenes.active`, centrado en la ficha del personaje. El DM la mueve en la TV.
   Requiere el permiso `TEMPLATE_CREATE` (los jugadores lo tienen por defecto).
 - **Ventanas en el teléfono:** CSS `body.bhd-mobile .application:has(> .window-header)` las pone
-  abajo, a lo ancho, con `!important` sobre la posición que Foundry escribe en línea.
+  abajo, a lo ancho (en ≥ 700 px, tarjeta centrada de 560 px), con `!important` sobre la posición
+  que Foundry escribe en línea; sube las variables `--font-size-*`.
+- **Ventanas compactas** (`scripts/mobile-dialogs.js`, 0.4.1): hook `renderDialog5e` añade
+  `.bhd-compact` y pliega partes poco importantes (`FOLDED_PARTS`: en `activity-usage`
+  concentración / recursos / área; en `roll-configuration` fórmula y opciones) con un botón
+  `.bhd-fold-toggle`. No pliega si hay avisos o un selector de tipo de daño. Lo abierto se recuerda
+  por ventana (WeakMap) porque dnd5e redibuja partes al cambiar opciones.
+- **Toque rápido / toque largo** (0.4.1): tocar = `#useItem(item, "normal")`; mantener 450 ms
+  (escuchado en `this.element`, se cancela si el dedo se mueve > 10 px) abre `.bhd-chooser`
+  con Ventaja / Normal / Desventaja (si tiene actividad de ataque) o Usar, y "Más opciones".
+  Hooks en `main.js`: `dnd5e.preUseActivity` → `configure = false` si la actividad es de
+  `SIMPLE_ACTIVITY_TYPES`, `scaling === false` (sin elegir espacio) y no hay que terminar otra
+  concentración; `dnd5e.preRollAttackV2` / `preRollDamageV2` → `dialog.configure = false` y
+  `config.advantage/disadvantage` según `#pendingAttack` (válido 3 s tras el uso). "Más opciones"
+  (`#fullOptionsItem`) deja todas las ventanas de dnd5e para ese objeto. Los hechizos de nivel
+  siguen mostrando la ventana de uso (compacta) para elegir el espacio.
 - Los clics dentro del panel con `data-action` desconocido llegan también a `BHDMobileApp`, que
   los ignora; no usar en la app nombres de acción que use dnd5e en sus tarjetas.
 

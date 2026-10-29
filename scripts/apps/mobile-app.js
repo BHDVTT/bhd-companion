@@ -7,6 +7,18 @@ const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applicat
 /** Cuánto tiempo (ms) se ve el resultado de una tirada en el teléfono. */
 const TOAST_DURATION = 4000;
 
+/** Cuánto hay que mantener el dedo (ms) para abrir el menú de ventaja / desventaja. */
+const LONG_PRESS_MS = 450;
+
+/** Cuánto se puede mover el dedo (px) sin que deje de contar como toque largo. */
+const LONG_PRESS_TOLERANCE = 10;
+
+/**
+ * Actividades que con un toque rápido se usan sin ventana cuando no hay nivel de espacio que elegir.
+ * Las demás (invocar, encantar, transformar...) siempre muestran la ventana de dnd5e.
+ */
+const SIMPLE_ACTIVITY_TYPES = new Set(["attack", "damage", "heal", "save", "check", "utility"]);
+
 /**
  * Vista móvil a pantalla completa: encabezado, contenido por pestañas y barra de pestañas abajo.
  */
@@ -30,7 +42,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       useItem: BHDMobileApp.#onUseItem,
       itemInfo: BHDMobileApp.#onItemInfo,
       actionFilter: BHDMobileApp.#onActionFilter,
-      closeTray: BHDMobileApp.#onCloseTray
+      closeTray: BHDMobileApp.#onCloseTray,
+      chooseUse: BHDMobileApp.#onChooseUse,
+      closeChooser: BHDMobileApp.#onCloseChooser
     }
   };
 
@@ -91,6 +105,24 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #trayRender = 0;
 
   /**
+   * Toque largo en curso sobre una fila de la pestaña Acciones.
+   * @type {{target: HTMLElement, x: number, y: number, timer: number, fired: boolean}|null}
+   */
+  #longPress = null;
+
+  /** Objeto que se está usando con un toque rápido (sin ventanas si es sencillo). */
+  #quickUseItem = null;
+
+  /**
+   * Ventaja / desventaja elegida para el próximo ataque de un objeto.
+   * @type {{itemId: string, mode: string, time?: number}|null}
+   */
+  #pendingAttack = null;
+
+  /** Objeto usado con "Más opciones": sus tiradas muestran las ventanas completas de dnd5e. */
+  #fullOptionsItem = null;
+
+  /**
    * Personaje que se muestra ahora mismo.
    * @type {Actor|null}
    */
@@ -144,6 +176,24 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       </header>
       <ol class="chat-log themed theme-dark bhd-tray-log"></ol>`;
     this.element.append(tray);
+
+    // Menú del toque largo: ventaja, normal, desventaja o todas las opciones de dnd5e.
+    const chooser = document.createElement("div");
+    chooser.className = "bhd-chooser";
+    chooser.hidden = true;
+    this.element.append(chooser);
+
+    // Toque largo en las filas de la pestaña Acciones. Se escucha en el contenedor (que no se
+    // vuelve a crear al redibujar), así sirve para todas las filas.
+    this.element.addEventListener("pointerdown", this.#onPointerDown.bind(this));
+    this.element.addEventListener("pointermove", this.#onPointerMove.bind(this));
+    for ( const type of ["pointerup", "pointercancel"] ) {
+      this.element.addEventListener(type, () => clearTimeout(this.#longPress?.timer));
+    }
+    // Android abre un menú del navegador con el toque largo: lo evitamos en las filas.
+    this.element.addEventListener("contextmenu", event => {
+      if ( event.target.closest(".bhd-action-use") ) event.preventDefault();
+    });
 
     const toast = document.createElement("div");
     toast.className = "bhd-toast";
@@ -210,6 +260,143 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     const none = root.querySelector("[data-bhd-no-actions]");
     if ( none ) none.hidden = anyGroup;
+  }
+
+  /* -------------------------------------------- */
+  /*  Toque rápido y toque largo                  */
+  /* -------------------------------------------- */
+
+  /**
+   * Empieza a contar un posible toque largo sobre una fila de la pestaña Acciones.
+   * @param {PointerEvent} event
+   */
+  #onPointerDown(event) {
+    clearTimeout(this.#longPress?.timer);
+    this.#longPress = null;
+    const target = event.target.closest(".bhd-action-use");
+    if ( !target || (event.button !== 0) ) return;
+    const press = this.#longPress = { target, x: event.clientX, y: event.clientY, fired: false };
+    press.timer = setTimeout(() => {
+      press.fired = true;
+      navigator.vibrate?.(20);
+      this.#openChooser(target.dataset.itemId);
+    }, LONG_PRESS_MS);
+  }
+
+  /**
+   * Si el dedo se mueve (el jugador está desplazando la lista), no es un toque largo.
+   * @param {PointerEvent} event
+   */
+  #onPointerMove(event) {
+    const press = this.#longPress;
+    if ( !press || press.fired ) return;
+    if ( Math.hypot(event.clientX - press.x, event.clientY - press.y) > LONG_PRESS_TOLERANCE ) {
+      clearTimeout(press.timer);
+      this.#longPress = null;
+    }
+  }
+
+  /**
+   * Muestra el menú del toque largo para un objeto.
+   * @param {string} itemId
+   */
+  #openChooser(itemId) {
+    const item = this.actor?.items.get(itemId);
+    const chooser = this.element.querySelector(".bhd-chooser");
+    if ( !item || !chooser ) return;
+    const hasAttack = !!item.system.activities?.getByType("attack").length;
+    const button = (mode, icon, label, cssClass) => `
+      <button type="button" class="${cssClass}" data-action="chooseUse" data-mode="${mode}" data-item-id="${item.id}">
+        <i class="${icon}" aria-hidden="true"></i><span>${game.i18n.localize(label)}</span>
+      </button>`;
+    chooser.innerHTML = `
+      <div class="bhd-chooser-backdrop" data-action="closeChooser"></div>
+      <section class="bhd-chooser-sheet" role="dialog" aria-modal="true">
+        <header class="bhd-chooser-header"><img src="" alt=""><span class="bhd-chooser-name"></span></header>
+        ${hasAttack ? `<div class="bhd-chooser-modes">
+          ${button("advantage", "fa-solid fa-angles-up", "BHD.Actions.Advantage", "bhd-mode bhd-mode-adv")}
+          ${button("normal", "fa-solid fa-dice-d20", "BHD.Actions.Normal", "bhd-mode")}
+          ${button("disadvantage", "fa-solid fa-angles-down", "BHD.Actions.Disadvantage", "bhd-mode bhd-mode-dis")}
+        </div>` : button("normal", "fa-solid fa-hand-sparkles", "BHD.Actions.Use", "bhd-mode bhd-mode-use")}
+        ${button("full", "fa-solid fa-sliders", "BHD.Actions.MoreOptions", "bhd-chooser-more")}
+        <button type="button" class="bhd-chooser-cancel" data-action="closeChooser">${game.i18n.localize("BHD.Actions.Cancel")}</button>
+      </section>`;
+    chooser.querySelector(".bhd-chooser-header img").src = item.img;
+    chooser.querySelector(".bhd-chooser-name").textContent = item.name;
+    chooser.hidden = false;
+  }
+
+  /** Cierra el menú del toque largo. */
+  #closeChooser() {
+    const chooser = this.element.querySelector(".bhd-chooser");
+    if ( chooser ) chooser.hidden = true;
+  }
+
+  /**
+   * Usa un objeto con el flujo de dnd5e.
+   * @param {Item} item
+   * @param {"normal"|"advantage"|"disadvantage"|"full"} mode  "full" muestra todas las ventanas de dnd5e;
+   *   los demás saltan las ventanas cuando el uso es sencillo y tiran directo.
+   * @param {PointerEvent} event
+   * @param {HTMLElement} [target]  Fila tocada, para marcarla mientras se usa.
+   */
+  async #useItem(item, mode, event, target) {
+    if ( this.#using ) return;
+    const quick = mode !== "full";
+    this.#using = true;
+    this.#quickUseItem = quick ? item.id : null;
+    this.#fullOptionsItem = quick ? null : item.id;
+    this.#pendingAttack = quick ? { itemId: item.id, mode } : null;
+    target?.classList.add("bhd-rolling");
+    try {
+      const result = await item.use({ event });
+      const message = result?.message ?? result;
+      if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
+    } finally {
+      this.#using = false;
+      this.#quickUseItem = null;
+      // El ataque automático llega justo después del uso; pasado un momento ya no se aplica.
+      if ( this.#pendingAttack ) this.#pendingAttack.time = Date.now();
+      target?.classList.remove("bhd-rolling");
+    }
+  }
+
+  /**
+   * Hook `dnd5e.preUseActivity`: con un toque rápido, salta la ventana de uso si no hay nada
+   * importante que elegir (trucos, armas, pociones...). Con hechizos de nivel la ventana sigue
+   * apareciendo para elegir el espacio de conjuro.
+   * @param {Activity} activity
+   * @param {object} usageConfig
+   * @param {object} dialogConfig
+   */
+  onPreUseActivity(activity, usageConfig, dialogConfig) {
+    if ( (activity.actor !== this.actor) || (activity.item.id !== this.#quickUseItem) ) return;
+    const simple = SIMPLE_ACTIVITY_TYPES.has(activity.type)
+      && (usageConfig.scaling === false)          // sin elegir nivel de espacio
+      && !usageConfig.concentration?.end;          // no hay que terminar otra concentración
+    if ( simple ) dialogConfig.configure = false;
+  }
+
+  /**
+   * Hooks `dnd5e.preRollAttackV2` / `dnd5e.preRollDamageV2`: en el teléfono los ataques y daños
+   * de este personaje se tiran sin ventana, con la ventaja / desventaja elegida con el toque largo.
+   * Si el jugador eligió "Más opciones", se deja la ventana normal de dnd5e.
+   * @param {"attack"|"damage"} type
+   * @param {object} config  Configuración de la tirada (config.subject es la actividad).
+   * @param {object} dialog  Configuración de la ventana.
+   */
+  onPreRoll(type, config, dialog) {
+    const activity = config.subject;
+    if ( !activity || (activity.actor !== this.actor) ) return;
+    if ( activity.item.id === this.#fullOptionsItem ) return;
+    dialog.configure = false;
+    if ( type !== "attack" ) return;
+    const pending = this.#pendingAttack;
+    this.#pendingAttack = null;
+    const fresh = pending && (pending.itemId === activity.item.id) && (!pending.time || (Date.now() - pending.time < 3000));
+    if ( !fresh ) return;
+    if ( pending.mode === "advantage" ) config.advantage = true;
+    else if ( pending.mode === "disadvantage" ) config.disadvantage = true;
   }
 
   /* -------------------------------------------- */
@@ -437,26 +624,41 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Usa un arma, hechizo, rasgo o consumible con el flujo normal de dnd5e: ventana de opciones si hace
-   * falta (espacio de conjuro, recursos), tarjeta en el chat, gasto de usos, tirada de ataque o daño
-   * y área en el mapa. Después muestra la tarjeta en el panel de resultados.
+   * Toque en una fila: usa el arma, hechizo, rasgo o consumible con el flujo normal de dnd5e
+   * (tarjeta en el chat, gasto de usos o espacio, tirada de ataque o daño, área en el mapa).
+   * Si el uso es sencillo, tira directo sin ventanas. Después muestra la tarjeta en el panel.
    * @this {BHDMobileApp}
    * @param {PointerEvent} event
    * @param {HTMLElement} target
    */
   static async #onUseItem(event, target) {
-    const item = this.actor?.items.get(target.dataset.itemId);
-    if ( !item || this.#using ) return;
-    this.#using = true;
-    target.classList.add("bhd-rolling");
-    try {
-      const result = await item.use({ event });
-      const message = result?.message ?? result;
-      if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
-    } finally {
-      this.#using = false;
-      target.classList.remove("bhd-rolling");
+    // Al soltar un toque largo también llega un clic: ese ya abrió el menú, no se usa el objeto.
+    if ( this.#longPress?.fired && (this.#longPress.target === target) ) {
+      this.#longPress = null;
+      return;
     }
+    const item = this.actor?.items.get(target.dataset.itemId);
+    if ( item ) await this.#useItem(item, "normal", event, target);
+  }
+
+  /**
+   * Botón del menú del toque largo: Ventaja, Normal, Desventaja, Usar o Más opciones.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onChooseUse(event, target) {
+    this.#closeChooser();
+    const item = this.actor?.items.get(target.dataset.itemId);
+    if ( item ) await this.#useItem(item, target.dataset.mode, event);
+  }
+
+  /**
+   * Cierra el menú del toque largo sin usar nada.
+   * @this {BHDMobileApp}
+   */
+  static #onCloseChooser() {
+    this.#closeChooser();
   }
 
   /**

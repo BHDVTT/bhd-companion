@@ -75,6 +75,11 @@ function openMobileView() {
     Hooks.on(`${action}ChatMessage`, message => app.onChatMessage(message, action));
   }
 
+  // Toque rápido: usar y tirar sin ventanas; toque largo: ventaja / desventaja.
+  Hooks.on("dnd5e.preUseActivity", (activity, usage, dialog) => app.onPreUseActivity(activity, usage, dialog));
+  Hooks.on("dnd5e.preRollAttackV2", (config, dialog) => app.onPreRoll("attack", config, dialog));
+  Hooks.on("dnd5e.preRollDamageV2", (config, dialog) => app.onPreRoll("damage", config, dialog));
+
   // Total de ataques y daños en el teléfono (el mensaje completo va al chat).
   Hooks.on("dnd5e.rollAttackV2", (rolls, { subject }={}) => app.onActivityRoll("attack", rolls, subject));
   Hooks.on("dnd5e.rollDamageV2", (rolls, { subject }={}) => app.onActivityRoll("damage", rolls, subject));

@@ -57,7 +57,13 @@
       "Empty": "Tu personaje no tiene armas equipadas, hechizos, rasgos ni consumibles que usar.",
       "NoneForFilter": "Nada de este tipo.",
       "NoSpellsFound": "Ningún hechizo coincide con la búsqueda.",
-      "TapToUse": "Toca algo para usarlo. Las tiradas salen en el chat (en la TV).",
+      "TapToUse": "Toca para usar y tirar directo. Mantén presionado para ventaja, desventaja o más opciones. Las tiradas salen en el chat (en la TV).",
+      "Advantage": "Ventaja",
+      "Normal": "Normal",
+      "Disadvantage": "Desventaja",
+      "Use": "Usar",
+      "MoreOptions": "Más opciones…",
+      "Cancel": "Cancelar",
       "Attack": "Ataque",
       "Damage": "Daño",
       "Close": "Cerrar",
@@ -66,6 +72,13 @@
       "TemplateNoScene": "No hay una escena activa donde colocar el área.",
       "TemplateNoPermission": "No tienes permiso para colocar áreas en el mapa. Pídeselo al DM.",
       "TemplateFailed": "No se pudo colocar el área en el mapa."
+    },
+    "Dialogs": {
+      "Formulas": "Fórmula y bonificador",
+      "Configuration": "Opciones de tirada",
+      "Concentration": "Concentración",
+      "Consumption": "Recursos",
+      "Creation": "Área en el mapa"
     },
     "Exit": {
       "Button": "Volver a la interfaz normal de Foundry",

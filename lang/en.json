@@ -57,7 +57,13 @@
       "Empty": "Your character has no equipped weapons, spells, features or consumables to use.",
       "NoneForFilter": "Nothing of this type.",
       "NoSpellsFound": "No spells match your search.",
-      "TapToUse": "Tap anything to use it. Rolls go to chat (on the TV).",
+      "TapToUse": "Tap to use and roll right away. Press and hold for advantage, disadvantage or more options. Rolls go to chat (on the TV).",
+      "Advantage": "Advantage",
+      "Normal": "Normal",
+      "Disadvantage": "Disadvantage",
+      "Use": "Use",
+      "MoreOptions": "More options…",
+      "Cancel": "Cancel",
       "Attack": "Attack",
       "Damage": "Damage",
       "Close": "Close",
@@ -66,6 +72,13 @@
       "TemplateNoScene": "There is no active scene to place the area on.",
       "TemplateNoPermission": "You don't have permission to place areas on the map. Ask the DM.",
       "TemplateFailed": "The area could not be placed on the map."
+    },
+    "Dialogs": {
+      "Formulas": "Formula & bonus",
+      "Configuration": "Roll options",
+      "Concentration": "Concentration",
+      "Consumption": "Resources",
+      "Creation": "Area on the map"
     },
     "Exit": {
       "Button": "Return to the normal Foundry interface",
