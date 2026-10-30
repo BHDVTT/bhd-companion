@@ -73,6 +73,7 @@ scripts/apps/character-data.js  elegir personaje y preparar sus datos para las p
 scripts/apps/actions-data.js    datos de la pestaña Acciones (ataques, hechizos, rasgos, consumibles)
 scripts/apps/combat-data.js     datos de la pestaña Combate (turnos, vida aproximada, salvaciones de muerte)
 scripts/apps/inventory-data.js  datos de la pestaña Inventario (objetos, contenedores, monedas, peso)
+scripts/apps/spells-data.js     datos de la pestaña Hechizos (todos los hechizos, preparados, filtros)
 scripts/apps/notes-data.js      datos de la pestaña Notas (notas personales, personalidad, biografía)
 scripts/apps/move-data.js       datos de la pestaña Mover (ficha, pies usados / restantes, cruceta)
 scripts/apps/combat-hud-data.js datos del HUD de combate (bloques, opciones por bloque, tarjetas de objetivos)
@@ -319,6 +320,35 @@ lang/es.json, en.json        traducciones
 - **Registro:** cada paso sale en la consola del teléfono (`useLog`, también en la del DM) y del DM
   (`BHD Companion | [jugador] objeto | 1. / 2. / 3.`).
 
+## Pestañas Hechizos y Combate, resultado y consumos (0.14.0, sin probar)
+
+- **Resultado de Midi** (`summarizeWorkflow`): cada parte solo si el flujo la tiene. Ataque = `workflow.attackRoll`
+  (impacta por `hitTargets`); salvación = `workflow.activityHasSave` (de la actividad o la que dispara). Ojo: sin
+  salvación Midi pone a todos los impactados en `failedSaves`, por eso no se mira el tamaño de `saves`/`failedSaves`.
+  Daño = `damageList[].totalDamage`. Se compara por uuid (los Set de fichas de Midi se crean en cada lectura).
+  Sin nada que enseñar, el aviso no se abre.
+- **Consumos:** ni el flujo nativo ni el de Midi pasan `consume`; dnd5e aplica todos los de la actividad (también
+  negativos, p. ej. Magical Cunning: `attribute` `spells.pact.value` con `-(ceil(@spells.pact.max / 2))`).
+  El resultado trae `consumed` (de `card.system.deltas`, con `dnd5e.utils.getHumanReadableAttributeLabel`) y
+  `notices` (avisos de aviso / error de `ui.notifications` en el DM durante el uso, `collectNotices`); si el uso
+  falla, el teléfono enseña esos avisos (el motivo real) en lugar del genérico.
+- **Pestañas visibles** (`#getVisibleTabs`, aplicado en `_prepareTabs` y al principio de `_prepareContext`):
+  Combate solo si `getActiveCombat(actor)` (el encuentro que incluye al personaje, empezado o no; preferencia:
+  activo de la escena de la TV); Hechizos solo con algún hechizo. Si la pestaña abierta desaparece, vuelve a
+  Personaje. `#syncCombatTab` (en `onCombatUpdate`) pone el punto rojo (`tab.dot`) al aparecer Combate hasta que
+  se abre; en su turno, el punto dorado. `getActiveCombat()` sin argumento sigue como antes (vida de otros, mover).
+- **Pestaña Hechizos** (`spells-data.js`, `spells.hbs`): `prepareSpellbook(..., { all: true, row: prepareSpellRow })`
+  (la misma agrupación por método / nivel que Acciones, sin `isSpellShown`). Fila = la de Acciones (mismos botones,
+  con Midi en el DM) + `row.spell`: escuela y V/S/M (`labels.school`, `labels.components.vsm`), tiempo / alcance /
+  duración (`labels.*`), iconos C / R, preparado. Preparar = `system.prepared` 0 ↔ 1 (como `inventory.mjs` de dnd5e),
+  no con "siempre preparado" (2) ni trucos; límite = `spellcasting.preparation.value/max` de la clase del hechizo
+  (`classIdentifier`). Círculos = `system.spells.<clave>.value` (lleno → gasta ese y los siguientes, vacío →
+  recupera hasta él). Filtros sin redibujar (`#applySpellFilters`, `data-level`, `data-spell-flags`,
+  `data-activation`, `data-search`). Acciones sigue mostrando sus hechizos como antes.
+- **Enlaces de las descripciones:** un clic en `.bhd-item-info a.content-link[data-uuid]` se captura en `document`
+  (fase de captura) y se enseña en una ventana propia (objeto → `renderItemDetails`, diario → texto enriquecido).
+- **Barra:** botones `flex: 1 1 0`, texto 9,5 px (11 px desde 480 px de ancho) e icono 20 px para que quepan 7.
+
 ## Pestaña Combate (decisiones de la etapa 4)
 
 - **Qué combate** (`getActiveCombat` en `scripts/apps/combat-data.js`): el `active` de la escena
@@ -562,3 +592,6 @@ lang/es.json, en.json        traducciones
     Chris's Premades: el teléfono pide y el DM ejecuta, un botón por fila, resultado impacta / falla / daño,
     preguntas de Midi y Chris's Premades en el teléfono, salvaciones y reacciones de Midi en avisos, aviso sin DM,
     teléfono sin mapa.
+12. **Hechizos y Combate** (0.14.0, sin probar; JS y plantillas comprobados con Chrome sin pantalla) — resultado
+    de Midi solo con lo que tiene el flujo, consumos y avisos del DM en el teléfono, pestaña Combate solo con
+    encuentro (aunque no haya empezado) y con aviso, pestaña Hechizos completa, barra de pestañas para 7.

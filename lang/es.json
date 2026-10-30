@@ -4,6 +4,7 @@
     "Tabs": {
       "character": "Personaje",
       "actions": "Acciones",
+      "spells": "Hechizos",
       "combat": "Combate",
       "move": "Mover",
       "inventory": "Inventario",
@@ -428,6 +429,7 @@
       "Damage": "{n} de daño",
       "Healed": "+{n} PG",
       "Done": "Hecho. Mira el chat de la TV.",
+      "Consumed": "Gastado o recuperado",
       "Reason": {
         "NoGM": "No hay ningún DM conectado: no se puede usar {name}. Pide al DM que abra Foundry.",
         "NoSocketlib": "Falta el módulo socketlib (lo necesita Midi QOL): no se puede usar {name}. Avisa al DM.",
@@ -448,6 +450,20 @@
       "Seconds": "Quedan {seconds} s",
       "Used": "Reacción: {name}",
       "NotUsed": "No se pudo usar {name}. Mira el chat."
+    },
+    "Spells": {
+      "AllLevels": "Todos los niveles",
+      "Level": "Nivel",
+      "Filters": "Filtrar hechizos",
+      "Concentration": "Concentración",
+      "Ritual": "Ritual",
+      "Prepared": "Preparado",
+      "Prepare": "Preparar",
+      "PreparedCount": "{name}: {value}/{max} preparados",
+      "PrepareFull": "{name} ya tiene {value} de {max} hechizos preparados. Desmarca otro primero.",
+      "SlotPip": "Espacio {n}",
+      "NoneForFilter": "Ningún hechizo coincide con los filtros.",
+      "Hint": "Toca un hechizo para leerlo entero. Toca los círculos de cada nivel para gastar o recuperar espacios a mano. Los botones de la derecha funcionan igual que en Acciones."
     },
     "Relay": {
       "Title": "El DM pregunta"

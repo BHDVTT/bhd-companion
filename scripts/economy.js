@@ -32,7 +32,7 @@ function getTurnKey(combat, combatant) {
  * @returns {{combat: Combat, combatant: Combatant}|null}
  */
 export function getOwnCombatant(actor) {
-  const combat = getActiveCombat();
+  const combat = getActiveCombat(actor ?? null);
   if ( !combat?.started || !actor ) return null;
   const combatant = combat.combatants.find(c => isActorCombatant(c, actor));
   return combatant ? { combat, combatant } : null;

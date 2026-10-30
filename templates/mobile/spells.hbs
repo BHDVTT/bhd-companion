@@ -1,0 +1,63 @@
+{{!-- Pestaña Hechizos: todos los hechizos como en la hoja de dnd5e, por nivel y método, con sus espacios.
+     Los filtros ocultan filas sin volver a dibujar (mobile-app.js #applySpellFilters). --}}
+<div class="bhd-sheet bhd-spells-tab">
+  {{#if spells}}
+  <div class="bhd-spell-filters">
+    <label class="bhd-search">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input type="search" name="bhdSpellTabSearch" data-bhd-spelltab-search value="{{spells.filters.search}}" autocomplete="off"
+             placeholder="{{localize 'BHD.Actions.SearchSpells'}}" aria-label="{{localize 'BHD.Actions.SearchSpells'}}">
+    </label>
+    <div class="bhd-filters bhd-spell-chips" role="group" aria-label="{{localize 'BHD.Spells.Filters'}}">
+      <label class="bhd-chip bhd-level-chip">
+        <span class="bhd-visually-hidden">{{localize "BHD.Spells.Level"}}</span>
+        <select data-bhd-spell-level aria-label="{{localize 'BHD.Spells.Level'}}">
+          {{#each spells.filters.levels}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+        </select>
+      </label>
+      {{#each spells.filters.toggles}}
+      <button type="button" class="bhd-chip {{#if on}}bhd-on{{/if}}" data-action="bhdSpellToggle" data-filter="{{id}}" aria-pressed="{{on}}">
+        <i class="{{icon}}" aria-hidden="true"></i> {{label}}
+      </button>
+      {{/each}}
+    </div>
+    <div class="bhd-filters bhd-spell-chips" role="group" aria-label="{{localize 'BHD.Actions.Filter'}}">
+      {{#each spells.filters.activations}}
+      <button type="button" class="bhd-chip {{#if on}}bhd-on{{/if}}" data-action="bhdSpellActivation" data-filter="{{id}}" aria-pressed="{{on}}">{{label}}</button>
+      {{/each}}
+    </div>
+  </div>
+
+  <p class="bhd-spellcasting">
+    {{#if spells.spellcasting.dc}}<span>{{localize "BHD.Actions.SpellDC"}} <strong>{{spells.spellcasting.dc}}</strong></span>{{/if}}
+    {{#if spells.spellcasting.attack}}<span>{{localize "BHD.Actions.SpellAttack"}} <strong>{{spells.spellcasting.attack}}</strong></span>{{/if}}
+    {{#each spells.preparation}}
+    <span class="{{#if full}}bhd-prep-full{{/if}}">{{localize "BHD.Spells.PreparedCount" name=name value=value max=max}}</span>
+    {{/each}}
+  </p>
+
+  {{#each spells.sections}}
+  <section class="bhd-action-group bhd-spell-level" data-spell-section>
+    <div class="bhd-spell-level-header">
+      <span class="bhd-spell-level-label">{{label}}</span>
+      {{#if slots}}
+      <span class="bhd-slots bhd-slots-tap" aria-label="{{localize 'BHD.Actions.Slots' value=slots.value max=slots.max}}">
+        {{#each slots.pips}}
+        <button type="button" class="bhd-pip-btn" data-action="bhdSlotPip" data-slot="{{../key}}" data-n="{{n}}"
+                aria-pressed="{{filled}}" aria-label="{{localize 'BHD.Spells.SlotPip' n=n}}">
+          <i class="bhd-pip {{#if filled}}bhd-filled{{/if}} {{#if temp}}bhd-temp-pip{{/if}}" aria-hidden="true"></i>
+        </button>
+        {{/each}}
+        <span class="bhd-slots-count">{{slots.value}}/{{slots.max}}</span>
+      </span>
+      {{/if}}
+    </div>
+    <div class="bhd-action-list">
+      {{#each items}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
+    </div>
+  </section>
+  {{/each}}
+  <p class="bhd-no-results" data-bhd-no-spells hidden>{{localize "BHD.Spells.NoneForFilter"}}</p>
+  <p class="bhd-tap-hint">{{localize "BHD.Spells.Hint"}}</p>
+  {{/if}}
+</div>

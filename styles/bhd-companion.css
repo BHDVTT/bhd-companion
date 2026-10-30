@@ -4049,3 +4049,193 @@ body.bhd-mobile .bhd-relay-dialog .bhd-relay-content img {
     animation: none;
   }
 }
+
+/* Resultado de Midi: veredictos por objetivo y lo gastado / recuperado */
+#bhd-mobile-app .bhd-midi-verdict.bhd-good {
+  color: #7fd08a;
+}
+
+#bhd-mobile-app .bhd-midi-verdict.bhd-bad {
+  color: var(--bhd-red-bright);
+}
+
+#bhd-mobile-app .bhd-midi-consumed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--bhd-border);
+  list-style: none;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-midi-consumed strong {
+  color: var(--bhd-gold);
+}
+
+/* ------------------------------------------ */
+/*  Pestaña Hechizos                           */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-spell-filters {
+  position: sticky;
+  top: -16px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: -16px -16px 0;
+  padding: 12px 16px 8px;
+  background: var(--bhd-bg);
+}
+
+#bhd-mobile-app .bhd-spell-filters .bhd-filters {
+  position: static;
+  margin: 0;
+  padding: 0;
+}
+
+#bhd-mobile-app .bhd-spell-chips .bhd-chip i {
+  margin: 0;
+  font-size: calc(11px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-level-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+}
+
+#bhd-mobile-app .bhd-level-chip select {
+  height: 100%;
+  min-height: 36px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-prep-full {
+  color: var(--bhd-red-bright);
+}
+
+#bhd-mobile-app .bhd-slots-tap {
+  gap: 2px;
+}
+
+#bhd-mobile-app .bhd-pip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+#bhd-mobile-app .bhd-spell-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "main main" "controls prep";
+  align-items: stretch;
+}
+
+#bhd-mobile-app .bhd-spell-row > .bhd-action-main {
+  grid-area: main;
+}
+
+#bhd-mobile-app .bhd-spell-row > .bhd-action-controls {
+  grid-area: controls;
+}
+
+#bhd-mobile-app .bhd-spell-row > .bhd-prep-toggle {
+  grid-area: prep;
+}
+
+#bhd-mobile-app .bhd-prep-toggle {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 64px;
+  height: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 10px;
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text-muted);
+  font-size: calc(11px * var(--bhd-text-scale, 1));
+  line-height: 1.1;
+  text-align: center;
+}
+
+#bhd-mobile-app .bhd-prep-toggle i {
+  margin: 0;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-prep-toggle.bhd-on {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold-soft);
+  color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-prep-toggle.bhd-always {
+  opacity: 0.85;
+}
+
+#bhd-mobile-app .bhd-spell-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  border-radius: 50%;
+  font-size: calc(11px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+  vertical-align: middle;
+}
+
+#bhd-mobile-app .bhd-spell-icon.bhd-conc {
+  border: 1px solid #b9a2f0;
+  color: #b9a2f0;
+}
+
+#bhd-mobile-app .bhd-spell-icon.bhd-ritual {
+  border: 1px solid #8db8ea;
+  color: #8db8ea;
+}
+
+/* Barra de pestañas: de 5 a 7 pestañas (Combate y Hechizos aparecen y desaparecen) sin amontonarse */
+#bhd-mobile-app .bhd-nav-btn {
+  flex: 1 1 0;
+  gap: 3px;
+  padding: 6px 1px;
+  font-size: calc(9.5px * var(--bhd-text-scale, 1));
+  letter-spacing: -0.01em;
+}
+
+#bhd-mobile-app .bhd-nav-btn i:not(.bhd-nav-dot) {
+  font-size: calc(20px * var(--bhd-text-scale, 1));
+}
+
+@media (min-width: 480px) {
+  #bhd-mobile-app .bhd-nav-btn {
+    font-size: calc(11px * var(--bhd-text-scale, 1));
+  }
+
+  #bhd-mobile-app .bhd-nav-btn i:not(.bhd-nav-dot) {
+    font-size: calc(22px * var(--bhd-text-scale, 1));
+  }
+}

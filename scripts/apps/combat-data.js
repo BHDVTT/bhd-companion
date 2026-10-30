@@ -16,12 +16,21 @@ const HEALTH_DYING = 0.25;
 /**
  * Combate que ve este jugador: el activo en la escena activa (la que está en la TV) o,
  * si no hay, cualquier combate marcado como activo.
+ * Con un personaje: el encuentro de Foundry en el que está ese personaje (empezado o no), prefiriendo el
+ * activo de la escena de la TV; null si no está en ninguno. La pestaña Combate solo se ve con este.
+ * @param {Actor|null} [actor]
  * @returns {Combat|null}
  */
-export function getActiveCombat() {
+export function getActiveCombat(actor) {
   const scene = game.scenes.active;
+  const onScene = c => !c.scene || (c.scene === scene);
+  if ( actor !== undefined ) {
+    if ( !actor ) return null;
+    const mine = game.combats.filter(c => c.combatants.some(combatant => isActorCombatant(combatant, actor)));
+    return mine.find(c => c.active && onScene(c)) ?? mine.find(c => c.active) ?? mine.find(onScene) ?? mine[0] ?? null;
+  }
   const active = game.combats.filter(c => c.active);
-  return active.find(c => !c.scene || (c.scene === scene)) ?? active[0] ?? null;
+  return active.find(onScene) ?? active[0] ?? null;
 }
 
 /**
@@ -51,10 +60,10 @@ export function isActorTurn(combat, actor) {
 /**
  * Datos completos de la pestaña Combate.
  * @param {Actor|null} actor  Personaje del jugador.
- * @returns {object|null}  null si no hay combate activo.
+ * @returns {object|null}  null si el personaje no está en ningún encuentro.
  */
 export function prepareCombat(actor) {
-  const combat = getActiveCombat();
+  const combat = getActiveCombat(actor ?? null);
   if ( !combat ) return null;
   const visible = combat.turns.filter(c => isVisible(c, actor));
   const current = combat.started ? combat.combatant : null;

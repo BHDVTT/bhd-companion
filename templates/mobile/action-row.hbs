@@ -1,6 +1,9 @@
 {{!-- Fila de un objeto usable: nombre (toca para ver la descripción) y botones de tirada a la derecha.
-     En el HUD de combate (row.hudBlock) los botones pasan por el selector de objetivos. --}}
-<div class="bhd-action {{#if row.cast}}bhd-cast-active{{/if}} {{#if row.passive}}bhd-passive-row{{/if}}" data-activation="{{row.activation}}" data-search="{{row.search}}">
+     En el HUD de combate (row.hudBlock) los botones pasan por el selector de objetivos.
+     En la pestaña Hechizos (row.spell) también escuela, componentes, concentración, ritual y preparado. --}}
+<div class="bhd-action {{#if row.cast}}bhd-cast-active{{/if}} {{#if row.passive}}bhd-passive-row{{/if}} {{#if row.spell}}bhd-spell-row{{/if}}"
+     data-activation="{{row.activation}}" data-search="{{row.search}}"
+     {{#if row.spell}}data-level="{{row.spell.level}}" data-spell-flags="{{row.spell.flags}}"{{/if}}>
   <button type="button" class="bhd-action-main" data-action="itemInfo" data-item-id="{{row.id}}"
           aria-label="{{row.name}} · {{localize 'BHD.Actions.Info'}}">
     <img class="bhd-action-img" src="{{row.img}}" alt="">
@@ -8,7 +11,10 @@
       <span class="bhd-action-name">
         {{row.name}}
         {{#each row.tags}}<span class="bhd-tag">{{this}}</span>{{/each}}
+        {{#if row.spell.concentration}}<span class="bhd-spell-icon bhd-conc" title="{{localize 'BHD.Spells.Concentration'}}">C</span>{{/if}}
+        {{#if row.spell.ritual}}<span class="bhd-spell-icon bhd-ritual" title="{{localize 'BHD.Spells.Ritual'}}">R</span>{{/if}}
       </span>
+      {{#if row.spell.meta}}<span class="bhd-action-sub bhd-spell-meta">{{row.spell.meta}}</span>{{/if}}
       {{#if row.subtitle}}<span class="bhd-action-sub">{{row.subtitle}}</span>{{/if}}
     </span>
     {{#if row.uses}}
@@ -17,6 +23,19 @@
     </span>
     {{/if}}
   </button>
+  {{#if row.spell.prepare}}
+  {{#if row.spell.prepare.always}}
+  <span class="bhd-prep-toggle bhd-on bhd-always" title="{{row.spell.prepare.label}}">
+    <i class="fa-solid fa-lock" aria-hidden="true"></i><span>{{row.spell.prepare.label}}</span>
+  </span>
+  {{else}}
+  <button type="button" class="bhd-prep-toggle {{#if row.spell.prepare.prepared}}bhd-on{{/if}}" data-action="bhdPrepare"
+          data-item-id="{{row.id}}" aria-pressed="{{row.spell.prepare.prepared}}">
+    <i class="fa-solid {{#if row.spell.prepare.prepared}}fa-book-open{{else}}fa-book{{/if}}" aria-hidden="true"></i>
+    <span>{{#if row.spell.prepare.prepared}}{{localize "BHD.Spells.Prepared"}}{{else}}{{localize "BHD.Spells.Prepare"}}{{/if}}</span>
+  </button>
+  {{/if}}
+  {{/if}}
   {{#unless row.passive}}
   <div class="bhd-action-controls">
     {{#if row.slots}}

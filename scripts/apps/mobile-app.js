@@ -1,6 +1,7 @@
 import { isMidiActive, MODULE_ID, TEMPLATE_PATH } from "../constants.js";
 import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "./character-data.js";
 import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.js";
+import { canTogglePrepared, getPreparationLimit, hasSpells, prepareSpellsTab, SPELL_ACTIVATIONS } from "./spells-data.js";
 import { getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
 import { BASIC_ACTIONS, getTargetNeed, prepareHud, prepareTargetCards, prepareTargetChips } from "./combat-hud-data.js";
 import { ECONOMY_BLOCKS, getEconomy, getOwnCombatant, setEconomy } from "../economy.js";
@@ -72,6 +73,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       closeTray: BHDMobileApp.#onCloseTray,
       chooseUse: BHDMobileApp.#onChooseUse,
       bhdChooseSlot: BHDMobileApp.#onChooseSlot,
+      bhdSpellToggle: BHDMobileApp.#onSpellToggle,
+      bhdSpellActivation: BHDMobileApp.#onSpellActivation,
+      bhdSlotPip: BHDMobileApp.#onSlotPip,
+      bhdPrepare: BHDMobileApp.#onPrepare,
       bhdMidiResultClose: BHDMobileApp.#onMidiResultClose,
       bhdReactionUse: BHDMobileApp.#onReactionUse,
       bhdReactionPass: BHDMobileApp.#onReactionPass,
@@ -114,6 +119,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         `${TEMPLATE_PATH}/mobile/character.hbs`,
         `${TEMPLATE_PATH}/mobile/actions.hbs`,
         `${TEMPLATE_PATH}/mobile/action-row.hbs`,
+        `${TEMPLATE_PATH}/mobile/spells.hbs`,
         `${TEMPLATE_PATH}/mobile/combat.hbs`,
         `${TEMPLATE_PATH}/mobile/death-saves.hbs`,
         `${TEMPLATE_PATH}/mobile/status.hbs`,
@@ -139,6 +145,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       tabs: [
         { id: "character", icon: "fa-solid fa-user" },
         { id: "actions", icon: "fa-solid fa-hand-fist" },
+        { id: "spells", icon: "fa-solid fa-wand-sparkles" },
         { id: "combat", icon: "fa-solid fa-swords" },
         { id: "move", icon: "fa-solid fa-arrows-up-down-left-right" },
         { id: "inventory", icon: "fa-solid fa-sack" },
@@ -281,6 +288,18 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** ¿Ya se revisó el combate una vez? (para no quitar Esquivar al recargar la página) */
   #combatChecked = false;
 
+  /** ¿Se veía la pestaña Combate en la última revisión? (null antes de la primera) */
+  #combatTabShown = null;
+
+  /** Aviso en la pestaña Combate: apareció un encuentro y el jugador aún no la abrió. */
+  #combatBadge = false;
+
+  /**
+   * Filtros de la pestaña Hechizos.
+   * @type {{level: string, activation: string, concentration: boolean, ritual: boolean, prepared: boolean, search: string}}
+   */
+  #spellFilters = { level: "all", activation: "all", concentration: false, ritual: false, prepared: false, search: "" };
+
   /** Pestaña visible ahora mismo. */
   get activeTab() {
     return this.tabGroups.primary;
@@ -303,6 +322,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @override
    */
   async _prepareContext(options) {
+    // Si la pestaña abierta dejó de existir (el encuentro se borró, no quedan hechizos), se vuelve a Personaje.
+    const visible = this.#getVisibleTabs();
+    if ( !visible.has(this.tabGroups.primary) ) this.tabGroups.primary = "character";
     const context = await super._prepareContext(options);
     const actor = this.actor;
     const tab = this.tabGroups.primary;
@@ -311,6 +333,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     context.sheet = (actor && (tab === "character")) ? prepareCharacterSheet(actor) : null;
     context.hpAmount = this.#hpAmount;
     context.actions = (actor && (tab === "actions")) ? prepareActions(actor, this.#quick) : null;
+    context.spells = (actor && (tab === "spells")) ? prepareSpellsTab(actor, this.#quick, this.#spellFilters) : null;
     context.spellSearch = this.#spellSearch;
     context.actionFilters = ["all", ...ACTION_FILTERS].map(id => ({
       id,
@@ -333,6 +356,60 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       id: a.id, name: a.name, selected: a === actor
     })) : null;
     return context;
+  }
+
+  /**
+   * Pestañas que se ven ahora: Combate solo si el personaje está en un encuentro de Foundry (aunque no haya
+   * empezado) y Hechizos solo si tiene hechizos.
+   * @returns {Set<string>}
+   */
+  #getVisibleTabs() {
+    const actor = this.actor;
+    const ids = new Set(this.constructor.TABS.primary.tabs.map(t => t.id));
+    if ( !getActiveCombat(actor ?? null) ) ids.delete("combat");
+    if ( !hasSpells(actor) ) ids.delete("spells");
+    return ids;
+  }
+
+  /**
+   * Pestañas de la barra de abajo: solo las visibles, con el aviso de Combate.
+   * @override
+   */
+  _prepareTabs(group) {
+    const tabs = super._prepareTabs(group);
+    if ( group !== "primary" ) return tabs;
+    const visible = this.#getVisibleTabs();
+    for ( const id of Object.keys(tabs) ) {
+      if ( !visible.has(id) ) delete tabs[id];
+    }
+    if ( tabs.combat ) {
+      const actor = this.actor;
+      const myTurn = isActorTurn(getActiveCombat(actor ?? null), actor);
+      tabs.combat.dot = this.#combatBadge || myTurn;
+      tabs.combat.myTurn = myTurn;
+    }
+    return tabs;
+  }
+
+  /**
+   * La pestaña Combate aparece o desaparece. Al aparecer, lleva un aviso hasta que el jugador la abra;
+   * al desaparecer, si el jugador estaba en ella, vuelve a Personaje.
+   * @param {boolean} shown
+   */
+  #syncCombatTab(shown) {
+    const before = this.#combatTabShown;
+    this.#combatTabShown = shown;
+    if ( before === shown ) return;
+    if ( shown ) {
+      this.#combatBadge = this.activeTab !== "combat";
+      useLog("Combate: el personaje está en un encuentro; aparece la pestaña Combate");
+    } else {
+      this.#combatBadge = false;
+      if ( before !== null ) useLog("Combate: el personaje ya no está en un encuentro; se quita la pestaña Combate");
+    }
+    if ( !this.rendered ) return;
+    if ( !shown && (this.activeTab === "combat") ) this.#switchTab("character");
+    else this.render({ parts: ["nav"] });
   }
 
   /* -------------------------------------------- */
@@ -370,6 +447,16 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     for ( const type of ["pointerup", "pointercancel"] ) {
       this.element.addEventListener(type, () => clearTimeout(this.#longPress?.timer));
     }
+    // Enlaces de las descripciones (reglas, condiciones, otros hechizos u objetos): en el teléfono no se abren
+    // hojas ni diarios, así que lo enlazado se enseña en una ventana de la vista.
+    document.addEventListener("click", event => {
+      const link = event.target.closest?.(".bhd-item-info a.content-link[data-uuid]");
+      if ( !link ) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.#openLinkedDocument(link.dataset.uuid);
+    }, { capture: true });
+
     // Android abre un menú del navegador con el toque largo: lo evitamos en las filas.
     this.element.addEventListener("contextmenu", event => {
       if ( event.target.closest(".bhd-roll-btn") ) event.preventDefault();
@@ -451,6 +538,19 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#applyActionFilters();
     });
     this.#applyActionFilters();
+
+    // Pestaña Hechizos: buscador y nivel (los demás filtros son botones).
+    const spellSearch = this.element.querySelector("[data-bhd-spelltab-search]");
+    spellSearch?.addEventListener("input", event => {
+      this.#spellFilters.search = event.currentTarget.value;
+      this.#applySpellFilters();
+    });
+    const spellLevel = this.element.querySelector("[data-bhd-spell-level]");
+    spellLevel?.addEventListener("change", event => {
+      this.#spellFilters.level = event.currentTarget.value;
+      this.#applySpellFilters();
+    });
+    this.#applySpellFilters();
 
     // Nivel de espacio de los hechizos: cambia la fórmula de daño de la fila.
     for ( const select of this.element.querySelectorAll("[data-bhd-slot]") ) {
@@ -663,6 +763,38 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     const none = root.querySelector("[data-bhd-no-actions]");
     if ( none ) none.hidden = anyGroup;
+  }
+
+  /**
+   * Pestaña Hechizos: muestra u oculta filas según los filtros (nivel, tiempo, concentración, ritual,
+   * preparados) y el buscador, sin volver a dibujar. Los niveles que quedan vacíos se ocultan.
+   */
+  #applySpellFilters() {
+    const root = this.element?.querySelector(".bhd-spells-tab");
+    if ( !root ) return;
+    const filters = this.#spellFilters;
+    const query = normalizeSearch(filters.search);
+    for ( const row of root.querySelectorAll(".bhd-action") ) {
+      const flags = (row.dataset.spellFlags ?? "").split(" ");
+      const activation = (row.dataset.activation ?? "").split(" ");
+      row.hidden = ((filters.level !== "all") && (row.dataset.level !== filters.level))
+        || ((filters.activation !== "all") && !activation.includes(filters.activation))
+        || (filters.concentration && !flags.includes("concentration"))
+        || (filters.ritual && !flags.includes("ritual"))
+        || (filters.prepared && !flags.includes("prepared"))
+        || (!!query && !row.dataset.search.includes(query));
+    }
+    let any = false;
+    const filtering = (filters.level !== "all") || (filters.activation !== "all") || filters.concentration
+      || filters.ritual || filters.prepared || !!query;
+    for ( const section of root.querySelectorAll("[data-spell-section]") ) {
+      const empty = !section.querySelector(".bhd-action:not([hidden])");
+      // Sin filtros, los niveles vacíos con espacios se ven (para gastar o recuperar a mano).
+      section.hidden = filtering && empty;
+      if ( !section.hidden ) any = true;
+    }
+    const none = root.querySelector("[data-bhd-no-spells]");
+    if ( none ) none.hidden = any;
   }
 
   /* -------------------------------------------- */
@@ -960,8 +1092,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const result = await requestMidiUse(activity, { targetIds, slot, mode });
       this.#hideToast();
       if ( !result?.ok ) {
-        useWarn(`${tag} | 2. El DM no lo usó: ${result?.reason}`, result?.error ?? "");
-        ui.notifications.warn(game.i18n.format(`BHD.Midi.Reason.${result?.reason ?? "Error"}`, {
+        useWarn(`${tag} | 2. El DM no lo usó: ${result?.reason}`, result?.error ?? "", result?.notices ?? []);
+        // Lo que dnd5e o Midi avisaron en el PC del DM ("no quedan usos"...) es el motivo real: se enseña aquí.
+        if ( result?.notices?.length ) result.notices.forEach(text => ui.notifications.warn(text));
+        else ui.notifications.warn(game.i18n.format(`BHD.Midi.Reason.${result?.reason ?? "Error"}`, {
           name: item.name, error: result?.error ?? ""
         }));
         return;
@@ -1005,8 +1139,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Muestra el resultado de un uso hecho por el DM: ataque (crítico, pifia), cada objetivo (impacta o falla,
-   * salva o no) y el daño que recibió. Impacta / falla solo con el ajuste del DM "showAttackResult".
+   * Muestra el resultado de un uso hecho por el DM. Solo las partes que tiene el flujo de Midi de esa actividad:
+   * ataque (total, crítico, pifia, impacta o falla a cada objetivo), salvación (quién salvó y quién no), daño o
+   * curación aplicados a cada objetivo, y lo que gastó o recuperó. Impacta / falla solo con el ajuste del DM
+   * "showAttackResult". Si no hay nada que enseñar, no se abre.
    * @param {Item} item
    * @param {object} result  Lo que devuelve el DM (midi-remote.js).
    */
@@ -1015,7 +1151,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( !panel ) return;
     const escape = foundry.utils.escapeHTML;
     const localize = key => escape(game.i18n.localize(key));
-    const attack = result.attack;
+    const attack = result.hasAttack ? result.attack : null;
     const tags = [];
     if ( attack?.critical ) tags.push(`<span class="bhd-midi-tag bhd-crit">${localize("BHD.Hud.Result.Critical")}</span>`);
     if ( attack?.fumble ) tags.push(`<span class="bhd-midi-tag bhd-fumble">${localize("BHD.Hud.Result.Fumble")}</span>`);
@@ -1025,26 +1161,26 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       return (amount < 0) ? game.i18n.format("BHD.Midi.Healed", { n: -amount }) : game.i18n.format("BHD.Midi.Damage", { n: amount });
     };
     const rows = (result.targets ?? []).map(target => {
-      let verdict = "";
-      let css = "";
-      if ( (target.hit !== null) && result.showHits ) {
-        verdict = game.i18n.localize(target.hit ? "BHD.Hud.Result.Hit" : "BHD.Hud.Result.Miss");
-        css = target.hit ? "bhd-hit" : "bhd-miss";
+      const verdicts = [];
+      if ( result.hasAttack && result.showHits && (target.hit !== null) ) {
+        verdicts.push({ css: target.hit ? "bhd-good" : "bhd-bad", text: game.i18n.localize(target.hit ? "BHD.Hud.Result.Hit" : "BHD.Hud.Result.Miss") });
       }
-      else if ( target.saved !== null ) {
-        verdict = game.i18n.localize(target.saved ? "BHD.Midi.Saved" : "BHD.Midi.Failed");
-        css = target.saved ? "bhd-miss" : "bhd-hit";
+      if ( result.hasSave && (target.saved !== null) ) {
+        verdicts.push({ css: target.saved ? "bhd-bad" : "bhd-good", text: game.i18n.localize(target.saved ? "BHD.Midi.Saved" : "BHD.Midi.Failed") });
       }
       const damage = damageText(target.damage);
-      return `<li class="bhd-midi-target ${css}">
+      if ( !verdicts.length && !damage ) return "";
+      return `<li class="bhd-midi-target">
         <span class="bhd-midi-target-name">${escape(target.name)}</span>
-        ${verdict ? `<strong class="bhd-midi-verdict">${escape(verdict)}</strong>` : ""}
+        ${verdicts.map(v => `<strong class="bhd-midi-verdict ${v.css}">${escape(v.text)}</strong>`).join("")}
         ${damage ? `<span class="bhd-midi-damage">${escape(damage)}</span>` : ""}
       </li>`;
     }).join("");
-    let summary = "";
-    if ( !rows && Number.isFinite(result.damageTotal) && result.damageTotal ) summary = damageText(result.damageTotal);
-    else if ( !rows && !attack ) summary = game.i18n.localize("BHD.Midi.Done");
+    const consumed = (result.consumed ?? []).map(c => `<li><span>${escape(c.label)}</span> <strong>${escape(c.delta)}</strong></li>`).join("");
+    if ( !attack && !rows && !consumed ) {
+      panel.hidden = true;
+      return;
+    }
 
     panel.innerHTML = `
       <header class="bhd-midi-result-head">
@@ -1058,7 +1194,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       ${attack ? `<p class="bhd-midi-attack"><i class="fa-solid fa-dice-d20" aria-hidden="true"></i>
         ${localize("BHD.Actions.Attack")}: <strong>${escape(String(attack.total ?? "?"))}</strong></p>` : ""}
       ${rows ? `<ul class="bhd-midi-targets">${rows}</ul>` : ""}
-      ${summary ? `<p class="bhd-midi-summary">${escape(summary)}</p>` : ""}`;
+      ${consumed ? `<ul class="bhd-midi-consumed" aria-label="${localize("BHD.Midi.Consumed")}">${consumed}</ul>` : ""}`;
     panel.classList.toggle("bhd-crit", !!attack?.critical);
     panel.hidden = false;
     clearTimeout(this.#midiResultTimeout);
@@ -1072,7 +1208,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {object}
    */
   #toHudResult(item, result) {
-    const verdicts = (result.targets ?? []).filter(t => (t.hit !== null) && result.showHits).map(t => ({
+    const verdicts = (result.targets ?? []).filter(t => result.hasAttack && (t.hit !== null) && result.showHits).map(t => ({
       id: t.hit ? "hit" : "miss",
       name: t.name,
       label: game.i18n.localize(t.hit ? "BHD.Hud.Result.Hit" : "BHD.Hud.Result.Miss")
@@ -1082,7 +1218,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       itemId: item.id,
       name: item.name,
       img: item.img,
-      attack: result.attack ? { total: result.attack.total, crit: result.attack.critical, fumble: result.attack.fumble } : null,
+      attack: (result.hasAttack && result.attack)
+        ? { total: result.attack.total, crit: result.attack.critical, fumble: result.attack.fumble } : null,
       verdicts,
       damage: damage ? { total: damage, label: game.i18n.localize("BHD.Actions.Damage") } : null,
       hint: null
@@ -1795,10 +1932,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * del jugador, muestra el aviso a pantalla completa y hace vibrar el teléfono.
    */
   onCombatUpdate() {
-    const combat = getActiveCombat();
     const actor = this.actor;
+    const combat = getActiveCombat(actor ?? null);
     const firstCheck = !this.#combatChecked;
     this.#combatChecked = true;
+    this.#syncCombatTab(!!combat);
     if ( !isActorTurn(combat, actor) ) {
       this.#hideTurnAlert();
       return;
@@ -1889,7 +2027,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {Promise<{total: number}|null>}
    */
   async #rollInitiative(actor) {
-    const combat = getActiveCombat();
+    const combat = getActiveCombat(actor);
     const combatant = combat?.getCombatantsByActor(actor).find(c => c.isOwner && (c.initiative === null));
     if ( combatant ) {
       await combat.rollInitiative([combatant.id]);
@@ -1935,6 +2073,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   async #switchTab(tab) {
     this.tabGroups.primary = tab;
+    if ( tab === "combat" ) this.#combatBadge = false;
     await this.render({ parts: ["main", "nav"] });
     if ( this.parts?.main ) this.parts.main.scrollTop = 0;
   }
@@ -2209,6 +2348,82 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Pestaña Hechizos: activa o quita un filtro (Concentración, Ritual, Preparados).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onSpellToggle(event, target) {
+    const id = target.dataset.filter;
+    if ( !["concentration", "ritual", "prepared"].includes(id) ) return;
+    this.#spellFilters[id] = !this.#spellFilters[id];
+    target.classList.toggle("bhd-on", this.#spellFilters[id]);
+    target.setAttribute("aria-pressed", String(this.#spellFilters[id]));
+    this.#applySpellFilters();
+  }
+
+  /**
+   * Pestaña Hechizos: filtro por tiempo de lanzamiento (Todo, Acción, Adicional, Reacción).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onSpellActivation(event, target) {
+    const id = target.dataset.filter;
+    if ( (id !== "all") && !SPELL_ACTIVATIONS.includes(id) ) return;
+    this.#spellFilters.activation = id;
+    for ( const chip of this.element.querySelectorAll("[data-action=bhdSpellActivation]") ) {
+      const on = chip.dataset.filter === id;
+      chip.classList.toggle("bhd-on", on);
+      chip.setAttribute("aria-pressed", String(on));
+    }
+    this.#applySpellFilters();
+  }
+
+  /**
+   * Toca un círculo de espacio de conjuro: como en la hoja, tocar uno lleno gasta ese y los de después; tocar
+   * uno vacío recupera hasta él. Cambia `system.spells.<espacio>.value` (lo mismo que la hoja de dnd5e).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onSlotPip(event, target) {
+    const actor = this.actor;
+    const key = target.dataset.slot;
+    const n = Number(target.dataset.n);
+    const slot = actor?.system.spells?.[key];
+    if ( !slot || !Number.isFinite(n) ) return;
+    const value = slot.value ?? 0;
+    const max = Math.max(slot.max ?? 0, value);
+    const next = Math.clamp((n <= value) ? n - 1 : n, 0, max);
+    if ( next === value ) return;
+    useLog(`Espacios ${key}: ${value} → ${next} (a mano)`);
+    await actor.update({ [`system.spells.${key}.value`]: next });
+  }
+
+  /**
+   * Marca o desmarca un hechizo como preparado (como la hoja de dnd5e), sin pasar del límite que calcula el
+   * sistema para su clase.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onPrepare(event, target) {
+    const item = this.actor?.items.get(target.dataset.itemId);
+    if ( !item || !canTogglePrepared(item) ) return;
+    const preparing = !item.system.prepared;
+    if ( preparing ) {
+      const limit = getPreparationLimit(item);
+      if ( limit && (limit.value >= limit.max) ) {
+        ui.notifications.warn(game.i18n.format("BHD.Spells.PrepareFull", limit));
+        return;
+      }
+    }
+    useLog(`${item.name}: ${preparing ? "preparado" : "sin preparar"}`);
+    await item.update({ "system.prepared": Number(preparing) });
+  }
+
+  /**
    * Elige el nivel del hechizo en el menú del toque largo (con Midi).
    * @this {BHDMobileApp}
    * @param {PointerEvent} event
@@ -2273,6 +2488,33 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Enseña lo que enlaza una descripción: un objeto o hechizo (su detalle de dnd5e) o una página de diario
+   * (su texto), con los enlaces de dentro también utilizables.
+   * @param {string} uuid
+   */
+  async #openLinkedDocument(uuid) {
+    let doc;
+    try {
+      doc = await fromUuid(uuid);
+    } catch(err) {
+      console.warn("BHD Companion | No se pudo abrir el enlace", uuid, err);
+    }
+    if ( !doc ) return;
+    if ( doc instanceof JournalEntry ) doc = doc.pages.contents.sort((a, b) => a.sort - b.sort)[0] ?? doc;
+    useLog(`Enlace abierto: ${doc.name}`, uuid);
+    if ( doc instanceof Item ) {
+      const html = `<div class="bhd-item-details">${await renderItemDetails(doc)}</div>`;
+      await this.#showInfo(doc.name, null, html);
+      return;
+    }
+    const text = doc.text?.content ?? doc.system?.description?.value ?? doc.description ?? "";
+    const html = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      text || `<p>${foundry.utils.escapeHTML(game.i18n.localize("BHD.Status.NoDescription"))}</p>`, { relativeTo: doc }
+    );
+    await this.#showInfo(doc.name, null, html);
+  }
+
+  /**
    * Ventana sencilla con un título, un icono y un texto.
    * @param {string} title
    * @param {string} img
@@ -2331,7 +2573,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @this {BHDMobileApp}
    */
   static async #onEndTurn() {
-    const combat = getActiveCombat();
+    const combat = getActiveCombat(this.actor ?? null);
     if ( this.#endingTurn || !isActorTurn(combat, this.actor) || !combat.combatant.isOwner ) return;
     this.#endingTurn = true;
     this.#hideTurnAlert();

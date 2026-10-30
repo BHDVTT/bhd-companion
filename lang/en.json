@@ -4,6 +4,7 @@
     "Tabs": {
       "character": "Character",
       "actions": "Actions",
+      "spells": "Spells",
       "combat": "Combat",
       "move": "Move",
       "inventory": "Inventory",
@@ -428,6 +429,7 @@
       "Damage": "{n} damage",
       "Healed": "+{n} HP",
       "Done": "Done. Check the TV chat.",
+      "Consumed": "Spent or recovered",
       "Reason": {
         "NoGM": "No DM is connected: {name} can't be used. Ask the DM to open Foundry.",
         "NoSocketlib": "The socketlib module is missing (Midi QOL needs it): {name} can't be used. Tell the DM.",
@@ -448,6 +450,20 @@
       "Seconds": "{seconds} s left",
       "Used": "Reaction: {name}",
       "NotUsed": "{name} couldn't be used. Check the chat."
+    },
+    "Spells": {
+      "AllLevels": "All levels",
+      "Level": "Level",
+      "Filters": "Filter spells",
+      "Concentration": "Concentration",
+      "Ritual": "Ritual",
+      "Prepared": "Prepared",
+      "Prepare": "Prepare",
+      "PreparedCount": "{name}: {value}/{max} prepared",
+      "PrepareFull": "{name} already has {value} of {max} spells prepared. Unprepare another one first.",
+      "SlotPip": "Slot {n}",
+      "NoneForFilter": "No spell matches the filters.",
+      "Hint": "Tap a spell to read all of it. Tap the circles of each level to spend or recover slots by hand. The buttons on the right work the same as in Actions."
     },
     "Relay": {
       "Title": "The DM asks"

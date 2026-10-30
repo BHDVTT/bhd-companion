@@ -182,6 +182,8 @@ async function runMidiUse(userId, { actorUuid, itemId, activityId, targetIds=[],
   };
   if ( mode === "advantage" ) midiOptions.advantage = workflowOptions.advantage = true;
   else if ( mode === "disadvantage" ) midiOptions.disadvantage = workflowOptions.disadvantage = true;
+  // Consumo: no se pasa ninguna opción de `consume`. dnd5e aplica todos los consumos que trae la actividad
+  // (usos, espacios, recursos; los valores negativos recuperan), igual que desde la hoja normal.
   const usage = { midiOptions };
   if ( slot ) usage.spell = { slot };
   // La ventana de dnd5e solo si el sistema la pide (invocar con elección, encantamientos...): va al teléfono.
@@ -189,13 +191,15 @@ async function runMidiUse(userId, { actorUuid, itemId, activityId, targetIds=[],
 
   const remote = startRemoteRun(user, actor, item.name);
   try {
-    console.log(`${tag} | 2. Midi QOL empieza (objetivos: ${targetUuids.length}, ventana de dnd5e: ${dialog.configure})`);
-    const workflow = await globalThis.MidiQOL.completeActivityUse(activity, usage, dialog, {});
+    console.log(`${tag} | 2. Midi QOL empieza (objetivos: ${targetUuids.length}, ventana de dnd5e: ${dialog.configure}, `
+      + `consumos: ${activity.consumption?.targets?.length ?? 0})`);
+    const { result: workflow, notices } = await collectNotices(() =>
+      globalThis.MidiQOL.completeActivityUse(activity, usage, dialog, {}));
     if ( !workflow || workflow.aborted ) {
-      console.warn(`${tag} | 3. Midi QOL no completó el uso (sin espacios o usos, cancelado o tardó demasiado)`);
-      return { ok: false, reason: "Cancelled" };
+      console.warn(`${tag} | 3. Midi QOL no completó el uso`, notices);
+      return { ok: false, reason: "Cancelled", notices };
     }
-    const result = summarizeWorkflow(workflow);
+    const result = { ...summarizeWorkflow(workflow), notices };
     console.log(`${tag} | 3. Terminado`, result);
     return { ok: true, ...result };
   } catch(err) {
@@ -207,38 +211,92 @@ async function runMidiUse(userId, { actorUuid, itemId, activityId, targetIds=[],
 }
 
 /**
- * Resultado de un uso para el teléfono, leído del flujo de Midi.
+ * Resultado de un uso para el teléfono, leído del flujo de Midi. Cada parte solo existe si el flujo la tiene:
+ * - ataque (`workflow.attackRoll`): total, crítico, pifia y a quién impactó (`hitTargets`);
+ * - salvación (`workflow.activityHasSave`, de la propia actividad o de la que dispara): quién salvó (`saves`).
+ *   Sin salvación, Midi pone a todos los impactados en `failedSaves`: eso no se cuenta como salvación;
+ * - daño o curación aplicados a cada objetivo (`damageList[].totalDamage`; negativo = curación).
  * @param {object} workflow  Workflow de Midi QOL.
  * @returns {object}
  */
 function summarizeWorkflow(workflow) {
   const hasAttack = !!workflow.attackRoll;
-  const saves = workflow.saves ?? new Set();
-  const failed = workflow.failedSaves ?? new Set();
-  const hasSave = (saves.size + failed.size) > 0;
+  const hasSave = !!workflow.activityHasSave;
+  const uuids = tokens => new Set(Array.from(tokens ?? []).map(t => (t.document ?? t).uuid));
+  const hits = uuids(workflow.hitTargets);
+  const saves = uuids(workflow.saves);
   const damage = new Map((workflow.damageList ?? []).map(entry => [entry.targetUuid, entry]));
   const card = workflow.itemCardUuid ? fromUuidSync(workflow.itemCardUuid) : null;
   return {
     messageId: card?.id ?? workflow.itemCardId ?? null,
     showHits: game.settings.get(MODULE_ID, "showAttackResult"),
+    hasAttack,
+    hasSave,
     attack: hasAttack ? {
       total: workflow.attackTotal ?? workflow.attackRoll.total,
       critical: !!workflow.isCritical,
       fumble: !!workflow.isFumble
     } : null,
-    damageTotal: Number.isFinite(workflow.damageTotal) ? workflow.damageTotal : null,
     targets: Array.from(workflow.targets ?? []).map(token => {
       const document = token.document ?? token;
       const entry = damage.get(document.uuid);
       return {
         id: document.id,
         name: document.name,
-        hit: hasAttack ? !!workflow.hitTargets?.has(token) : null,
-        saved: hasSave ? saves.has(token) : null,
+        hit: hasAttack ? hits.has(document.uuid) : null,
+        saved: hasSave ? saves.has(document.uuid) : null,
         damage: Number.isFinite(entry?.totalDamage) ? entry.totalDamage : null
       };
-    })
+    }),
+    consumed: describeDeltas(card, workflow.actor)
   };
+}
+
+/**
+ * Lo que gastó o recuperó el uso (usos, espacios, recursos), tal como dnd5e lo apuntó en la tarjeta
+ * (`system.deltas`, lo mismo que enseña la tarjeta del chat). Una recuperación sale en positivo.
+ * @param {ChatMessage|null} card
+ * @param {Actor} actor
+ * @returns {{label: string, delta: string}[]}
+ */
+function describeDeltas(card, actor) {
+  const deltas = card?.system?.deltas;
+  if ( !deltas || !actor ) return [];
+  const label = (keyPath, options) => dnd5e.utils.getHumanReadableAttributeLabel?.(keyPath, options) ?? keyPath;
+  const entry = ({ keyPath, delta }, doc, prefix) => ({
+    label: [prefix, label(keyPath, { [doc instanceof Actor ? "actor" : "item"]: doc })].filter(_ => _).join(": "),
+    delta: dnd5e.utils.formatNumber(keyPath.endsWith(".spent") ? -delta : delta, { signDisplay: "always" })
+  });
+  return [
+    ...(deltas.actor ?? []).map(d => entry(d, actor)),
+    ...Object.entries(deltas.item ?? {}).flatMap(([id, list]) => {
+      const item = actor.items.get(id);
+      return (list ?? []).map(d => entry(d, item ?? actor, item?.name));
+    })
+  ];
+}
+
+/**
+ * Avisos que Foundry, dnd5e o Midi enseñan en el PC del DM mientras usa algo por un jugador ("no quedan usos",
+ * "sin espacios"...). Se recogen para el teléfono, que es quien tiene que leerlos.
+ * @param {Function} fn
+ * @returns {Promise<{result: *, notices: string[]}>}
+ */
+async function collectNotices(fn) {
+  const notices = [];
+  const original = ui.notifications.notify;
+  ui.notifications.notify = function(message, type, options) {
+    if ( ["warning", "error"].includes(type) ) {
+      const text = options?.localize ? game.i18n.localize(message) : message;
+      notices.push(String(text));
+    }
+    return original.call(this, message, type, options);
+  };
+  try {
+    return { result: await fn(), notices };
+  } finally {
+    ui.notifications.notify = original;
+  }
 }
 
 /**

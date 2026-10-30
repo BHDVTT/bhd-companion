@@ -108,13 +108,17 @@ export function prepareActions(actor, state) {
  * Hechizos agrupados por nivel (o por método: pacto, innatos...) con sus espacios de conjuro.
  * Sigue la misma lógica que la hoja de personaje de dnd5e para decidir la sección de cada hechizo:
  * los de pacto van todos a "Magia de pacto" (se lanzan al nivel del espacio de pacto), los demás
- * a la sección de su nivel. Qué hechizos se muestran lo decide `isSpellShown`.
+ * a la sección de su nivel. En Acciones, qué hechizos se muestran lo decide `isSpellShown`; en la pestaña
+ * Hechizos (`all`), todos, como la hoja.
  * @param {Actor} actor
  * @param {Item[]} spells
  * @param {QuickActionState} [state]
+ * @param {object} [options]
+ * @param {boolean} [options.all]   Todos los hechizos, también los no preparados.
+ * @param {Function} [options.row]  Datos de cada fila (`prepareRow` por defecto).
  * @returns {object[]}
  */
-function prepareSpellbook(actor, spells, state) {
+export function prepareSpellbook(actor, spells, state, { all=false, row=prepareRow }={}) {
   const sections = {};
 
   const registerSection = (key, level, config) => {
@@ -136,7 +140,7 @@ function prepareSpellbook(actor, spells, state) {
     section.slots = {
       value,
       max,
-      pips: Array.fromRange(Math.max(max, value), 1).map(n => ({ filled: value >= n, temp: n > max }))
+      pips: Array.fromRange(Math.max(max, value), 1).map(n => ({ n, filled: value >= n, temp: n > max }))
     };
   };
 
@@ -150,7 +154,7 @@ function prepareSpellbook(actor, spells, state) {
 
   for ( const spell of spells ) {
     const system = spell.system;
-    if ( !isSpellShown(spell, actor) ) continue;
+    if ( !all && !isSpellShown(spell, actor) ) continue;
     let method = system.method;
     if ( !(method in CONFIG.DND5E.spellcasting) ) method = "innate";
     const config = CONFIG.DND5E.spellcasting[method];
@@ -177,7 +181,7 @@ function prepareSpellbook(actor, spells, state) {
       // En secciones por nivel ("Nivel 2") el nivel ya se ve en el título; en las demás (pacto,
       // innatos, rituales...) cada hechizo muestra su nivel.
       const showLevel = !/^spell\d+$/.test(section.key);
-      return { ...section, items: section.items.sort(byLevelAndName).map(item => prepareRow(item, { showLevel, state })) };
+      return { ...section, items: section.items.sort(byLevelAndName).map(item => row(item, { showLevel, state })) };
     });
 }
 
