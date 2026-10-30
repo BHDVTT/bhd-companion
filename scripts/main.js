@@ -20,7 +20,7 @@ import { registerUseLogSocket } from "./use-log.js";
 let mobileView = false;
 
 Hooks.once("init", () => {
-  console.log("BHD Companion cargado");
+  console.log(`BHD Companion ${game.modules.get(MODULE_ID)?.version ?? ""} cargado`);
   registerSettings();
 });
 
