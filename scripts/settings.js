@@ -72,6 +72,33 @@ export function registerSettings() {
     type: new foundry.data.fields.BooleanField({ initial: true })
   });
 
+  // Vista de cada dispositivo: automática (teléfonos y tabletas), siempre móvil o nunca.
+  // El enlace con ?bhd=mobile / ?bhd=normal / ?bhd=auto manda sobre este ajuste en esa pestaña.
+  // El GM nunca ve la vista móvil, elija lo que elija.
+  game.settings.register(MODULE_ID, "viewMode", {
+    name: "BHD.Settings.ViewMode.Name",
+    hint: "BHD.Settings.ViewMode.Hint",
+    scope: "client",
+    config: true,
+    type: new foundry.data.fields.StringField({
+      required: true,
+      blank: false,
+      initial: "auto",
+      choices: {
+        auto: "BHD.Settings.ViewMode.Auto",
+        mobile: "BHD.Settings.ViewMode.Mobile",
+        normal: "BHD.Settings.ViewMode.Normal"
+      }
+    }),
+    requiresReload: true,
+    // Elegir "Siempre móvil" deshace un "Volver a la interfaz normal" anterior.
+    onChange: value => {
+      if ( (value === "mobile") && game.settings.get(MODULE_ID, "preferNormal") ) {
+        game.settings.set(MODULE_ID, "preferNormal", false);
+      }
+    }
+  });
+
   // Preferencia de cada dispositivo: usar la interfaz normal de Foundry en lugar de la vista móvil.
   game.settings.register(MODULE_ID, "preferNormal", {
     name: "BHD.Settings.PreferNormal.Name",

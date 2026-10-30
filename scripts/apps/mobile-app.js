@@ -12,6 +12,7 @@ import { getSavedNotes, localNotesDraft, NOTES_FLAG, prepareNotes } from "./note
 import { applyLargeText, syncPlaylistSounds } from "../mobile-mode.js";
 import { canKeepAwake, updateWakeLock } from "../wake-lock.js";
 import { getInstallMode, promptInstall } from "../home-screen.js";
+import { reloadWithoutUrlMode } from "../device.js";
 import { beginUse, endUse, getBlockedWindows } from "../mobile-windows.js";
 import { useError, useLog, useWarn } from "../use-log.js";
 
@@ -1916,6 +1917,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     });
     if ( !confirmed ) return;
     await game.settings.set(MODULE_ID, "preferNormal", true);
-    window.location.reload();
+    reloadWithoutUrlMode();
   }
 }

@@ -357,6 +357,13 @@
         "Name": "Follow tokens moved from a phone",
         "Hint": "On this screen (for example, the TV), the map centers on the token a player moves from their phone."
       },
+      "ViewMode": {
+        "Name": "BHD Companion view",
+        "Hint": "On this device. Automatic: mobile view on phones and tablets (including iPad), normal Foundry on computers and TVs. You can also force it with ?bhd=mobile or ?bhd=normal at the end of the link. The GM always sees normal Foundry.",
+        "Auto": "Automatic",
+        "Mobile": "Always mobile",
+        "Normal": "Never"
+      },
       "PreferNormal": {
         "Name": "Use the normal interface on this device",
         "Hint": "When checked, this browser will not show the mobile view even on a phone."

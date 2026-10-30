@@ -84,6 +84,15 @@ lang/es.json, en.json        traducciones
   aún sin crear). Condiciones: ajuste `enabled` activo, usuario no GM, ajuste de cliente
   `preferNormal` desactivado, y (`forceAll` o pantalla pequeña: lado corto de la pantalla o
   ancho de ventana < 768 px).
+  **Desde 0.8.4** (`device.js`): modo = `?bhd=mobile|normal|auto` del enlace (recordado en `sessionStorage`
+  de la pestaña) o el ajuste de cliente `viewMode` ("Vista de BHD Companion": auto / mobile / normal).
+  Automático (`isMobileDevice`): nunca un televisor (user agent de TV), "Macintosh" con
+  `maxTouchPoints > 1` = iPad (Safari de iPad dice ser Mac), y si no, hace falta pantalla táctil: user agent
+  móvil sin ratón (`any-pointer: fine`), o puntero principal táctil (`pointer: coarse` + `hover: none`) con
+  lado corto ≤ 1100 px, o pantalla pequeña sin ratón. Un PC con la ventana estrecha ya **no** entra.
+  El GM nunca. `?bhd=mobile` manda sobre `preferNormal`; "Volver a la interfaz normal" y el botón
+  "Vista móvil" recargan sin el `?bhd=` (`reloadWithoutUrlMode`). La decisión y los datos del
+  dispositivo salen en consola.
 - **Sin mapa:** en `mobile-mode.js` `Canvas.prototype.initialize` se vuelve vacío (lo mismo que hace
   Foundry con `core.noCanvas`): no se crea WebGL, `canvas.initialized/ready` quedan en false. **No se toca
   ni se finge `core.noCanvas`** (0.8.2): antes se sustituía `game.settings.get` y The Forge, que sincroniza

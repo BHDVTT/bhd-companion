@@ -357,6 +357,13 @@
         "Name": "Seguir las fichas movidas desde un teléfono",
         "Hint": "En esta pantalla (por ejemplo, la TV), el mapa se centra en la ficha que un jugador mueve desde su teléfono."
       },
+      "ViewMode": {
+        "Name": "Vista de BHD Companion",
+        "Hint": "En este dispositivo. Automática: vista móvil en teléfonos y tabletas (también iPad), Foundry normal en computadoras y televisores. También se puede forzar con ?bhd=mobile o ?bhd=normal al final del enlace. El GM siempre ve Foundry normal.",
+        "Auto": "Automática",
+        "Mobile": "Siempre móvil",
+        "Normal": "Nunca"
+      },
       "PreferNormal": {
         "Name": "Usar la interfaz normal en este dispositivo",
         "Hint": "Si está marcado, este navegador no mostrará la vista móvil aunque sea un teléfono."

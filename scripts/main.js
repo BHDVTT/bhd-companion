@@ -4,7 +4,7 @@
 
 import { MODULE_ID } from "./constants.js";
 import { registerSettings } from "./settings.js";
-import { canUseMobileView, shouldUseMobileView } from "./device.js";
+import { canUseMobileView, reloadWithoutUrlMode, shouldUseMobileView } from "./device.js";
 import { enterMobileMode } from "./mobile-mode.js";
 import { closeStrayWindows } from "./mobile-windows.js";
 import { BHDMobileApp } from "./apps/mobile-app.js";
@@ -194,7 +194,7 @@ function addReturnToMobileButton() {
   button.innerHTML = `<i class="fa-solid fa-mobile-screen" aria-hidden="true"></i> ${game.i18n.localize("BHD.ReturnMobile")}`;
   button.addEventListener("click", async () => {
     await game.settings.set(MODULE_ID, "preferNormal", false);
-    window.location.reload();
+    reloadWithoutUrlMode();
   });
   document.body.append(button);
 }
