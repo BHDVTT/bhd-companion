@@ -1,16 +1,18 @@
 /**
  * Botones de tirada de cada fila (estilo D&D Beyond): Ataque, Daño, Salvación, Curar o Usar.
  *
- * Cada botón hace una sola cosa con las funciones de dnd5e, sin ventanas:
- * - Ataque → `activity.rollAttack` (solo la tirada de ataque).
- * - Daño / Curar → `activity.rollDamage` (solo esa tirada; crítico si el último ataque fue un 20 natural).
- * - Salvación / Usar → `activity.use` (la tarjeta del chat con la CD, para que el DM tire por los objetivos).
+ * Igual que desde la hoja normal, sin ventanas: primero `activity.use` (el "lanzamiento": tarjeta del chat,
+ * gasto de espacio / usos / cantidad, concentración, área y los eventos que escuchan Automated Animations y
+ * otros módulos) y después solo la tirada del botón, ligada a esa tarjeta (`originatingMessage`, nivel del
+ * espacio para el daño):
+ * - Ataque → `activity.rollAttack`.
+ * - Daño / Curar → `activity.rollDamage` (crítico si el último ataque fue un 20 natural).
+ * - Salvación / Usar → solo la tarjeta (con la CD, para que el DM tire por los objetivos).
  *
- * "Lanzamiento": lo que gasta algo (espacio de conjuro, usos, cantidad, concentración) se hace con
- * `activity.use` una sola vez, al tocar el primer botón. La tarjeta que crea es el "lanzamiento" y las
- * tiradas siguientes cuelgan de ella (`originatingMessage`, nivel del espacio para el daño). En hechizos el
- * lanzamiento dura hasta que cambia el turno (o 2 minutos fuera de combate), así se pueden tirar varios
- * ataques del mismo hechizo; en rasgos y consumibles termina con la tirada de daño o curación.
+ * Los hechizos que gastan espacio se lanzan una sola vez: el lanzamiento dura hasta que cambia el turno
+ * (o 2 minutos fuera de combate), así varios ataques del mismo hechizo no gastan otro espacio. Lo demás
+ * (armas, trucos, rasgos, consumibles) se vuelve a usar con cada Ataque, Salvación, Curar o Usar; el Daño
+ * cuelga del último uso.
  */
 
 /** Cuánto dura un lanzamiento de hechizo fuera de combate (ms). */
@@ -180,8 +182,8 @@ export function getScaledActivity(activity, scaling) {
 }
 
 /**
- * ¿Usar esta actividad gasta algo (y por eso hay que "lanzarla" con su tarjeta antes de tirar)?
- * Armas normales y trucos de ataque no: su ataque y su daño se tiran directo.
+ * ¿Usar esta actividad gasta algo (espacio, usos, cantidad, concentración)? En hechizos, eso hace que el
+ * lanzamiento dure el turno (no se vuelve a gastar con cada ataque).
  * @param {Item} item
  * @param {Activity} activity
  * @returns {boolean}
@@ -214,7 +216,9 @@ export function needsUsageDialog(activity) {
  */
 export function prepareRowButtons(item, activities, state) {
   const { attack, save, damage, heal, use, primary } = getRowActivities(item, activities);
-  const cast = state?.getCast(item) ?? null;
+  // Solo los hechizos que gastan espacio muestran su lanzamiento en curso ("Lanzado ✕").
+  const active = state?.getCast(item) ?? null;
+  const cast = active?.sticky ? active : null;
 
   // Nivel del hechizo: selector en la propia fila (solo si hay más de una opción).
   const options = getSlotOptions(primary);

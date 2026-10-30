@@ -61,7 +61,7 @@ scripts/apps/move-data.js       datos de la pestaña Mover (ficha, pies usados /
 scripts/apps/combat-hud-data.js datos del HUD de combate (bloques, opciones por bloque, tarjetas de objetivos)
 scripts/movement.js          mover fichas desde el teléfono: reglas, canal del módulo, lado del DM, seguir en la TV
 scripts/economy.js           acción / adicional / reacción / Correr usados en el turno (flag del combatiente)
-scripts/targets.js           objetivos sin mapa (PhoneTarget) y aviso a la TV
+scripts/targets.js           objetivos: fichas del mapa oculto (sin mapa, PhoneTarget) y aviso a la TV
 scripts/quick-actions.js     botones de tirada de cada fila (Ataque / Daño / CD / Curar / Usar), nivel, lanzamientos
 scripts/save-prompts.js      salvaciones pendientes que pide el chat (hechizo del DM, concentración, petición)
 scripts/apps/status-data.js  concentración, condiciones (con explicación) y efectos activos
@@ -96,12 +96,23 @@ lang/es.json, en.json        traducciones
   El GM nunca. `?bhd=mobile` manda sobre `preferNormal`; "Volver a la interfaz normal" y el botón
   "Vista móvil" recargan sin el `?bhd=` (`reloadWithoutUrlMode`). La decisión y los datos del
   dispositivo salen en consola.
-- **0.9.0 → 0.10.0:** la 0.9.0 cargaba el mapa oculto (Midi QOL necesitaba fichas `Token`) y tenía un
-  "modo ligero" con socketlib. Desde 0.10.0 Midi QOL y Cauldron están apagados (automatización nativa de
-  dnd5e 5.3): se volvió a **sin mapa** siempre y se quitaron el mapa oculto, el modo ligero, `remote-use.js`,
-  socketlib y todo lo de Midi. Se conserva que Dice So Nice no tire dados 3D en el teléfono
-  (`diceSoNiceMessagePreProcess`, `messageHookDisabled`, `showForRoll`, `#dice-box-canvas` oculto).
-- **Sin mapa:** en `mobile-mode.js` `Canvas.prototype.initialize` se vuelve vacío (lo mismo que hace
+- **Mapa oculto (0.9.0, quitado en 0.10.0, vuelto en 0.11.0):** Automated Animations dispara en el cliente que
+  tira (`dnd5e.postUseActivity`, `rollAttackV2`, `rollDamageV2`, `createRegion`/plantilla) y necesita la ficha
+  del mapa (`sourceToken`) y objetivos `Token`; sin mapa no mandaba nada. `prepareHiddenCanvas`: hook
+  `canvasConfig` (resolución 0.5, `low-power`), luces sin animar y, **solo tras `canvasReady`**,
+  `canvas.stage.renderable = false` y 10 FPS (en `canvasTearDown` se deshace). Probado en v14: ocultar el
+  escenario desde `canvasInit`, bajar los FPS antes de cargar o forzar `CANVAS_PERFORMANCE_MODES.LOW` deja la
+  carga colgada en `CanvasVisibility` → niebla (`TextureExtractor` espera un `fenceSync` de la GPU) y la vista
+  móvil no abre nunca (`ready` espera al mapa); por eso no se fuerza el modo de rendimiento.
+  Sequencer: `drawNoSequencerEffects` anula solo `Sequencer.EffectManager._playEffect` en el teléfono;
+  `EffectManager.play` primero hace `executeForOthers` (la TV y el DM la dibujan) y luego `_playEffect` local.
+  Dice So Nice sigue sin dados 3D en el teléfono. Objetivos: `canvas.tokens.setTargets` con fichas reales
+  (`PhoneTarget` solo si el mapa no cargó). `followToken` no corre en vista móvil.
+  Probado (Foundry v14 local, AA 7.0.22, Sequencer 4.2.3, JB2A): Eldritch Blast y daga desde el teléfono →
+  el efecto llega al cliente del DM (`_playEffect` con `creatorUserId` del jugador) y se reproduce; en el
+  teléfono 0 efectos. Ojo en las pruebas: Chrome headless con emulación de teléfono no termina de cargar
+  el mapa ni con Foundry normal; probar la vista móvil con ventana de escritorio y `?bhd=mobile`.
+- **Sin mapa (antes de 0.9.0 y en 0.10.0; ya no se usa):** en `mobile-mode.js` `Canvas.prototype.initialize` se vuelve vacío (lo mismo que hace
   Foundry con `core.noCanvas`): no se crea WebGL, `canvas.initialized/ready` quedan en false. **No se toca
   ni se finge `core.noCanvas`** (0.8.2): antes se sustituía `game.settings.get` y The Forge, que sincroniza
   los ajustes de cliente, guardó `true` y mostraba "Difference in client settings detected". Lo que Foundry
@@ -191,14 +202,15 @@ lang/es.json, en.json        traducciones
   bloque (`getBlockActivities`). `#runQuick`: Ataque → `activity.rollAttack(config, { configure: false })`;
   Daño / Curar → `activity.rollDamage` (crítico si el último ataque de esa actividad fue crítico, con su
   munición y modo); Salvación / Usar → solo el lanzamiento. Nada se encadena (`subsequentActions: false`).
-  **Lanzamiento** (`#cast`): si `needsCast` (consumible, espacio de conjuro, objetivos de consumo,
-  concentración) o es Salvación / Usar, primero `activity.use({ spell: { slot }, subsequentActions: false },
+  **Lanzamiento** (`#cast`, desde 0.11.0 siempre, como la hoja normal, para que Automated Animations y otros
+  módulos reciban los mismos eventos): Ataque / Salvación / Curar / Usar hacen primero `activity.use({ spell: { slot }, subsequentActions: false },
   { configure: needsUsageDialog })` (ventana solo para invocar, encantar...). Se guarda en
   `QuickActionState.casts` (nivel, `scaling`, id de la tarjeta, turno) y las tiradas siguientes usan
   `getScaledActivity` (copia con `flags.dnd5e.scaling`, como los botones de la tarjeta de dnd5e) y
   `originatingMessage` de la tarjeta. Hechizos: el lanzamiento dura hasta que cambia el turno (o 2 min fuera
-  de combate) — varios ataques del mismo hechizo no gastan otro espacio; chip "Lanzado ✕" (`bhdEndCast`)
-  para volver a lanzar. Rasgos / consumibles: termina con la tirada de daño o curación. Selector de nivel
+  de combate) — `sticky` = hechizo con `needsCast` (espacio, concentración...): varios ataques no gastan otro
+  espacio; chip "Lanzado ✕" (`bhdEndCast`) para volver a lanzar. Armas, trucos, rasgos y consumibles se
+  vuelven a usar en cada toque (tarjeta nueva); Daño cuelga del último uso (o usa la actividad si no hay). Selector de nivel
   (`data-bhd-slot`, `getSlotOptions` con las reglas de `_prepareScalingContext`) solo si hay más de una
   opción. Toque largo (450 ms) en Ataque: ventaja / normal / desventaja / "ventana de dnd5e" (`#useFull`,
   `#fullOptionsItem`); en Daño: normal / crítico. `onPreRoll` quita la ventana de las tiradas del personaje

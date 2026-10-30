@@ -749,14 +749,19 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return;
       }
 
+      // Como desde la hoja normal: primero `activity.use` (tarjeta del chat, gasto, eventos que escuchan
+      // Automated Animations y otros módulos) y después la tirada ligada a esa tarjeta. Un hechizo que gasta
+      // espacio se lanza una vez (sus ataques siguientes cuelgan de la misma tarjeta); lo demás (armas,
+      // trucos, rasgos, pociones) se vuelve a usar en cada Ataque, Salvación, Curar o Usar. El Daño usa la
+      // tarjeta del último uso (o usa la actividad si aún no hay ninguna, p. ej. Proyectil mágico).
       let cast = this.#quick.getCast(item);
-      if ( cast && ((kind === "save") || (kind === "use")) ) {
+      if ( cast?.sticky && ((kind === "save") || (kind === "use")) ) {
         ui.notifications.info(game.i18n.format("BHD.Actions.AlreadyCast", { name: item.name }));
         const message = game.messages.get(cast.messageId);
         if ( message ) this.#openTray(message);
         return;
       }
-      if ( !cast && ((kind === "save") || (kind === "use") || needsCast(item, activity)) ) {
+      if ( !cast || (!cast.sticky && (kind !== "damage")) ) {
         cast = await this.#cast(item, activity, event, tag);
         if ( !cast ) return;
       }
@@ -847,7 +852,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       messageId: message?.id ?? null,
       time: Date.now(),
       turnKey: getTurnKey(),
-      sticky: item.type === "spell"
+      sticky: (item.type === "spell") && needsCast(item, activity)
     };
     this.#quick.casts.set(item.id, cast);
     return cast;

@@ -8,7 +8,7 @@ un jugador entra a Foundry desde el teléfono, BHD Companion cambia la pantalla 
 móvil sencilla (estilo D&D Beyond) con su hoja de personaje, sus acciones y el combate en
 tiempo real. El GM y la TV siguen viendo Foundry normal.
 
-Versión actual: **0.10.0**
+Versión actual: **0.11.0**
 
 ## Qué hace
 
@@ -23,7 +23,7 @@ Versión actual: **0.10.0**
   consumibles. Filtros (acción / adicional / reacción) y buscador de hechizos.
   Estilo D&D Beyond: cada fila tiene sus botones de tirada, sin ventanas: **Ataque** (+5),
   **Daño** (1d4 + 3 Perforante), **CD 13 DES** si pide salvación, **Curar** o **Usar**. Cada botón
-  saca solo su tirada en el chat, con las funciones de dnd5e (el DM aplica el daño desde el chat).
+  usa la actividad como la hoja normal (tarjeta en el chat, gasto) y saca su tirada ligada a esa tarjeta (el DM aplica el daño desde el chat).
   Mantener presionado Ataque = ventaja / desventaja; Daño = normal / crítico. Tras un 20 natural,
   el botón de daño se marca **¡Crítico!**. Los hechizos de nivel tienen un selector de nivel en la
   fila y gastan el espacio una sola vez por lanzamiento.
@@ -62,7 +62,10 @@ Versión actual: **0.10.0**
   «Sin conexión» y el teléfono sigue intentando reconectar sin rendirse (Foundry, por sí solo,
   se rinde a los 5 segundos). Al volver, la vista se pone al día sola. Las notas que se estaban
   escribiendo se guardan también en el teléfono y no se pierden.
-- **Rendimiento en teléfonos viejos** — el mapa no se dibuja en el teléfono; solo se prepara la
+- **Animaciones** — Automated Animations / Sequencer funcionan desde el teléfono: el teléfono carga el
+  mapa escondido (sin pintarlo) para saber desde qué ficha sale cada animación, la manda a la TV y al PC
+  del DM, y no la dibuja él.
+- **Rendimiento en teléfonos viejos** — el mapa no se pinta en el teléfono (resolución baja y 10 FPS); solo se prepara la
   pestaña que se está viendo; con la pantalla apagada no se redibuja nada; animaciones ligeras
   (y ninguna si el teléfono tiene activado «reducir movimiento»).
 - **Español e inglés** — todos los textos están en `lang/es.json` y `lang/en.json`; se usa el

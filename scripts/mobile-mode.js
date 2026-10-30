@@ -4,6 +4,12 @@ import { registerCompactDialogs } from "./mobile-dialogs.js";
 import { registerMobileWindows } from "./mobile-windows.js";
 import { enableHomeScreenApp } from "./home-screen.js";
 
+/** Resolución del mapa oculto (1 = un píxel por píxel CSS; las pantallas retina usan 2 o 3). */
+const CANVAS_RESOLUTION = 0.5;
+
+/** Fotogramas por segundo del mapa oculto: bastan para que terminen las animaciones de las fichas. */
+const CANVAS_FPS = 10;
+
 /**
  * Avisos de Foundry que no tienen sentido en la vista móvil:
  * - "Resolución demasiado baja" (Foundry pide pantallas de PC).
@@ -29,8 +35,9 @@ function getSilencedNotifications() {
 export function enterMobileMode() {
   document.body.classList.add("bhd-mobile");
   applyLargeText();
-  disableCanvas();
+  prepareHiddenCanvas();
   disableDiceSoNice();
+  drawNoSequencerEffects();
   silenceDesktopNotifications();
   patchPlaylistSounds();
   patchAbilityTemplates();
@@ -72,29 +79,58 @@ function disableDiceSoNice() {
 }
 
 /**
- * El mapa (WebGL) no se crea en el teléfono: ahorra batería y memoria.
- * No se toca el ajuste "Disable Game Canvas" (core.noCanvas), ni guardado ni leído: The Forge
- * sincroniza los ajustes de cliente y avisaba de una diferencia. Se hace lo mismo que Foundry hace
- * con ese ajuste activo: `Canvas#initialize` sale sin crear nada, así que `canvas.initialized`
- * y `canvas.ready` quedan en false y `Scene#view` no dibuja.
+ * El mapa se carga (Automated Animations y Sequencer necesitan las fichas del mapa para saber desde dónde
+ * y hacia dónde va una animación; los objetivos son fichas de verdad), pero escondido detrás de la vista
+ * y gastando lo mínimo:
+ * - resolución baja y modo de rendimiento bajo (sin suavizado ni mipmaps, bordes de luz simples);
+ * - sin animaciones de luces;
+ * - una vez cargado, pocos fotogramas por segundo y no se pinta nada (`canvas.stage.renderable = false`):
+ *   las fichas existen y se mueven, pero la tarjeta gráfica no dibuja ni el mapa ni los efectos de FXMaster.
+ * No se cambia ningún ajuste de Foundry (The Forge los sincroniza): se sustituyen las funciones.
  */
-function disableCanvas() {
-  foundry.canvas.Canvas.prototype.initialize = function() {};
+function prepareHiddenCanvas() {
+  Hooks.on("canvasConfig", config => {
+    config.resolution = CANVAS_RESOLUTION;
+    config.powerPreference = "low-power";
+  });
 
-  // Lo que Foundry evita por su cuenta cuando el ajuste está activo y necesitaría el mapa:
-  // la pestaña de fichas de la escena y las miniaturas de vídeo.
-  const Placeables = CONFIG.ui.placeables;
-  if ( Placeables ) {
-    CONFIG.ui.placeables = class BHDPlaceableDirectory extends Placeables {
-      _canRender() {
-        return false;
-      }
-    };
-  }
-  const VideoHelper = foundry.helpers.media.VideoHelper;
-  VideoHelper.prototype.createThumbnail = async function() {
-    return "icons/svg/video.svg";
+  const EffectsGroup = foundry.canvas.groups.EffectsCanvasGroup;
+  EffectsGroup.prototype.activateAnimation = function() {
+    this.deactivateAnimation();
   };
+
+  // Mientras el mapa se dibuja tiene que pintarse con normalidad: la niebla de guerra lee píxeles de la
+  // tarjeta gráfica y espera a que se pinte un fotograma (con el mapa sin pintar o a pocos FPS, la carga
+  // se quedaba esperando y la vista móvil no llegaba a abrirse). Ya cargado, deja de pintarse y baja a 10 FPS.
+  Hooks.on("canvasReady", () => {
+    canvas.stage.renderable = false;
+    canvas.app.ticker.maxFPS = PIXI.Ticker.shared.maxFPS = PIXI.Ticker.system.maxFPS = CANVAS_FPS;
+  });
+  Hooks.on("canvasTearDown", () => {
+    if ( canvas.stage ) canvas.stage.renderable = true;
+    canvas.app.ticker.maxFPS = PIXI.Ticker.shared.maxFPS = PIXI.Ticker.system.maxFPS = 0;
+  });
+
+  // Sonidos ambientales del mapa: como la música, solo con "Música en el teléfono".
+  const SoundsLayer = foundry.canvas.layers.SoundsLayer;
+  const syncPositions = SoundsLayer.prototype._syncPositions;
+  SoundsLayer.prototype._syncPositions = function(listeners, options) {
+    return syncPositions.call(this, game.settings.get(MODULE_ID, "phoneMusic") ? listeners : [], options);
+  };
+}
+
+/**
+ * Sequencer (lo usa Automated Animations): el teléfono **sí manda** las animaciones a las demás pantallas
+ * (TV, PC del DM), pero no las dibuja él. `Sequencer.EffectManager.play` primero las envía a los demás
+ * (`executeForOthers`) y después llama a `_playEffect` para dibujarlas aquí: solo se anula ese último paso
+ * (también para las animaciones que llegan de otros). No se cambian sus ajustes.
+ */
+function drawNoSequencerEffects() {
+  Hooks.once("ready", () => {
+    const effects = globalThis.Sequencer?.EffectManager;
+    if ( typeof effects?._playEffect !== "function" ) return;
+    effects._playEffect = async () => ({ duration: Promise.resolve(0), promise: Promise.resolve() });
+  });
 }
 
 /**
@@ -137,4 +173,5 @@ export function syncPlaylistSounds() {
   for ( const playlist of game.playlists ) {
     for ( const sound of playlist.sounds ) sound.sync();
   }
+  if ( canvas?.ready ) canvas.sounds?.refresh();
 }
