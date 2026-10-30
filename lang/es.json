@@ -111,6 +111,13 @@
         "Dead": "Tu personaje ha muerto."
       }
     },
+    "Use": {
+      "Busy": "Espera: todavía se está usando {name}.",
+      "NotUsed": "{name} no se usó (se canceló o faltó algo: objetivo, espacio de conjuro o usos). Si sigue pasando, avisa al DM.",
+      "WindowClosed": "{name} no se usó: se cerró una ventana que hacía falta. Avisa al DM (los detalles están en su consola).",
+      "Stuck": "{name} sigue esperando algo (una ventana o un botón de la tarjeta del chat). Ya puedes usar otra cosa; si no sale nada, avisa al DM.",
+      "Error": "No se pudo usar {name}: {error}. Avisa al DM (los detalles están en su consola)."
+    },
     "Hud": {
       "Title": "Tu turno",
       "Block": {

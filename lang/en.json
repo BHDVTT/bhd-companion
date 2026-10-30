@@ -111,6 +111,13 @@
         "Dead": "Your character has died."
       }
     },
+    "Use": {
+      "Busy": "Wait: {name} is still being used.",
+      "NotUsed": "{name} was not used (it was cancelled or something was missing: a target, a spell slot or uses). If this keeps happening, tell the DM.",
+      "WindowClosed": "{name} was not used: a window it needed was closed. Tell the DM (details are in their console).",
+      "Stuck": "{name} is still waiting for something (a window or a chat card button). You can use something else now; if nothing shows up, tell the DM.",
+      "Error": "{name} could not be used: {error}. Tell the DM (details are in their console)."
+    },
     "Hud": {
       "Title": "Your turn",
       "Block": {

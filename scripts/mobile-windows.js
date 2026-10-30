@@ -7,8 +7,11 @@
  * - Las ventanas de dnd5e para usar y tirar (`Dialog5e`: uso de actividad, opciones de tirada,
  *   descansos) y la de elegir actividad.
  * - Las ventanas propias del módulo (clase `bhd-dialog`).
+ * - Las ventanas de Midi QOL (confirmar objetivos, elegir tirada...): forman parte de su flujo de ataque.
  * - Otros diálogos (`DialogV2` o el `Dialog` antiguo) solo si el jugador acaba de tocar la pantalla:
  *   son la respuesta a algo que pidió (p. ej. una confirmación de dnd5e). Los que salen solos se cierran.
+ * - Mientras se usa un objeto desde la vista (`beginUse` / `endUse`), cualquier ventana: un módulo
+ *   que la abre a mitad del uso la necesita para seguir (cerrarla dejaría el ataque parado).
  *
  * Si quedan dos ventanas permitidas a la vez, solo se ve la última; la otra vuelve al cerrarse esta.
  * Mientras no se decide, el CSS mantiene invisible cualquier ventana sin la clase `bhd-window`.
@@ -19,6 +22,15 @@ const TAP_WINDOW_MS = 3000;
 
 /** Momento del último toque en la pantalla. */
 let lastTap = 0;
+
+/** Usos de objetos en curso desde la vista móvil (ver `beginUse`). */
+let usesInProgress = 0;
+
+/**
+ * Ventanas cerradas por no estar permitidas: nombre y momento (para el registro de los ataques).
+ * @type {{name: string, time: number}[]}
+ */
+const blockedLog = [];
 
 /**
  * Ventanas permitidas abiertas, de la más antigua a la más nueva (la última es la visible).
@@ -49,6 +61,29 @@ export function closeStrayWindows() {
   }
 }
 
+/**
+ * Empieza un uso de objeto desde la vista: hasta `endUse`, ninguna ventana se cierra.
+ */
+export function beginUse() {
+  usesInProgress++;
+}
+
+/**
+ * Termina un uso empezado con `beginUse`.
+ */
+export function endUse() {
+  usesInProgress = Math.max(0, usesInProgress - 1);
+}
+
+/**
+ * Ventanas cerradas por el control desde un momento dado.
+ * @param {number} since  Momento (Date.now()).
+ * @returns {string[]}
+ */
+export function getBlockedWindows(since) {
+  return blockedLog.filter(b => b.time >= since).map(b => b.name);
+}
+
 /* -------------------------------------------- */
 
 /**
@@ -76,6 +111,8 @@ function isWindow(app) {
  */
 function isAllowed(app, element) {
   if ( element.classList.contains("bhd-dialog") ) return true;
+  if ( usesInProgress > 0 ) return true;
+  if ( isMidiWindow(app, element) ) return true;
   const dnd5eApps = globalThis.dnd5e?.applications;
   if ( dnd5eApps?.api?.Dialog5e && (app instanceof dnd5eApps.api.Dialog5e) ) return true;
   if ( dnd5eApps?.activity?.ActivityChoiceDialog && (app instanceof dnd5eApps.activity.ActivityChoiceDialog) ) {
@@ -83,6 +120,29 @@ function isAllowed(app, element) {
   }
   const isDialog = (app instanceof foundry.applications.api.DialogV2) || (app instanceof foundry.appv1.api.Dialog);
   return isDialog && (Date.now() - lastTap < TAP_WINDOW_MS);
+}
+
+/**
+ * ¿Es una ventana de Midi QOL? Sus clases se llaman "Midi..." o "TargetConfirmation..." y sus
+ * elementos llevan clases "midi-..." (p. ej. `midi-targeting`).
+ * @param {ApplicationV2|Application} app
+ * @param {HTMLElement} element
+ */
+function isMidiWindow(app, element) {
+  if ( !game.modules.get("midi-qol")?.active ) return false;
+  if ( [...element.classList].some(c => c.startsWith("midi")) ) return true;
+  for ( let cls = app.constructor; cls && (cls !== Object); cls = Object.getPrototypeOf(cls) ) {
+    if ( /^(Midi|TargetConfirmation)/.test(cls.name) ) return true;
+  }
+  return false;
+}
+
+/**
+ * Nombre de una ventana para el registro.
+ * @param {ApplicationV2|Application} app
+ */
+function windowName(app) {
+  return `${app.constructor?.name ?? "?"} (${app.id ?? app.appId ?? "?"})`;
 }
 
 /**
@@ -104,13 +164,22 @@ function onRender(app, html) {
 
   if ( !isAllowed(app, element) ) {
     element.classList.add("bhd-window-blocked");
+    const name = windowName(app);
+    console.warn(`BHD Companion | Ventana cerrada en el teléfono: ${name}`);
+    blockedLog.push({ name, time: Date.now() });
+    if ( blockedLog.length > 20 ) blockedLog.shift();
     if ( app instanceof foundry.applications.api.ApplicationV2 ) app.close({ animate: false }).catch(() => {});
     else app.close({ force: true });
     return;
   }
 
   element.classList.add("bhd-window");
+  // Las ventanas que no son de dnd5e ni propias reciben el estilo compacto genérico.
+  if ( !element.classList.contains("bhd-dialog") && !element.classList.contains("dnd5e2") ) {
+    element.classList.add("bhd-foreign-window");
+  }
   stack.push(app);
+  console.log(`BHD Companion | Ventana mostrada en el teléfono: ${windowName(app)}`);
   updateVisibleWindow();
 }
 

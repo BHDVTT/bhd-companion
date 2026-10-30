@@ -14,6 +14,13 @@ import { watchConnection } from "./connection.js";
 import { updateWakeLock } from "./wake-lock.js";
 import { registerMovementSocket } from "./movement.js";
 import { broadcastTargets, pruneTargets } from "./targets.js";
+import { registerUseLogSocket } from "./use-log.js";
+
+/** Pasos del flujo de Midi QOL que se anotan en el registro de los usos del teléfono. */
+const MIDI_HOOKS = [
+  "preTargeting", "preItemRoll", "preAttackRoll", "AttackRollComplete", "preCheckHits",
+  "preDamageRoll", "DamageRollComplete", "preCheckSaves", "postCheckSaves", "RollComplete"
+];
 
 /** ¿Este cliente está en vista móvil? Se decide una sola vez al cargar. */
 let mobileView = false;
@@ -32,6 +39,8 @@ Hooks.once("setup", () => {
 Hooks.once("ready", () => {
   // Pestaña Mover: el DM mueve las fichas que piden los teléfonos y la TV las sigue.
   registerMovementSocket();
+  // Registro de los ataques del teléfono: el DM lo ve en su consola (F12).
+  registerUseLogSocket();
   if ( mobileView ) openMobileView();
   else if ( canUseMobileView() ) addReturnToMobileButton();
 });
@@ -138,9 +147,20 @@ function openMobileView() {
 
   // HUD de combate: marcar como usada la acción, adicional o reacción de lo que se use.
   // (Es un Hooks.call de dnd5e: devolver false cortaría el uso, así que no se devuelve nada.)
-  Hooks.on("dnd5e.postUseActivity", activity => {
-    app.onPostUseActivity(activity);
+  Hooks.on("dnd5e.postUseActivity", (activity, usageConfig, results) => {
+    app.onPostUseActivity(activity, results);
   });
+
+  // Midi QOL: anota en el registro por qué paso va su flujo de ataque (no cambia nada).
+  if ( game.modules.get("midi-qol")?.active ) {
+    for ( const hook of MIDI_HOOKS ) Hooks.on(`midi-qol.${hook}`, workflow => {
+      try {
+        app.onMidiHook(hook, workflow);
+      } catch(err) {
+        console.error("BHD Companion | Registro de Midi QOL", err);
+      }
+    });
+  }
 
   // Toque rápido: usar y tirar sin ventanas; toque largo: ventaja / desventaja.
   Hooks.on("dnd5e.preUseActivity", (activity, usage, dialog) => app.onPreUseActivity(activity, usage, dialog));

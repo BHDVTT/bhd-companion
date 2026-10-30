@@ -65,6 +65,7 @@ scripts/targets.js           objetivos sin mapa: game.user.targets con PhoneTarg
 scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
 scripts/mobile-windows.js    qué ventanas se permiten en vista móvil (cierra las de otros módulos), una a la vez
+scripts/use-log.js           registro paso a paso de los usos del teléfono (consola del teléfono y del DM)
 scripts/connection.js        reconexión sin límite y aviso "Sin conexión" en vista móvil
 scripts/wake-lock.js         pantalla siempre encendida (Screen Wake Lock API)
 scripts/home-screen.js       manifiesto de app web y etiquetas apple-* (añadir a pantalla de inicio)
@@ -160,6 +161,9 @@ lang/es.json, en.json        traducciones
   `:is(.application:has(> .window-header), .window-app)`: invisibles sin `.bhd-window`, centradas
   (ancho de pantalla − 16 px; en ≥ 700 px, 560 px) con `!important` sobre la posición en línea;
   sube las variables `--font-size-*`. Diálogos propios nuevos: poner `classes: ["bhd-dialog"]`.
+  Desde 0.8.3 también se permiten las ventanas de Midi QOL (clases `Midi*` / `TargetConfirmation*` o
+  clase CSS `midi*`) y **cualquier** ventana mientras dura un uso del teléfono (`beginUse` / `endUse`);
+  las que no son de dnd5e llevan `.bhd-foreign-window`. Cada ventana cerrada o mostrada sale en consola.
 - **Ventanas compactas** (`scripts/mobile-dialogs.js`, 0.4.1): hook `renderDialog5e` añade
   `.bhd-compact` y pliega partes poco importantes (`FOLDED_PARTS`: en `activity-usage`
   concentración / recursos / área; en `roll-configuration` fórmula y opciones) con un botón
@@ -178,6 +182,15 @@ lang/es.json, en.json        traducciones
   mínimo, `exclusive.spells/slots`) vea un solo tipo de espacio con usos y sea el que dnd5e ya
   eligió (p. ej. brujo solo con pacto): entonces se lanza directo y dnd5e gasta ese espacio y
   escala al nivel del espacio.
+- **Midi QOL y registro de usos** (0.8.3): `#useItem` pasa `midiOptions.workflowOptions.targetConfirmation =
+  "none"` si Midi está activo (su `resolveTargetConfirmation` usa `ui.controls` y fichas del mapa y fallaba
+  sin avisar; los objetivos ya se eligen en el teléfono). Midi sustituye `activity.use` (clona el objeto, crea
+  su Workflow, lee `game.user.targets`). Cada paso (toque, use(), preUseActivity, postUseActivity, tiradas,
+  hooks `midi-qol.*`) se anota con `useLog` en la consola del teléfono y en la del DM (canal del módulo,
+  tipo `useLog`). Errores → `ui.notifications.error`; uso sin tarjeta → aviso; si el uso no termina en
+  20 s (`USE_TIMEOUT`) se libera `#using` para no dejar el teléfono bloqueado. La tarjeta se abre en el
+  panel ya en `postUseActivity` (Midi tarda en devolver). Midi en un cliente sin mapa: los objetivos son
+  `PhoneTarget` (no `Token`), así que `getToken`/`getTokenDocument` de Midi no los reconocen; **sin probar**.
 - Los clics dentro del panel con `data-action` desconocido llegan también a `BHDMobileApp`, que
   los ignora; no usar en la app nombres de acción que use dnd5e en sus tarjetas.
 

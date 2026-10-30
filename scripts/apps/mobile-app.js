@@ -12,11 +12,19 @@ import { getSavedNotes, localNotesDraft, NOTES_FLAG, prepareNotes } from "./note
 import { applyLargeText, syncPlaylistSounds } from "../mobile-mode.js";
 import { canKeepAwake, updateWakeLock } from "../wake-lock.js";
 import { getInstallMode, promptInstall } from "../home-screen.js";
+import { beginUse, endUse, getBlockedWindows } from "../mobile-windows.js";
+import { useError, useLog, useWarn } from "../use-log.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
 /** Cuánto tiempo (ms) se ve el resultado de una tirada en el teléfono. */
 const TOAST_DURATION = 4000;
+
+/**
+ * Si un uso no termina en este tiempo (ms), el teléfono deja volver a usar objetos y avisa.
+ * (Con Midi QOL el uso espera a que acabe el flujo; si se queda esperando algo, no debe bloquear.)
+ */
+const USE_TIMEOUT = 20000;
 
 /** Cuánto hay que mantener el dedo (ms) para abrir el menú de ventaja / desventaja. */
 const LONG_PRESS_MS = 450;
@@ -174,6 +182,15 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** ¿Se está usando un objeto? Evita usos dobles por tocar dos veces. */
   #using = false;
+
+  /**
+   * Uso de objeto en curso (para el registro paso a paso y los avisos si falla).
+   * @type {{id: number, itemId: string, name: string, started: number, posted: boolean}|null}
+   */
+  #currentUse = null;
+
+  /** Número del último uso (para distinguir los usos en el registro). */
+  #useCounter = 0;
 
   /**
    * Mensajes del chat que se ven en el panel de resultados: la tarjeta del último objeto usado
@@ -718,24 +735,97 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {Activity} [activity]   Actividad concreta que usar (si no, dnd5e pregunta cuál si hay varias).
    */
   async #useItem(item, mode, event, target, activity) {
-    if ( this.#using ) return;
+    if ( this.#using ) {
+      useWarn(`Uso ignorado (${item.name}): todavía hay otro uso en curso (${this.#currentUse?.name ?? "?"})`);
+      ui.notifications.info(game.i18n.format("BHD.Use.Busy", { name: this.#currentUse?.name ?? item.name }));
+      return;
+    }
     const quick = mode !== "full";
+    const use = { id: ++this.#useCounter, itemId: item.id, name: item.name, started: Date.now(), posted: false };
+    const tag = `Uso ${use.id} (${item.name})`;
     this.#using = true;
+    this.#currentUse = use;
     this.#quickUseItem = quick ? item.id : null;
     this.#fullOptionsItem = quick ? null : item.id;
     this.#pendingAttack = quick ? { itemId: item.id, mode } : null;
     target?.classList.add("bhd-rolling");
-    try {
-      const result = await (activity ?? item).use({ event });
-      const message = result?.message ?? result;
-      if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
-    } finally {
+    beginUse();
+
+    // Deja de bloquear el teléfono (una sola vez por uso): al terminar o si tarda demasiado.
+    let released = false;
+    const release = () => {
+      if ( released ) return;
+      released = true;
+      endUse();
+      target?.classList.remove("bhd-rolling");
+      if ( this.#currentUse !== use ) return;
       this.#using = false;
+      this.#currentUse = null;
       this.#quickUseItem = null;
       // El ataque automático llega justo después del uso; pasado un momento ya no se aplica.
       if ( this.#pendingAttack ) this.#pendingAttack.time = Date.now();
-      target?.classList.remove("bhd-rolling");
+    };
+    const guard = setTimeout(() => {
+      useWarn(`${tag} | Sigue sin terminar tras ${USE_TIMEOUT / 1000} s: se deja usar otros objetos.`
+        + " ¿Hay una ventana o un botón de la tarjeta esperando?", { closedWindows: getBlockedWindows(use.started) });
+      if ( !use.posted ) ui.notifications.warn(game.i18n.format("BHD.Use.Stuck", { name: item.name }));
+      release();
+    }, USE_TIMEOUT);
+
+    const midi = !!game.modules.get("midi-qol")?.active;
+    useLog(`${tag} | 1. Toque recibido`, {
+      mode, activity: activity ? `${activity.name || activity.type} (${activity.type})` : "elige dnd5e",
+      targets: Array.from(game.user.targets).map(t => t.name), midiQOL: midi
+    });
+    try {
+      // Con Midi QOL: los objetivos ya se eligieron en el teléfono. Su ventana de confirmar objetivos
+      // se maneja tocando fichas en el mapa (que el teléfono no tiene) y falla, así que no se pide.
+      const usage = { event };
+      if ( midi ) usage.midiOptions = { workflowOptions: { targetConfirmation: "none" } };
+      useLog(`${tag} | 2. Llamando a ${activity ? "activity.use()" : "item.use()"}${midi ? " (Midi QOL toma el control, sin confirmar objetivos)" : ""}`);
+      const result = await (activity ?? item).use(usage);
+      const message = result?.message ?? result;
+      if ( message instanceof foundry.documents.ChatMessage ) {
+        useLog(`${tag} | 6. Uso terminado`, { message: message.id });
+        this.#openTray(message);
+      }
+      else if ( use.posted ) useLog(`${tag} | 6. Uso terminado (la tarjeta ya está en el chat)`);
+      else {
+        const closed = getBlockedWindows(use.started);
+        useWarn(`${tag} | 6. El uso terminó sin tarjeta en el chat (cancelado o detenido)`, { result: String(result), closedWindows: closed });
+        ui.notifications.warn(game.i18n.format(closed.length ? "BHD.Use.WindowClosed" : "BHD.Use.NotUsed", { name: item.name }));
+      }
+    } catch(err) {
+      useError(`${tag} | Error al usar`, err);
+      ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: item.name, error: err?.message ?? String(err) }));
+    } finally {
+      clearTimeout(guard);
+      release();
     }
+  }
+
+  /**
+   * Prefijo del registro para una actividad del uso en curso (o null si no es de ese uso).
+   * @param {Activity} activity
+   * @returns {string|null}
+   */
+  #useTag(activity) {
+    const use = this.#currentUse;
+    if ( !use || (activity?.item?.id !== use.itemId) || (activity.actor !== this.actor) ) return null;
+    return `Uso ${use.id} (${use.name})`;
+  }
+
+  /**
+   * Hooks de Midi QOL: solo anotan en el registro por qué paso va su flujo.
+   * @param {string} hook
+   * @param {object} workflow
+   */
+  onMidiHook(hook, workflow) {
+    const activity = workflow?.activity ?? workflow;
+    const tag = this.#useTag(activity);
+    if ( !tag ) return;
+    const targets = workflow?.targets ? Array.from(workflow.targets).map(t => t?.name) : undefined;
+    useLog(`${tag} | Midi QOL: ${hook}`, targets ? { targets } : {});
   }
 
   /**
@@ -747,11 +837,14 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {object} dialogConfig
    */
   onPreUseActivity(activity, usageConfig, dialogConfig) {
+    const tag = this.#useTag(activity);
+    if ( tag ) useLog(`${tag} | 3. dnd5e.preUseActivity: ${activity.name || activity.type} (${activity.type})`);
     if ( (activity.actor !== this.actor) || (activity.item.id !== this.#quickUseItem) ) return;
     const simple = SIMPLE_ACTIVITY_TYPES.has(activity.type)
       && ((usageConfig.scaling === false) || hasSingleSlotChoice(activity, usageConfig))
       && !usageConfig.concentration?.end;          // no hay que terminar otra concentración
     if ( simple ) dialogConfig.configure = false;
+    if ( tag ) useLog(`${tag} | 3b. Ventana de uso: ${simple ? "se salta (uso sencillo)" : "se muestra"}`);
   }
 
   /**
@@ -765,6 +858,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   onPreRoll(type, config, dialog) {
     const activity = config.subject;
     if ( !activity || (activity.actor !== this.actor) ) return;
+    const tag = this.#useTag(activity);
+    if ( tag ) useLog(`${tag} | 5. Preparando tirada de ${type === "attack" ? "ataque" : "daño"}`);
     if ( activity.item.id === this.#fullOptionsItem ) return;
     dialog.configure = false;
     if ( type !== "attack" ) return;
@@ -783,6 +878,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {ChatMessage} message
    */
   #openTray(message) {
+    // Ya se muestra (p. ej. se abrió al crearse la tarjeta): no se pierden las tiradas añadidas.
+    if ( this.#trayMessages[0] === message.id ) return;
     this.#trayMessages = [message.id];
     this.#renderTray();
   }
@@ -846,6 +943,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   onActivityRoll(type, rolls, subject) {
     const actor = this.actor;
     if ( !actor || !rolls?.length || (subject?.actor !== actor) ) return;
+    const tag = this.#useTag(subject);
+    if ( tag ) useLog(`${tag} | 5b. Tirada de ${type === "attack" ? "ataque" : "daño"}: ${rolls.map(r => r.total).join(", ")}`);
     const name = subject.item?.name ?? "";
     const result = (this.#hudResult?.itemId === subject.item?.id) ? this.#hudResult : null;
     if ( type === "attack" ) {
@@ -888,8 +987,12 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const need = getTargetNeed(activities.length ? activities : (item.system.activities?.contents ?? []));
     if ( need ) {
       const ids = await this.#pickTargets({ title: item.name, img: item.img, max: need.max });
-      if ( ids === null ) return;
+      if ( ids === null ) {
+        useLog(`HUD (${item.name}) | Selector de objetivos cancelado`);
+        return;
+      }
       setTargets(ids);
+      useLog(`HUD (${item.name}) | Objetivos elegidos`, Array.from(game.user.targets).map(t => t.name));
     }
     this.#hudUse = { itemId: item.id, block: (block === "opportunity") ? "reaction" : block };
     try {
@@ -905,8 +1008,16 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * empieza a mostrar el resultado.
    * @param {Activity} activity
    */
-  onPostUseActivity(activity) {
+  onPostUseActivity(activity, results) {
     if ( activity.actor !== this.actor ) return;
+    const tag = this.#useTag(activity);
+    if ( tag ) {
+      const message = results?.message;
+      useLog(`${tag} | 4. dnd5e.postUseActivity: tarjeta creada`, { message: message?.id ?? null });
+      this.#currentUse.posted = true;
+      // Con Midi QOL el uso puede tardar en terminar (espera su flujo): la tarjeta se muestra ya.
+      if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
+    }
     const hud = (this.#hudUse?.itemId === activity.item.id) ? this.#hudUse : null;
     const block = hud?.block ?? activity.activation?.type;
     const own = getOwnCombatant(this.actor);

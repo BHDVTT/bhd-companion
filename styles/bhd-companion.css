@@ -1388,6 +1388,29 @@ body.bhd-mobile :is(.application:has(> .window-header), .window-app) > .window-c
   overscroll-behavior: contain;
 }
 
+/* Ventanas de otros módulos que forman parte de un uso (p. ej. confirmar objetivos de Midi QOL):
+   botones y casillas fáciles de tocar, imágenes que no se salen y tablas con desplazamiento propio. */
+body.bhd-mobile .bhd-foreign-window > .window-content :is(button, select, input[type="text"], input[type="number"]) {
+  min-height: 44px;
+  height: auto;
+}
+
+body.bhd-mobile .bhd-foreign-window > .window-content input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+}
+
+body.bhd-mobile .bhd-foreign-window > .window-content :is(img, video) {
+  max-width: 100%;
+  height: auto;
+}
+
+body.bhd-mobile .bhd-foreign-window > .window-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 body.bhd-mobile :is(.application:has(> .window-header), .window-app) .window-resize-handle {
   display: none;
 }
