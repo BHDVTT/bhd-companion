@@ -85,14 +85,8 @@
   </section>
   {{#if sheet.speed.others}}<p class="bhd-speed-others">{{sheet.speed.others}}</p>{{/if}}
 
-  {{!-- Condiciones activas --}}
-  {{#if sheet.conditions.length}}
-  <section class="bhd-conditions">
-    {{#each sheet.conditions}}
-    <span class="bhd-condition"><img src="{{img}}" alt=""> {{label}}</span>
-    {{/each}}
-  </section>
-  {{/if}}
+  {{!-- Concentración, condiciones y efectos (tocar una condición la explica) --}}
+  {{#if status}}{{> "modules/bhd-companion/templates/mobile/status.hbs" status=status}}{{/if}}
 
   {{!-- Descansos --}}
   <section class="bhd-card bhd-rest">

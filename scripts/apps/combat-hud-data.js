@@ -80,9 +80,10 @@ export function getTargetNeed(activities) {
  * Datos del HUD de turno, o null si el personaje no está en un combate empezado.
  * @param {Actor|null} actor
  * @param {string|null} openBlock  Bloque abierto ("action", "bonus" o "reaction").
+ * @param {QuickActionState} [state]  Botones de tirada: nivel elegido, lanzamientos, críticos.
  * @returns {object|null}
  */
-export function prepareHud(actor, openBlock) {
+export function prepareHud(actor, openBlock, state) {
   const own = getOwnCombatant(actor);
   if ( !own ) return null;
   const { combat, combatant } = own;
@@ -103,7 +104,7 @@ export function prepareHud(actor, openBlock) {
   return {
     blocks,
     isMyTurn: isActorCombatant(combat.combatant, actor),
-    panel: panelBlock ? preparePanel(actor, panelBlock) : null,
+    panel: panelBlock ? preparePanel(actor, panelBlock, state) : null,
     targets: prepareTargetChips()
   };
 }
@@ -138,9 +139,10 @@ function prepareMoveBlock(actor, combatant, dashed) {
  * acciones básicas (bloque Acción) o el ataque de oportunidad (bloque Reacción).
  * @param {Actor} actor
  * @param {object} block
+ * @param {QuickActionState} [state]
  * @returns {object}
  */
-function preparePanel(actor, block) {
+function preparePanel(actor, block, state) {
   const groups = { attacks: [], spells: [], features: [], items: [] };
   const opportunity = [];
   for ( const item of actor.items ) {
@@ -167,8 +169,9 @@ function preparePanel(actor, block) {
 
   const byName = (a, b) => a.name.localeCompare(b.name, game.i18n.lang);
   const byLevel = (a, b) => ((a.system.level ?? 0) - (b.system.level ?? 0)) || byName(a, b);
+  // Los botones de cada fila usan solo las actividades de ese bloque (un arma con la reacción: su ataque).
   const toRows = (items, hudBlock, sort=byName) => items.sort(sort).map(item => ({
-    ...prepareRow(item, { showLevel: true }), hudBlock
+    ...prepareRow(item, { showLevel: true, state, activities: getBlockActivities(item, hudBlock) }), hudBlock
   }));
 
   const sections = [

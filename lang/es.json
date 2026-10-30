@@ -58,12 +58,12 @@
       "Empty": "Tu personaje no tiene armas equipadas, hechizos, rasgos ni consumibles que usar.",
       "NoneForFilter": "Nada de este tipo.",
       "NoSpellsFound": "Ningún hechizo coincide con la búsqueda.",
-      "TapToUse": "Toca para usar y tirar directo. Mantén presionado para ventaja, desventaja o más opciones. Las tiradas salen en el chat (en la TV).",
+      "TapToUse": "Toca Ataque, Daño o la CD para tirar (sale en el chat de la TV). Mantén presionado Ataque para ventaja o desventaja, y Daño para elegir normal o crítico. Toca el nombre para ver la descripción.",
       "Advantage": "Ventaja",
       "Normal": "Normal",
       "Disadvantage": "Desventaja",
       "Use": "Usar",
-      "MoreOptions": "Más opciones…",
+      "MoreOptions": "Ventana de dnd5e (munición, modo de ataque…)",
       "Cancel": "Cancelar",
       "Attack": "Ataque",
       "Damage": "Daño",
@@ -72,7 +72,20 @@
       "TemplatePlaced": "Área colocada sobre tu ficha en el mapa. El DM puede moverla o girarla.",
       "TemplateNoScene": "No hay una escena activa donde colocar el área.",
       "TemplateNoPermission": "No tienes permiso para colocar áreas en el mapa. Pídeselo al DM.",
-      "TemplateFailed": "No se pudo colocar el área en el mapa."
+      "TemplateFailed": "No se pudo colocar el área en el mapa.",
+      "Save": "Salvación",
+      "Critical": "¡Crítico!",
+      "Heal": "Curar",
+      "SaveDC": "CD {dc} {ability}",
+      "SlotLevel": "Nv. {level} ({n})",
+      "SlotPact": "Pacto nv. {level} ({n})",
+      "SlotChoose": "Nivel del espacio de conjuro",
+      "Cast": "Lanzado",
+      "CastAt": "Lanzado nv. {level}",
+      "EndCast": "Terminar este lanzamiento: el próximo botón lo vuelve a lanzar",
+      "AlreadyCast": "{name} ya está lanzado. Para lanzarlo otra vez, toca «Lanzado ✕» en su fila.",
+      "NormalDamage": "Daño normal",
+      "CriticalDamage": "Daño crítico (dados dobles)"
     },
     "Combat": {
       "None": "No hay combate",
@@ -111,20 +124,8 @@
         "Dead": "Tu personaje ha muerto."
       }
     },
-    "Remote": {
-      "NoSocketlib": "No se pudo usar {name}: en modo ligero hace falta el módulo socketlib activo.",
-      "NoGM": "No se pudo usar {name}: el DM no está conectado.",
-      "GMNotViewing": "No se pudo usar {name}: el DM no está viendo la escena de la TV.",
-      "NotOwner": "No se pudo usar {name}: el DM no ve que este personaje sea tuyo.",
-      "NotFound": "No se pudo usar {name}: el DM no encontró el objeto.",
-      "Cancelled": "{name} no se usó (se canceló o faltó algo: objetivo, espacio de conjuro o usos).",
-      "Error": "No se pudo usar {name} en el PC del DM: {error}"
-    },
     "Use": {
       "Busy": "Espera: todavía se está usando {name}.",
-      "NotUsed": "{name} no se usó (se canceló o faltó algo: objetivo, espacio de conjuro o usos). Si sigue pasando, avisa al DM.",
-      "WindowClosed": "{name} no se usó: se cerró una ventana que hacía falta. Avisa al DM (los detalles están en su consola).",
-      "Stuck": "{name} sigue esperando algo (una ventana o un botón de la tarjeta del chat). Ya puedes usar otra cosa; si no sale nada, avisa al DM.",
       "Error": "No se pudo usar {name}: {error}. Avisa al DM (los detalles están en su consola)."
     },
     "Hud": {
@@ -156,7 +157,7 @@
         "Miss": "Falla",
         "Critical": "¡Crítico!",
         "Fumble": "Pifia",
-        "DamageHint": "Toca «Daño» (o «Curación») en la tarjeta de abajo para tirarlo."
+        "DamageHint": "Toca «Daño» en la fila para tirarlo."
       },
       "Picker": {
         "One": "Toca a quién apuntas. Se verá en la TV.",
@@ -334,10 +335,6 @@
         "Hint": "La pantalla no se apaga sola mientras la vista está abierta. Gasta algo más de batería.",
         "Unsupported": "Este navegador no lo permite (hace falta HTTPS, como en The Forge, y un navegador reciente)."
       },
-      "LightMode": {
-        "Name": "Modo ligero (aparatos lentos)",
-        "Hint": "Este aparato no carga el mapa. Con Midi QOL, los ataques y hechizos los hace el PC del DM (necesita socketlib). La página se recarga."
-      },
       "PhoneMusic": {
         "Name": "Música en el teléfono",
         "Hint": "Normalmente la música suena solo en la TV. Actívalo para oírla también aquí (gasta datos y batería)."
@@ -381,6 +378,71 @@
         "Name": "Usar la interfaz normal en este dispositivo",
         "Hint": "Si está marcado, este navegador no mostrará la vista móvil aunque sea un teléfono."
       }
+    },
+    "Status": {
+      "Title": "Estado",
+      "Concentrating": "Concentrado en",
+      "EndConcentration": "Terminar",
+      "EndConcentrationTitle": "¿Terminar la concentración?",
+      "EndConcentrationContent": "¿Dejar de concentrarte en {name}? El hechizo termina.",
+      "ConcentrationReplaced": "Dejas de concentrarte en {name}: solo puedes concentrarte en un hechizo a la vez.",
+      "ExhaustionLevel": "Nivel {level}",
+      "NoDescription": "Sin descripción."
+    },
+    "Save": {
+      "Title": "¡Tira una salvación!",
+      "ConcentrationTitle": "¡Mantén la concentración!",
+      "From": "Lo pide: {source}",
+      "Button": "Salvación de {ability}",
+      "ConcentrationButton": "Concentración ({ability})",
+      "ConcentrationSource": "Recibiste daño",
+      "Later": "Ahora no",
+      "More": "+{count} más después de esta",
+      "Success": "Éxito",
+      "Failure": "Fallo"
+    },
+    "Conditions": {
+      "blinded": "No ves. Fallas las pruebas que necesitan la vista. Tus ataques tienen desventaja y los ataques contra ti tienen ventaja.",
+      "charmed": "No puedes atacar ni dañar a quien te hechizó. Esa criatura tiene ventaja en las pruebas para relacionarse contigo.",
+      "deafened": "No oyes. Fallas las pruebas que necesitan el oído.",
+      "exhaustion": "Cada nivel resta 2 a tus tiradas d20 (ataques, pruebas y salvaciones) y 5 pies a tu velocidad. Un descanso largo quita un nivel. Con 6 niveles, mueres.",
+      "exhaustionLegacy": "Nivel 1: desventaja en pruebas de característica. 2: velocidad a la mitad. 3: desventaja en ataques y salvaciones. 4: PG máximos a la mitad. 5: velocidad 0. 6: muerte. Un descanso largo quita un nivel.",
+      "frightened": "Desventaja en pruebas y ataques mientras veas lo que te asusta. No puedes acercarte a ello por tu voluntad.",
+      "grappled": "Tu velocidad es 0. Desventaja en ataques contra cualquiera que no sea quien te agarra. Quien te agarra puede arrastrarte.",
+      "incapacitated": "No puedes hacer acciones, acciones adicionales ni reacciones, ni hablar. Pierdes la concentración. Desventaja en la iniciativa.",
+      "invisible": "Nadie te ve. Ventaja en tu iniciativa y en tus ataques; los ataques contra ti tienen desventaja (salvo que te vean de otra forma).",
+      "paralyzed": "Estás incapacitado y tu velocidad es 0. Fallas las salvaciones de Fuerza y Destreza. Los ataques contra ti tienen ventaja y, a 5 pies, todo impacto es crítico.",
+      "petrified": "Eres de piedra: incapacitado, velocidad 0, fallas las salvaciones de Fuerza y Destreza, resistes todo el daño y eres inmune al veneno. Los ataques contra ti tienen ventaja.",
+      "poisoned": "Desventaja en tus tiradas de ataque y en tus pruebas de característica.",
+      "prone": "Estás en el suelo: solo puedes arrastrarte o levantarte (cuesta la mitad de tu velocidad). Tus ataques tienen desventaja. Contra ti: ventaja a 5 pies, desventaja desde más lejos.",
+      "restrained": "Tu velocidad es 0. Tus ataques y tus salvaciones de Destreza tienen desventaja. Los ataques contra ti tienen ventaja.",
+      "stunned": "Estás incapacitado. Fallas las salvaciones de Fuerza y Destreza. Los ataques contra ti tienen ventaja.",
+      "unconscious": "Estás incapacitado, en el suelo y sueltas lo que llevas. Velocidad 0, fallas las salvaciones de Fuerza y Destreza. Los ataques contra ti tienen ventaja y, a 5 pies, todo impacto es crítico.",
+      "surprised": "Te pillaron por sorpresa: tienes desventaja en la tirada de iniciativa.",
+      "bleeding": "Estás sangrando: pierdes vida hasta que te curen o se detenga la herida. El DM te dirá cuánto.",
+      "burning": "Estás en llamas: recibes 1d4 de daño de fuego al empezar cada turno. Con una acción te apagas (quedas en el suelo).",
+      "cursed": "Estás bajo una maldición. El DM te dirá qué efecto tiene.",
+      "diseased": "Tienes una enfermedad. El DM te dirá sus efectos.",
+      "dehydration": "Te falta agua: ganas niveles de cansancio hasta que bebas.",
+      "malnutrition": "Te falta comida: ganas niveles de cansancio hasta que comas.",
+      "suffocation": "No puedes respirar: al acabarse el aire, ganas un nivel de cansancio al final de cada turno.",
+      "falling": "Estás cayendo. Al llegar al suelo recibes 1d6 de daño contundente por cada 10 pies (máximo 20d6) y quedas en el suelo.",
+      "silenced": "No puedes hablar: no puedes lanzar hechizos con componente verbal.",
+      "transformed": "Tu forma cambió (por ejemplo, Forma salvaje o Polimorfar): tus estadísticas pueden ser otras.",
+      "dead": "Tu personaje ha muerto.",
+      "dodging": "Hasta tu próximo turno, los ataques contra ti tienen desventaja y tienes ventaja en las salvaciones de Destreza.",
+      "ethereal": "Estás en el Plano Etéreo: no afectas a lo que hay en el mundo normal ni te afecta (salvo excepciones).",
+      "flying": "Estás volando. Si quedas en el suelo o tu velocidad baja a 0, caes.",
+      "hovering": "Flotas en el aire: no caes aunque quedes derribado.",
+      "burrowing": "Estás excavando bajo tierra.",
+      "hiding": "Estás escondido: no saben dónde estás y tienes ventaja en tu próximo ataque. Se acaba si haces ruido, atacas o te encuentran.",
+      "marked": "Estás marcado por un efecto (por ejemplo, Marca del cazador o Maleficio).",
+      "sleeping": "Estás dormido: inconsciente hasta que recibas daño o alguien te despierte.",
+      "stable": "Estás estable a 0 PG: ya no tiras salvaciones de muerte. Recuperas 1 PG en 1d4 horas.",
+      "coverHalf": "Media cobertura: +2 a tu CA y a tus salvaciones de Destreza.",
+      "coverThreeQuarters": "Tres cuartos de cobertura: +5 a tu CA y a tus salvaciones de Destreza.",
+      "coverTotal": "Cobertura total: no pueden atacarte directamente ni apuntarte con hechizos.",
+      "bloodied": "Te queda la mitad de tus PG o menos."
     }
   }
 }

@@ -593,30 +593,6 @@ body.bhd-mobile {
   text-align: center;
 }
 
-/* Condiciones */
-#bhd-mobile-app .bhd-conditions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-#bhd-mobile-app .bhd-condition {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px 4px 4px;
-  border: 1px solid var(--bhd-red);
-  border-radius: 16px;
-  background: rgba(179, 32, 42, 0.2);
-  font-size: calc(14px * var(--bhd-text-scale, 1));
-}
-
-#bhd-mobile-app .bhd-condition img {
-  width: 22px;
-  height: 22px;
-  border: none;
-}
-
 /* Títulos de sección */
 #bhd-mobile-app .bhd-section-title {
   margin: 8px 0 -4px;
@@ -875,9 +851,12 @@ body.bhd-mobile {
   background: var(--bhd-surface);
 }
 
+/* Fila: nombre arriba y botones de tirada debajo (teléfono); en tableta, botones a la derecha */
 #bhd-mobile-app .bhd-action {
-  display: flex;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 8px 10px 10px;
   border-bottom: 1px solid var(--bhd-border);
 }
 
@@ -885,25 +864,26 @@ body.bhd-mobile {
   border-bottom: none;
 }
 
-#bhd-mobile-app .bhd-action-use {
-  flex: 1;
+#bhd-mobile-app .bhd-action.bhd-cast-active {
+  box-shadow: inset 4px 0 0 var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-action-main {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 60px;
-  padding: 8px 4px 8px 10px;
+  width: 100%;
+  height: auto;
+  min-height: var(--bhd-touch);
+  padding: 0;
   border: none;
-  border-radius: 0;
+  border-radius: 8px;
   background: transparent;
   text-align: left;
 }
 
-#bhd-mobile-app .bhd-action-use:active {
-  background: var(--bhd-gold-soft);
-}
-
-#bhd-mobile-app .bhd-action-use.bhd-rolling {
-  opacity: 0.6;
+#bhd-mobile-app .bhd-action-main:active {
+  background: var(--bhd-surface-2);
 }
 
 #bhd-mobile-app .bhd-action-img {
@@ -920,6 +900,7 @@ body.bhd-mobile {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 #bhd-mobile-app .bhd-action-name {
@@ -948,15 +929,6 @@ body.bhd-mobile {
   overflow-wrap: anywhere;
 }
 
-#bhd-mobile-app .bhd-action-roll {
-  flex: none;
-  min-width: 40px;
-  font-size: calc(17px * var(--bhd-text-scale, 1));
-  font-weight: bold;
-  text-align: center;
-  white-space: nowrap;
-}
-
 #bhd-mobile-app .bhd-uses {
   flex: none;
   min-width: 44px;
@@ -977,21 +949,210 @@ body.bhd-mobile {
   color: var(--bhd-text-muted);
 }
 
-#bhd-mobile-app .bhd-action-info {
-  flex: none;
-  width: var(--bhd-touch);
-  padding: 0;
-  border: none;
-  border-left: 1px solid var(--bhd-border);
-  border-radius: 0;
-  background: transparent;
-  color: var(--bhd-text-muted);
-  font-size: calc(18px * var(--bhd-text-scale, 1));
+#bhd-mobile-app .bhd-action-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
 }
 
-#bhd-mobile-app .bhd-action-info:active {
+#bhd-mobile-app .bhd-roll-buttons {
+  flex: 1 1 100%;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Botones de tirada: grandes, con lo que tiran bien visible (+5, 1d8 + 3, CD 13 DES) */
+#bhd-mobile-app .bhd-roll-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  height: auto;
+  min-height: 58px;
+  padding: 6px 8px;
+  border: 2px solid var(--bhd-border);
+  border-radius: 10px;
   background: var(--bhd-surface-2);
   color: var(--bhd-text);
+  line-height: 1.1;
+  text-align: center;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#bhd-mobile-app .bhd-roll-btn:active {
+  filter: brightness(1.3);
+  transform: scale(0.97);
+}
+
+#bhd-mobile-app .bhd-roll-btn.bhd-rolling {
+  opacity: 0.55;
+}
+
+#bhd-mobile-app .bhd-roll-btn i {
+  margin: 0;
+}
+
+#bhd-mobile-app .bhd-roll-caption {
+  font-size: calc(11px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+  color: var(--bhd-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#bhd-mobile-app .bhd-roll-value {
+  max-width: 100%;
+  font-size: calc(19px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+#bhd-mobile-app .bhd-roll-detail {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: calc(11px * var(--bhd-text-scale, 1));
+  color: var(--bhd-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#bhd-mobile-app .bhd-roll-attack {
+  border-color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-roll-attack .bhd-roll-value {
+  color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-roll-damage {
+  border-color: var(--bhd-red-bright);
+}
+
+#bhd-mobile-app .bhd-roll-damage.bhd-crit {
+  border-color: #ffcf5a;
+  background: var(--bhd-red);
+  box-shadow: 0 0 12px rgba(255, 207, 90, 0.5);
+}
+
+#bhd-mobile-app .bhd-roll-damage.bhd-crit .bhd-roll-caption,
+#bhd-mobile-app .bhd-roll-damage.bhd-crit .bhd-roll-detail {
+  color: #fff;
+}
+
+#bhd-mobile-app .bhd-roll-save {
+  border-color: #4f86c6;
+}
+
+#bhd-mobile-app .bhd-roll-save .bhd-roll-value {
+  color: #8db8ea;
+}
+
+#bhd-mobile-app .bhd-roll-heal {
+  border-color: #3f9a4a;
+}
+
+#bhd-mobile-app .bhd-roll-heal .bhd-roll-value {
+  color: #7fd08a;
+}
+
+#bhd-mobile-app .bhd-roll-use {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold-soft);
+  flex-direction: row;
+}
+
+/* Nivel del hechizo, dentro de la fila */
+#bhd-mobile-app .bhd-slot-select {
+  flex: 1 1 auto;
+  display: flex;
+}
+
+#bhd-mobile-app .bhd-slot-select select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 10px;
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text);
+  font-size: calc(15px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-cast-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: auto;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--bhd-gold);
+  border-radius: 22px;
+  background: var(--bhd-gold-soft);
+  color: var(--bhd-gold);
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+#bhd-mobile-app .bhd-cast-chip i {
+  margin: 0;
+}
+
+#bhd-mobile-app .bhd-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Tableta (iPad): como D&D Beyond, nombre a la izquierda y los botones en columnas a la derecha */
+@media (min-width: 700px) {
+  #bhd-mobile-app .bhd-action {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  #bhd-mobile-app .bhd-action-controls {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+
+  /* Dos columnas fijas a la derecha (como D&D Beyond): los selectores de nivel quedan alineados */
+  #bhd-mobile-app .bhd-roll-buttons {
+    flex: none;
+    grid-auto-columns: minmax(104px, max-content);
+    justify-content: end;
+    min-width: 214px;
+  }
+
+  #bhd-mobile-app .bhd-roll-btn {
+    min-height: 54px;
+  }
+
+  #bhd-mobile-app .bhd-roll-value {
+    white-space: nowrap;
+  }
+
+  #bhd-mobile-app .bhd-slot-select {
+    flex: none;
+    width: 150px;
+  }
 }
 
 /* Hechizos */
@@ -1293,11 +1454,9 @@ body.bhd-mobile {
   background: rgba(179, 32, 42, 0.2);
 }
 
-#bhd-mobile-app .bhd-mode-use {
-  border-color: var(--bhd-gold);
-  background: var(--bhd-gold-soft);
-  flex-direction: row;
-  min-height: 56px;
+#bhd-mobile-app .bhd-mode-crit {
+  border-color: #ffcf5a;
+  background: rgba(179, 32, 42, 0.45);
 }
 
 #bhd-mobile-app .bhd-chooser-cancel {
@@ -1310,12 +1469,8 @@ body.bhd-mobile {
   filter: brightness(1.3);
 }
 
-/* Toque largo: sin menú del sistema ni arrastrar la imagen */
-#bhd-mobile-app .bhd-action-use {
-  -webkit-touch-callout: none;
-}
-
-#bhd-mobile-app .bhd-action-use img {
+/* Filas: sin menú del sistema ni arrastrar la imagen */
+#bhd-mobile-app .bhd-action-main img {
   pointer-events: none;
   -webkit-user-drag: none;
 }
@@ -2219,6 +2374,11 @@ body.bhd-mobile .bhd-item-info-sub {
   background: var(--bhd-surface-2);
 }
 
+#bhd-mobile-app .bhd-hud-panel .bhd-roll-btn,
+#bhd-mobile-app .bhd-hud-panel .bhd-slot-select select {
+  background: var(--bhd-surface);
+}
+
 #bhd-mobile-app .bhd-hud-basics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2660,6 +2820,76 @@ body.bhd-mobile .bhd-item-info-sub {
 
 #bhd-mobile-app .bhd-turn-alert .bhd-big-btn {
   margin-top: 12px;
+}
+
+/* Aviso de salvación pendiente (encima del aviso de turno) */
+#bhd-mobile-app .bhd-save-alert {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle, rgba(30, 52, 92, 0.96) 0%, rgba(10, 8, 12, 0.98) 75%);
+  animation: bhd-alert-in 0.25s ease-out;
+}
+
+#bhd-mobile-app .bhd-save-alert[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-save-alert-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+#bhd-mobile-app .bhd-save-alert-icon {
+  font-size: calc(64px * var(--bhd-text-scale, 1));
+  color: #8db8ea;
+  animation: bhd-pulse 1.2s ease-in-out infinite;
+}
+
+#bhd-mobile-app .bhd-save-concentration .bhd-save-alert-icon {
+  color: #b9a2f0;
+}
+
+#bhd-mobile-app .bhd-save-alert-title {
+  font-size: calc(34px * var(--bhd-text-scale, 1));
+  line-height: 1.1;
+  color: #fff;
+}
+
+#bhd-mobile-app .bhd-save-alert-source,
+#bhd-mobile-app .bhd-save-alert-more {
+  font-size: calc(16px * var(--bhd-text-scale, 1));
+  color: var(--bhd-text);
+}
+
+#bhd-mobile-app .bhd-save-alert-roll {
+  width: 100%;
+  margin-top: 8px;
+  height: auto;
+  min-height: 64px;
+  border-color: #4f86c6;
+  background: #23477a;
+  font-size: calc(19px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-save-alert-later {
+  height: auto;
+  min-height: var(--bhd-touch);
+  padding: 0 20px;
+  border: none;
+  background: transparent;
+  color: var(--bhd-text-muted);
+  font-size: calc(16px * var(--bhd-text-scale, 1));
+  font-weight: bold;
 }
 
 @keyframes bhd-alert-in {
@@ -3135,4 +3365,110 @@ body.bhd-mobile .bhd-offline-reload {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ------------------------------------------ */
+/*  Concentración y condiciones                */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-status {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-concentration {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #7b5fc7;
+  border-radius: 12px;
+  background: rgba(123, 95, 199, 0.16);
+}
+
+#bhd-mobile-app .bhd-concentration-img {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+#bhd-mobile-app .bhd-concentration-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#bhd-mobile-app .bhd-concentration-label {
+  font-size: calc(12px * var(--bhd-text-scale, 1));
+  color: #b9a2f0;
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-concentration-name {
+  font-size: calc(16px * var(--bhd-text-scale, 1));
+  overflow-wrap: anywhere;
+}
+
+#bhd-mobile-app .bhd-concentration-end {
+  flex: none;
+  height: auto;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--bhd-red-bright);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--bhd-text);
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#bhd-mobile-app .bhd-condition {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: auto;
+  min-height: 40px;
+  padding: 4px 12px 4px 6px;
+  border: 1px solid var(--bhd-red-bright);
+  border-radius: 20px;
+  background: rgba(179, 32, 42, 0.2);
+  color: var(--bhd-text);
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-condition.bhd-effect {
+  border-color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-condition img {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.bhd-dialog .bhd-status-info-img {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 8px;
+  padding: 8px;
+  border: none;
+  border-radius: 50%;
+  background: #27232c;
 }

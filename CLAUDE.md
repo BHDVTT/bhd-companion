@@ -61,18 +61,20 @@ scripts/apps/move-data.js       datos de la pestaña Mover (ficha, pies usados /
 scripts/apps/combat-hud-data.js datos del HUD de combate (bloques, opciones por bloque, tarjetas de objetivos)
 scripts/movement.js          mover fichas desde el teléfono: reglas, canal del módulo, lado del DM, seguir en la TV
 scripts/economy.js           acción / adicional / reacción / Correr usados en el turno (flag del combatiente)
-scripts/targets.js           objetivos: fichas reales del mapa oculto; sin mapa, PhoneTarget; aviso a la TV
+scripts/targets.js           objetivos sin mapa (PhoneTarget) y aviso a la TV
+scripts/quick-actions.js     botones de tirada de cada fila (Ataque / Daño / CD / Curar / Usar), nivel, lanzamientos
+scripts/save-prompts.js      salvaciones pendientes que pide el chat (hechizo del DM, concentración, petición)
+scripts/apps/status-data.js  concentración, condiciones (con explicación) y efectos activos
 scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
 scripts/mobile-windows.js    qué ventanas se permiten en vista móvil (cierra las de otros módulos), una a la vez
-scripts/remote-use.js        modo ligero: el PC del DM usa la actividad por el jugador (socketlib)
-scripts/use-log.js           registro paso a paso de los usos del teléfono (consola del teléfono y del DM)
+scripts/use-log.js           registro de los usos del teléfono (consola del teléfono y del DM)
 scripts/connection.js        reconexión sin límite y aviso "Sin conexión" en vista móvil
 scripts/wake-lock.js         pantalla siempre encendida (Screen Wake Lock API)
 scripts/home-screen.js       manifiesto de app web y etiquetas apple-* (añadir a pantalla de inicio)
 icons/icon-{180,192,512}.png icono de la app (generado con System.Drawing de PowerShell)
 templates/mobile/*.hbs       partes de la vista: header, main, turn, nav; parciales de pestaña:
-                             character.hbs, actions.hbs, action-row.hbs, combat.hbs, death-saves.hbs,
+                             character.hbs, actions.hbs, action-row.hbs, combat.hbs, death-saves.hbs, status.hbs,
                              inventory.hbs, inventory-row.hbs, inventory-container.hbs, notes.hbs, move.hbs;
                              settings.hbs y target-picker.hbs (se dibujan con renderTemplate)
 styles/bhd-companion.css     estilos
@@ -94,23 +96,12 @@ lang/es.json, en.json        traducciones
   El GM nunca. `?bhd=mobile` manda sobre `preferNormal`; "Volver a la interfaz normal" y el botón
   "Vista móvil" recargan sin el `?bhd=` (`reloadWithoutUrlMode`). La decisión y los datos del
   dispositivo salen en consola.
-- **Mapa oculto (desde 0.9.0):** el teléfono **sí carga el mapa** (Midi QOL necesita fichas `Token`: sin ellas
-  fallaba con "You must provide an embedded Document instance as the input for a PlaceableObject"), oculto y
-  barato (`prepareHiddenCanvas`): hook `canvasConfig` (resolución 0.5, `low-power`), `_configurePerformanceMode`
-  envuelto (modo LOW, sin msaa/smaa/mipmaps, `lightSoftEdges: false`, 10 FPS), `EffectsCanvasGroup#activateAnimation`
-  sin animar luces, `canvas.stage.renderable = false` (no se pinta nada, también FXMaster / Sequencer) y
-  `SoundsLayer#_syncPositions` sin oyentes salvo `phoneMusic`. Dice So Nice (`diceSoNiceMessagePreProcess`,
-  `messageHookDisabled`, `showForRoll`, `#dice-box-canvas` oculto) y `Sequencer.EffectManager._playEffect`
-  se anulan en el teléfono. Nunca con `game.settings.set` ni sustituyendo `get` (The Forge sincroniza).
-  `followToken` no se ejecuta en vista móvil. Objetivos: `canvas.tokens.setTargets` con las fichas reales.
-- **Modo ligero** (ajuste del teléfono `lightMode`, recarga): sin mapa, como antes de 0.9.0 (lo de abajo). Con
-  Midi QOL y sin mapa (o el mapa en otra escena que la activa), `shouldUseRemotely` → `#useRemotely`: el
-  teléfono elige actividad y pide por socketlib (`executeAsGM("useActivity")`) al DM, que comprueba dueño,
-  pone los objetivos del jugador como suyos (debe ver la escena activa), hace `activity.use` con
-  `configure: false` y `workflowOptions` (sin confirmar objetivos, ataque / daño automáticos, ventaja) y
-  restaura sus objetivos; en cola. El teléfono llama a `onPostUseActivity` con la tarjeta devuelta.
-  Limitación: sin ventana de espacio de conjuro (el que dnd5e propone), sin aviso de total en el teléfono.
-- **Sin mapa (solo modo ligero):** en `mobile-mode.js` `Canvas.prototype.initialize` se vuelve vacío (lo mismo que hace
+- **0.9.0 → 0.10.0:** la 0.9.0 cargaba el mapa oculto (Midi QOL necesitaba fichas `Token`) y tenía un
+  "modo ligero" con socketlib. Desde 0.10.0 Midi QOL y Cauldron están apagados (automatización nativa de
+  dnd5e 5.3): se volvió a **sin mapa** siempre y se quitaron el mapa oculto, el modo ligero, `remote-use.js`,
+  socketlib y todo lo de Midi. Se conserva que Dice So Nice no tire dados 3D en el teléfono
+  (`diceSoNiceMessagePreProcess`, `messageHookDisabled`, `showForRoll`, `#dice-box-canvas` oculto).
+- **Sin mapa:** en `mobile-mode.js` `Canvas.prototype.initialize` se vuelve vacío (lo mismo que hace
   Foundry con `core.noCanvas`): no se crea WebGL, `canvas.initialized/ready` quedan en false. **No se toca
   ni se finge `core.noCanvas`** (0.8.2): antes se sustituía `game.settings.get` y The Forge, que sincroniza
   los ajustes de cliente, guardó `true` y mostraba "Difference in client settings detected". Lo que Foundry
@@ -166,12 +157,11 @@ lang/es.json, en.json        traducciones
 - **Filtros y buscador:** se aplican en `#applyActionFilters` ocultando filas con `hidden`
   (sin volver a dibujar). Cada fila lleva `data-activation` (tipos de activación del objeto y sus
   actividades) y `data-search` (nombre sin acentos). El buscador solo afecta a hechizos.
-- **Usar:** `item.use({ event })`, flujo normal de dnd5e (elegir actividad, ventana de espacio de
-  conjuro, gasto, ataque automático con su ventana de ventaja/desventaja). La tarjeta del chat se
+- **Usar:** ver "Botones de tirada (0.10.0)" más abajo. La tarjeta del chat (o la tirada) se
   muestra en un panel inferior (`.bhd-tray`, fuera de las partes de la plantilla) con
   `message.renderHTML()`, que trae los botones de dnd5e ya conectados (daño, curación...). Los
-  mensajes con `flags.dnd5e.originatingMessage` de esa tarjeta se añaden al panel (hooks
-  `create/update/deleteChatMessage`). El total de ataque/daño sale en el aviso
+  mensajes con `flags.dnd5e.originatingMessage` de esa tarjeta, y las tiradas propias del mismo objeto
+  (`#trayItemId`), se añaden al panel (hooks `create/update/deleteChatMessage`). El total de ataque/daño sale en el aviso
   (hooks `dnd5e.rollAttackV2` / `dnd5e.rollDamageV2`).
 - **Áreas sin mapa** (`scripts/mobile-templates.js`): en vista móvil se sustituye
   `dnd5e.canvas.AbilityTemplate.fromActivity`; captura los datos con el hook
@@ -187,36 +177,35 @@ lang/es.json, en.json        traducciones
   `:is(.application:has(> .window-header), .window-app)`: invisibles sin `.bhd-window`, centradas
   (ancho de pantalla − 16 px; en ≥ 700 px, 560 px) con `!important` sobre la posición en línea;
   sube las variables `--font-size-*`. Diálogos propios nuevos: poner `classes: ["bhd-dialog"]`.
-  Desde 0.8.3 también se permiten las ventanas de Midi QOL (clases `Midi*` / `TargetConfirmation*` o
-  clase CSS `midi*`) y **cualquier** ventana mientras dura un uso del teléfono (`beginUse` / `endUse`);
-  las que no son de dnd5e llevan `.bhd-foreign-window`. Cada ventana cerrada o mostrada sale en consola.
+  Las que no son de dnd5e llevan `.bhd-foreign-window`. Cada ventana cerrada o mostrada sale en consola.
 - **Ventanas compactas** (`scripts/mobile-dialogs.js`, 0.4.1): hook `renderDialog5e` añade
   `.bhd-compact` y pliega partes poco importantes (`FOLDED_PARTS`: en `activity-usage`
   concentración / recursos / área; en `roll-configuration` fórmula y opciones) con un botón
   `.bhd-fold-toggle`. No pliega si hay avisos o un selector de tipo de daño. Lo abierto se recuerda
   por ventana (WeakMap) porque dnd5e redibuja partes al cambiar opciones.
-- **Toque rápido / toque largo** (0.4.1): tocar = `#useItem(item, "normal")`; mantener 450 ms
-  (escuchado en `this.element`, se cancela si el dedo se mueve > 10 px) abre `.bhd-chooser`
-  con Ventaja / Normal / Desventaja (si tiene actividad de ataque) o Usar, y "Más opciones".
-  Hooks en `main.js`: `dnd5e.preUseActivity` → `configure = false` si la actividad es de
-  `SIMPLE_ACTIVITY_TYPES`, `scaling === false` (sin elegir espacio) y no hay que terminar otra
-  concentración; `dnd5e.preRollAttackV2` / `preRollDamageV2` → `dialog.configure = false` y
-  `config.advantage/disadvantage` según `#pendingAttack` (válido 3 s tras el uso). "Más opciones"
-  (`#fullOptionsItem`) deja todas las ventanas de dnd5e para ese objeto. Los hechizos de nivel
-  muestran la ventana de uso (compacta) para elegir el espacio, salvo que `hasSingleSlotChoice`
-  (0.4.2, mismas reglas que `_prepareScalingContext` de dnd5e: `slot.max`, `slot.type`, nivel
-  mínimo, `exclusive.spells/slots`) vea un solo tipo de espacio con usos y sea el que dnd5e ya
-  eligió (p. ej. brujo solo con pacto): entonces se lanza directo y dnd5e gasta ese espacio y
-  escala al nivel del espacio.
-- **Midi QOL y registro de usos** (0.8.3): `#useItem` pasa `midiOptions.workflowOptions.targetConfirmation =
-  "none"` si Midi está activo (su `resolveTargetConfirmation` usa `ui.controls` y fichas del mapa y fallaba
-  sin avisar; los objetivos ya se eligen en el teléfono). Midi sustituye `activity.use` (clona el objeto, crea
-  su Workflow, lee `game.user.targets`). Cada paso (toque, use(), preUseActivity, postUseActivity, tiradas,
-  hooks `midi-qol.*`) se anota con `useLog` en la consola del teléfono y en la del DM (canal del módulo,
-  tipo `useLog`). Errores → `ui.notifications.error`; uso sin tarjeta → aviso; si el uso no termina en
-  20 s (`USE_TIMEOUT`) se libera `#using` para no dejar el teléfono bloqueado. La tarjeta se abre en el
-  panel ya en `postUseActivity` (Midi tarda en devolver). Midi en un cliente sin mapa: los objetivos son
-  `PhoneTarget` (no `Token`), así que `getToken`/`getTokenDocument` de Midi no los reconocen; **sin probar**.
+- **Botones de tirada (0.10.0, `scripts/quick-actions.js`, estilo D&D Beyond, sin ventanas):** cada fila
+  (`action-row.hbs`) tiene a la izquierda el nombre (toca = descripción, `itemInfo`) y a la derecha botones
+  `bhdQuick` con `data-kind`: `attack` (`activity.labels.toHit`), `save` ("CD 13 DES"), `damage`
+  (`labels.damage` de la actividad de ataque, salvación o daño, subida de nivel si hace falta), `heal` o
+  `use` (si no hay nada de lo anterior). `getRowActivities` elige las actividades; en el HUD, solo las del
+  bloque (`getBlockActivities`). `#runQuick`: Ataque → `activity.rollAttack(config, { configure: false })`;
+  Daño / Curar → `activity.rollDamage` (crítico si el último ataque de esa actividad fue crítico, con su
+  munición y modo); Salvación / Usar → solo el lanzamiento. Nada se encadena (`subsequentActions: false`).
+  **Lanzamiento** (`#cast`): si `needsCast` (consumible, espacio de conjuro, objetivos de consumo,
+  concentración) o es Salvación / Usar, primero `activity.use({ spell: { slot }, subsequentActions: false },
+  { configure: needsUsageDialog })` (ventana solo para invocar, encantar...). Se guarda en
+  `QuickActionState.casts` (nivel, `scaling`, id de la tarjeta, turno) y las tiradas siguientes usan
+  `getScaledActivity` (copia con `flags.dnd5e.scaling`, como los botones de la tarjeta de dnd5e) y
+  `originatingMessage` de la tarjeta. Hechizos: el lanzamiento dura hasta que cambia el turno (o 2 min fuera
+  de combate) — varios ataques del mismo hechizo no gastan otro espacio; chip "Lanzado ✕" (`bhdEndCast`)
+  para volver a lanzar. Rasgos / consumibles: termina con la tirada de daño o curación. Selector de nivel
+  (`data-bhd-slot`, `getSlotOptions` con las reglas de `_prepareScalingContext`) solo si hay más de una
+  opción. Toque largo (450 ms) en Ataque: ventaja / normal / desventaja / "ventana de dnd5e" (`#useFull`,
+  `#fullOptionsItem`); en Daño: normal / crítico. `onPreRoll` quita la ventana de las tiradas del personaje
+  (también las de los botones de las tarjetas). El crítico se recuerda en `onActivityRoll`
+  (`QuickActionState.attacks`) y se olvida tras el daño. Probado (Foundry v14 local, dnd5e 5.3.2): daga,
+  Fire Bolt, Burning Hands (CD + área + daño colgando de la tarjeta), Guiding Bolt a nivel 2 (5d6, un solo
+  espacio para dos ataques), Magic Missile, Cure Wounds, Bless, crítico y ventaja.
 - Los clics dentro del panel con `data-action` desconocido llegan también a `BHDMobileApp`, que
   los ignora; no usar en la app nombres de acción que use dnd5e en sus tarjetas.
 
@@ -244,6 +233,22 @@ lang/es.json, en.json        traducciones
   y el mensaje. Tras 3 éxitos dnd5e pone los contadores a 0 (no hay "estable" automático).
 - La iniciativa del botón usa el mismo `#rollInitiative` de la hoja (con `getActiveCombat`).
 - Actores del combate (vida, efectos) también disparan el redibujado.
+
+## Salvaciones, concentración y condiciones (0.10.0)
+
+- **Salvaciones pendientes** (`scripts/save-prompts.js`, en `onChatMessage` al crearse un mensaje):
+  `findSavePrompts` lee los botones del contenido: `[data-action="concentration"]` si el mensaje habla como
+  el personaje (`challengeConcentration` de dnd5e al recibir daño); `[data-action="rollSave"]` de una
+  tarjeta de actividad `save` con el personaje en `flags.dnd5e.targets` (por `uuid`); y
+  `[data-action="rollRequest"][data-type="save"]` de mensajes del DM. Cola `#savePrompts`, aviso
+  `.bhd-save-alert` (z-index 6, encima del aviso de turno) con vibración; `bhdSaveRoll` →
+  `actor.rollSavingThrow` / `rollConcentration` con `{ configure: false }` y `target` = CD. La CD solo se
+  muestra si `message.shouldDisplayChallenge` (ajuste de dnd5e "challengeVisibility").
+- **Concentración y condiciones** (`status-data.js`, `status.hbs`, en Personaje y Combate): `actor.concentration`
+  (botón Terminar → confirmación → `actor.endConcentration(effect)`), `actor.statuses` con
+  `CONFIG.statusEffects` (sin `hud: false` ni la de concentrar) y efectos temporales sin estado. Tocar una
+  condición abre la explicación breve de `BHD.Conditions.<id>` (cansancio: `exhaustionLegacy` con las reglas
+  2014) o, si no hay, la página de reglas `reference` de dnd5e.
 
 ## Inventario, notas y descansos (decisiones de la etapa 5)
 
@@ -350,13 +355,12 @@ lang/es.json, en.json        traducciones
   largo y "Más opciones" también pasan por el HUD con `data-hud-block`). Si solo hay una actividad
   de ese tipo se usa `activity.use()` (sin preguntar cuál). Acciones básicas en `BASIC_ACTIONS`:
   mensaje al chat + tirada (Esconderse = Sigilo, Buscar = Percepción) + marcar acción.
-- **Objetivos sin mapa** (`targets.js`, desde 0.9.0 solo en modo ligero; con mapa, fichas reales): `game.user.targets` se llena con `PhoneTarget` (id, name,
+- **Objetivos sin mapa** (`targets.js`): `game.user.targets` se llena con `PhoneTarget` (id, name,
   actor, document, x/y/w/h, center, `hasDynamicRing: false` porque dnd5e lo lee en `targetToken`).
   dnd5e solo usa `name` y `actor` (`getTargetDescriptors`). Se avisa a las demás pantallas con
   `broadcastActivity({ sceneId, targets })` (sin `sceneId` la TV los ignora, ver
   `Users#handleUserActivity`); se reenvía al reconectar. `pruneTargets` con `deleteToken` y cambio
-  de escena activa. Midi QOL lee `game.user.targets` en el cliente que usa el objeto (el teléfono,
-  sin mapa): **no probado** (Midi no está instalado en local).
+  de escena activa.
 - **¿Necesita objetivo?** (`getTargetNeed`): no si la actividad tiene área (`target.template.type`)
   o `affects.type` es `self` / `space`; sí si es ataque o tiene `affects.type`; cuántos =
   `affects.count` (con `simplifyBonus`) o 1. El selector (`#pickTargets`, `.bhd-picker`, z-index 4)
@@ -383,6 +387,14 @@ lang/es.json, en.json        traducciones
   En The Forge la actualización aparece en el gestor de módulos (Update).
 
 ## Entorno local
+
+- **Pruebas sin tocar los datos del usuario** (0.10.0, macOS): servidor de Foundry aparte con
+  `--dataPath=<scratchpad>/fvtt --port=30123` (licencia copiada a `Config/`, dnd5e copiado, el módulo enlazado),
+  arrancado con `ELECTRON_RUN_AS_NODE=1` y un `start.mjs` que borra `process.versions.electron` antes de
+  importar `main.mjs` (si no, intenta abrir la ventana de Electron). Se maneja con Chrome sin pantalla
+  (`--headless=new --remote-debugging-pipe`, `--use-angle=swiftshader` para WebGL) desde un script de Python;
+  el jugador en otro contexto de navegador (otra cookie) con tamaño de teléfono o de iPad. El Foundry
+  instalado en esta Mac es **v14**.
 
 - Datos de Foundry: `C:\Users\Frulo\AppData\Local\FoundryVTT\Data`
 - `Data\modules\bhd-companion` es una **unión de directorio (junction)** que apunta a esta
@@ -430,3 +442,6 @@ lang/es.json, en.json        traducciones
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
 8. **Publicación** (0.8.1 publicada en GitHub; falta instalar en The Forge y probar con 5 jugadores) — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
    `download` en `module.json` para instalar en The Forge.
+9. **Tiradas estilo D&D Beyond** ✅ (0.10.0, probada en Foundry local) — botones Ataque / Daño / CD /
+   Curar / Usar en cada fila, crítico, nivel del hechizo en la fila, salvaciones pendientes, concentración y
+   condiciones; sin Midi QOL ni mapa oculto.

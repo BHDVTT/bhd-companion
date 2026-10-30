@@ -3,15 +3,18 @@
  * Solo lee valores ya calculados por dnd5e (etiquetas, usos, espacios de conjuro).
  */
 
+import { prepareRowButtons } from "../quick-actions.js";
+
 /** Tipos de activación que tienen filtro propio en la pestaña. */
 export const ACTION_FILTERS = ["action", "bonus", "reaction"];
 
 /**
  * Datos completos de la pestaña Acciones.
  * @param {Actor} actor
+ * @param {QuickActionState} [state]  Botones de tirada: nivel elegido, lanzamientos, críticos.
  * @returns {object}
  */
-export function prepareActions(actor) {
+export function prepareActions(actor, state) {
   const attacks = [];
   const spells = [];
   const features = [];
@@ -35,18 +38,18 @@ export function prepareActions(actor) {
   }
 
   const byName = (a, b) => a.name.localeCompare(b.name, game.i18n.lang);
-  const spellbook = prepareSpellbook(actor, spells);
+  const spellbook = prepareSpellbook(actor, spells, state);
   const spellAttributes = actor.system.attributes.spell ?? {};
 
   return {
-    attacks: attacks.sort(byName).map(item => prepareRow(item)),
+    attacks: attacks.sort(byName).map(item => prepareRow(item, { state })),
     spellbook,
     spellcasting: spellbook.length ? {
       dc: spellAttributes.dc ?? null,
       attack: Number.isFinite(spellAttributes.attack) ? signed(spellAttributes.attack) : null
     } : null,
-    features: features.sort(byName).map(item => prepareRow(item)),
-    consumables: consumables.sort(byName).map(item => prepareRow(item)),
+    features: features.sort(byName).map(item => prepareRow(item, { state })),
+    consumables: consumables.sort(byName).map(item => prepareRow(item, { state })),
     isEmpty: !attacks.length && !spellbook.length && !features.length && !consumables.length
   };
 }
@@ -60,9 +63,10 @@ export function prepareActions(actor) {
  * a la sección de su nivel. Qué hechizos se muestran lo decide `isSpellShown`.
  * @param {Actor} actor
  * @param {Item[]} spells
+ * @param {QuickActionState} [state]
  * @returns {object[]}
  */
-function prepareSpellbook(actor, spells) {
+function prepareSpellbook(actor, spells, state) {
   const sections = {};
 
   const registerSection = (key, level, config) => {
@@ -125,7 +129,7 @@ function prepareSpellbook(actor, spells) {
       // En secciones por nivel ("Nivel 2") el nivel ya se ve en el título; en las demás (pacto,
       // innatos, rituales...) cada hechizo muestra su nivel.
       const showLevel = !/^spell\d+$/.test(section.key);
-      return { ...section, items: section.items.sort(byLevelAndName).map(item => prepareRow(item, { showLevel })) };
+      return { ...section, items: section.items.sort(byLevelAndName).map(item => prepareRow(item, { showLevel, state })) };
     });
 }
 
@@ -157,27 +161,29 @@ export function isSpellShown(spell, actor) {
 /* -------------------------------------------- */
 
 /**
- * Datos de una fila: nombre, icono, resumen, valor de tirada y usos restantes.
+ * Datos de una fila: nombre, icono, resumen, usos restantes y botones de tirada.
  * @param {Item} item
  * @param {object} [options]
- * @param {boolean} [options.showLevel]  Mostrar el nivel del hechizo ("Nv. 1") junto al nombre.
+ * @param {boolean} [options.showLevel]      Mostrar el nivel del hechizo ("Nv. 1") junto al nombre.
+ * @param {QuickActionState} [options.state]  Nivel elegido, lanzamiento en curso y críticos.
+ * @param {Activity[]} [options.activities]  Actividades de los botones (en el HUD, las del bloque).
  * @returns {object}
  */
-export function prepareRow(item, { showLevel=false }={}) {
+export function prepareRow(item, { showLevel=false, state, activities }={}) {
   const system = item.system;
   const labels = item.labels ?? {};
-  const activities = system.activities?.filter(a => a.canUse) ?? [];
+  const usable = system.activities?.filter(a => a.canUse) ?? [];
+  activities ??= usable;
 
   // Tipos de activación (acción, adicional, reacción...) para los filtros.
   const activation = new Set();
   if ( system.activation?.type ) activation.add(system.activation.type);
-  for ( const activity of activities ) {
+  for ( const activity of usable ) {
     if ( activity.activation?.type ) activation.add(activity.activation.type);
   }
 
-  // Resumen: tiempo de lanzamiento / activación, alcance y daño.
-  const damage = (labels.damages ?? []).map(d => d.label ?? d.formula).filter(_ => _).join(" + ");
-  const subtitle = [labels.activation, labels.range, damage].filter(_ => _).join(" · ");
+  // Resumen: tiempo de lanzamiento / activación y alcance (el daño va en su botón).
+  const subtitle = [labels.activation, labels.range].filter(_ => _).join(" · ");
 
   // Etiquetas cortas: nivel, concentración y ritual (hechizos), cantidad (consumibles).
   const tags = [];
@@ -196,23 +202,9 @@ export function prepareRow(item, { showLevel=false }={}) {
     tags,
     activation: [...activation].join(" "),
     search: normalizeSearch(item.name),
-    roll: getRollLabel(item, activities),
-    uses: getUses(item, activities)
+    uses: getUses(item, usable),
+    ...prepareRowButtons(item, activities, state)
   };
-}
-
-/**
- * Lo que se muestra a la derecha: bonificador de ataque o CD de salvación.
- * @param {Item} item
- * @param {Activity[]} activities
- * @returns {string|null}
- */
-function getRollLabel(item, activities) {
-  if ( item.labels?.toHit ) return item.labels.toHit;
-  const save = activities.find(a => a.type === "save");
-  const dc = save?.save?.dc?.value;
-  if ( dc ) return game.i18n.format("BHD.Actions.DC", { dc });
-  return null;
 }
 
 /**

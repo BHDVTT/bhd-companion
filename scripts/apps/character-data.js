@@ -43,7 +43,6 @@ export function prepareCharacterSheet(actor) {
     initiative: signed(attributes.init?.total ?? 0),
     prof: signed(attributes.prof ?? 0),
     speed: prepareSpeed(attributes.movement),
-    conditions: prepareConditions(actor),
     abilities: prepareAbilities(system.abilities),
     skills: prepareSkills(system.skills),
     rest: prepareRest(actor)
@@ -109,21 +108,6 @@ function prepareSpeed(movement = {}) {
     .map(([key, config]) => `${game.i18n.localize(config.label)} ${format(movement[key])}`);
   if ( movement.special ) others.push(movement.special);
   return { walk: format(movement.walk ?? 0), others: others.join(" · ") };
-}
-
-/**
- * Estados activos (condiciones de Foundry/dnd5e) del personaje.
- * @param {Actor} actor
- */
-function prepareConditions(actor) {
-  const conditions = [];
-  for ( const status of CONFIG.statusEffects ) {
-    if ( !actor.statuses.has(status.id) ) continue;
-    let label = game.i18n.localize(status.name);
-    if ( status.id === "exhaustion" ) label += ` ${actor.system.attributes.exhaustion ?? ""}`;
-    conditions.push({ id: status.id, label, img: status.img });
-  }
-  return conditions;
 }
 
 /**

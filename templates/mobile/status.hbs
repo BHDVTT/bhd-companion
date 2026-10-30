@@ -1,0 +1,30 @@
+{{!-- Concentración, condiciones y efectos activos. Recibe status (ver status-data.js). --}}
+<section class="bhd-status" aria-label="{{localize 'BHD.Status.Title'}}">
+  {{#each status.concentration}}
+  <div class="bhd-concentration">
+    <img class="bhd-concentration-img" src="{{img}}" alt="">
+    <span class="bhd-concentration-text">
+      <span class="bhd-concentration-label"><i class="fa-solid fa-brain" aria-hidden="true"></i> {{localize "BHD.Status.Concentrating"}}</span>
+      <strong class="bhd-concentration-name">{{name}}</strong>
+    </span>
+    <button type="button" class="bhd-concentration-end" data-action="bhdEndConcentration"
+            data-effect-id="{{effectId}}" data-name="{{name}}">
+      {{localize "BHD.Status.EndConcentration"}}
+    </button>
+  </div>
+  {{/each}}
+  {{#if (or status.conditions.length status.effects.length)}}
+  <div class="bhd-conditions">
+    {{#each status.conditions}}
+    <button type="button" class="bhd-condition" data-action="bhdConditionInfo" data-status="{{id}}">
+      <img src="{{img}}" alt=""><span>{{name}}{{#if level}} {{level}}{{/if}}</span>
+    </button>
+    {{/each}}
+    {{#each status.effects}}
+    <button type="button" class="bhd-condition bhd-effect" data-action="bhdEffectInfo" data-uuid="{{uuid}}">
+      <img src="{{img}}" alt=""><span>{{name}}</span>
+    </button>
+    {{/each}}
+  </div>
+  {{/if}}
+</section>

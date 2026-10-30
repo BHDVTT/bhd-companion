@@ -3,7 +3,7 @@
  *
  * En el teléfono casi nunca se puede abrir la consola, así que cada paso se escribe en la consola
  * del teléfono y también se manda a la consola del DM (F12 en el PC del DM), con el nombre del
- * jugador. Así se ve en qué paso se queda un ataque (p. ej. con Midi QOL).
+ * jugador. Así se ve en qué paso se queda un ataque o un hechizo.
  */
 
 import { MODULE_ID } from "./constants.js";

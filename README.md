@@ -8,7 +8,7 @@ un jugador entra a Foundry desde el teléfono, BHD Companion cambia la pantalla 
 móvil sencilla (estilo D&D Beyond) con su hoja de personaje, sus acciones y el combate en
 tiempo real. El GM y la TV siguen viendo Foundry normal.
 
-Versión actual: **0.7.0**
+Versión actual: **0.10.0**
 
 ## Qué hace
 
@@ -17,10 +17,17 @@ Versión actual: **0.7.0**
 - **Personaje** — vida (daño, curación, vida temporal), CA, velocidad, iniciativa,
   inspiración, características, salvaciones y habilidades. Un toque = una tirada; el resultado
   aparece unos segundos en el teléfono y completo en el chat (en la TV). Descanso corto y largo.
+  **Concentración** (en qué hechizo, con botón para terminarla) y **condiciones** activas con su
+  icono: al tocar una (Derribado, Envenenado…) se explica qué hace.
 - **Acciones** — armas equipadas, hechizos por nivel con sus espacios, rasgos con usos y
   consumibles. Filtros (acción / adicional / reacción) y buscador de hechizos.
-  Toque = usar y tirar directo. Mantener presionado = ventaja, desventaja o más opciones.
-  Las áreas (bola de fuego…) se colocan sobre la ficha del personaje y el DM las mueve en la TV.
+  Estilo D&D Beyond: cada fila tiene sus botones de tirada, sin ventanas: **Ataque** (+5),
+  **Daño** (1d4 + 3 Perforante), **CD 13 DES** si pide salvación, **Curar** o **Usar**. Cada botón
+  saca solo su tirada en el chat, con las funciones de dnd5e (el DM aplica el daño desde el chat).
+  Mantener presionado Ataque = ventaja / desventaja; Daño = normal / crítico. Tras un 20 natural,
+  el botón de daño se marca **¡Crítico!**. Los hechizos de nivel tienen un selector de nivel en la
+  fila y gastan el espacio una sola vez por lanzamiento.
+  Las áreas (manos ardientes…) se colocan sobre la ficha del personaje y el DM las mueve en la TV.
 - **Combate** — HUD del turno: arriba, el orden de iniciativa en una fila de retratos (quién va
   ahora, iniciativa, estado aproximado de vida); abajo, cuatro bloques **Acción**, **Adicional**,
   **Reacción** y **Movimiento** que se marcan como usados en el turno. Al tocar un bloque se ven
@@ -29,9 +36,12 @@ Versión actual: **0.7.0**
   Si algo necesita objetivo, se abre un **selector de objetivos** con tarjetas grandes ordenadas
   por cercanía y su distancia en pies (uno o varios, según el hechizo); también se marca un
   objetivo tocando su retrato. Los objetivos son los de Foundry: se resaltan en la TV y los
-  reciben dnd5e (y Midi QOL). Tras usar algo, el HUD muestra si **impactó o falló** y el daño.
+  recibe dnd5e. Tras usar algo, el HUD muestra si **impactó o falló** y el daño.
   Además: botón de iniciativa, aviso **«¡Es tu turno!»** (con vibración en Android),
   **Terminar turno** y salvaciones de muerte.
+- **Salvaciones pendientes** — si el chat pide una salvación al personaje (un hechizo del DM que
+  lo tiene como objetivo, la concentración al recibir daño o una petición de tirada del DM),
+  aparece un aviso grande con vibración y un botón para tirarla ahí mismo.
 - **Mover** — cruceta para mover la ficha casilla a casilla en la TV, respetando paredes y
   puertas, con pies usados / restantes (dobles si usaste Correr) y Deshacer.
 - **Inventario** — objetos por tipo, contenedores, equipar, sintonizar, cantidades, monedas y peso.

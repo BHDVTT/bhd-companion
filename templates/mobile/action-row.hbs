@@ -1,7 +1,8 @@
-{{!-- Fila de un objeto usable. En el HUD de combate (row.hudBlock) pasa por el selector de objetivos. --}}
-<div class="bhd-action" data-activation="{{row.activation}}" data-search="{{row.search}}">
-  <button type="button" class="bhd-action-use" data-item-id="{{row.id}}"
-          {{#if row.hudBlock}}data-action="bhdHudUse" data-hud-block="{{row.hudBlock}}"{{else}}data-action="useItem"{{/if}}>
+{{!-- Fila de un objeto usable: nombre (toca para ver la descripción) y botones de tirada a la derecha.
+     En el HUD de combate (row.hudBlock) los botones pasan por el selector de objetivos. --}}
+<div class="bhd-action {{#if row.cast}}bhd-cast-active{{/if}}" data-activation="{{row.activation}}" data-search="{{row.search}}">
+  <button type="button" class="bhd-action-main" data-action="itemInfo" data-item-id="{{row.id}}"
+          aria-label="{{row.name}} · {{localize 'BHD.Actions.Info'}}">
     <img class="bhd-action-img" src="{{row.img}}" alt="">
     <span class="bhd-action-text">
       <span class="bhd-action-name">
@@ -10,15 +11,40 @@
       </span>
       {{#if row.subtitle}}<span class="bhd-action-sub">{{row.subtitle}}</span>{{/if}}
     </span>
-    {{#if row.roll}}<span class="bhd-action-roll">{{row.roll}}</span>{{/if}}
     {{#if row.uses}}
     <span class="bhd-uses {{#if row.uses.empty}}bhd-empty{{/if}}" aria-label="{{localize 'BHD.Actions.Uses'}}">
       {{row.uses.value}}/{{row.uses.max}}
     </span>
     {{/if}}
   </button>
-  <button type="button" class="bhd-action-info" data-action="itemInfo" data-item-id="{{row.id}}"
-          aria-label="{{localize 'BHD.Actions.Info'}}">
-    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-  </button>
+  <div class="bhd-action-controls">
+    {{#if row.slots}}
+    <label class="bhd-slot-select">
+      <span class="bhd-visually-hidden">{{localize "BHD.Actions.SlotChoose"}}</span>
+      <select data-bhd-slot data-item-id="{{row.id}}" {{#if row.cast}}disabled{{/if}}>
+        {{#each row.slots}}
+        <option value="{{value}}" {{#if selected}}selected{{/if}} {{#if disabled}}disabled{{/if}}>{{label}}</option>
+        {{/each}}
+      </select>
+    </label>
+    {{/if}}
+    {{#if row.cast}}
+    <button type="button" class="bhd-cast-chip" data-action="bhdEndCast" data-item-id="{{row.id}}"
+            aria-label="{{localize 'BHD.Actions.EndCast'}}">
+      <i class="fa-solid fa-wand-sparkles" aria-hidden="true"></i> {{row.cast.label}}
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+    </button>
+    {{/if}}
+    <div class="bhd-roll-buttons">
+      {{#each row.buttons}}
+      <button type="button" class="bhd-roll-btn bhd-roll-{{kind}} {{#if critical}}bhd-crit{{/if}}"
+              data-action="bhdQuick" data-kind="{{kind}}" data-item-id="{{../row.id}}" data-activity-id="{{activityId}}"
+              {{#if ../row.hudBlock}}data-hud-block="{{../row.hudBlock}}"{{/if}}>
+        {{#if caption}}<span class="bhd-roll-caption"><i class="{{icon}}" aria-hidden="true"></i> {{caption}}</span>{{/if}}
+        <span class="bhd-roll-value">{{#unless caption}}<i class="{{icon}}" aria-hidden="true"></i> {{/unless}}{{value}}</span>
+        {{#if detail}}<span class="bhd-roll-detail">{{detail}}</span>{{/if}}
+      </button>
+      {{/each}}
+    </div>
+  </div>
 </div>

@@ -2,9 +2,9 @@ import { MODULE_ID, TEMPLATE_PATH } from "../constants.js";
 import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "./character-data.js";
 import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.js";
 import { getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
-import { BASIC_ACTIONS, getBlockActivities, getTargetNeed, prepareHud, prepareTargetCards, prepareTargetChips } from "./combat-hud-data.js";
+import { BASIC_ACTIONS, getTargetNeed, prepareHud, prepareTargetCards, prepareTargetChips } from "./combat-hud-data.js";
 import { ECONOMY_BLOCKS, getEconomy, getOwnCombatant, setEconomy } from "../economy.js";
-import { getTargetIds, setTargets, toggleTarget } from "../targets.js";
+import { setTargets, toggleTarget } from "../targets.js";
 import { prepareInventory } from "./inventory-data.js";
 import { getMoveToken, prepareMovement } from "./move-data.js";
 import { requestMovement } from "../movement.js";
@@ -13,22 +13,17 @@ import { applyLargeText, syncPlaylistSounds } from "../mobile-mode.js";
 import { canKeepAwake, updateWakeLock } from "../wake-lock.js";
 import { getInstallMode, promptInstall } from "../home-screen.js";
 import { reloadWithoutUrlMode } from "../device.js";
-import { beginUse, endUse, getBlockedWindows } from "../mobile-windows.js";
-import { useError, useLog, useWarn } from "../use-log.js";
-import { requestRemoteUse, shouldUseRemotely } from "../remote-use.js";
+import { useError, useLog } from "../use-log.js";
+import { getScaledActivity, getScaling, getTurnKey, needsCast, needsUsageDialog, QuickActionState } from "../quick-actions.js";
+import { getConditionInfo, prepareStatus } from "./status-data.js";
+import { findSavePrompts, getSavePromptLabel, rollSavePrompt } from "../save-prompts.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
 /** Cuánto tiempo (ms) se ve el resultado de una tirada en el teléfono. */
 const TOAST_DURATION = 4000;
 
-/**
- * Si un uso no termina en este tiempo (ms), el teléfono deja volver a usar objetos y avisa.
- * (Con Midi QOL el uso espera a que acabe el flujo; si se queda esperando algo, no debe bloquear.)
- */
-const USE_TIMEOUT = 20000;
-
-/** Cuánto hay que mantener el dedo (ms) para abrir el menú de ventaja / desventaja. */
+/** Cuánto hay que mantener el dedo (ms) en Ataque o Daño para abrir el menú (ventaja / crítico). */
 const LONG_PRESS_MS = 450;
 
 /** Cuánto se puede mover el dedo (px) sin que deje de contar como toque largo. */
@@ -36,42 +31,6 @@ const LONG_PRESS_TOLERANCE = 10;
 
 /** Cuánto se espera (ms) desde la última tecla para guardar las notas personales. */
 const NOTES_SAVE_DELAY = 1000;
-
-/**
- * Actividades que con un toque rápido se usan sin ventana cuando no hay nivel de espacio que elegir.
- * Las demás (invocar, encantar, transformar...) siempre muestran la ventana de dnd5e.
- */
-const SIMPLE_ACTIVITY_TYPES = new Set(["attack", "damage", "heal", "save", "check", "utility"]);
-
-/**
- * ¿Este hechizo de nivel solo se puede lanzar con un tipo de espacio, y es el que dnd5e ya eligió?
- * Pasa, por ejemplo, con un brujo que solo tiene espacios de pacto: no hay nada que elegir,
- * así que con un toque se lanza directo al nivel del espacio de pacto.
- * Usa las mismas reglas que la ventana de uso de dnd5e para decidir qué espacios se ofrecen.
- * @param {Activity} activity
- * @param {object} usageConfig  Configuración de uso ya preparada por dnd5e.
- * @returns {boolean}
- */
-function hasSingleSlotChoice(activity, usageConfig) {
-  if ( !activity.requiresSpellSlot || usageConfig.cause?.activity ) return false;
-  const consumeSlot = (usageConfig.consume === true) || usageConfig.consume?.spellSlot;
-  if ( !consumeSlot ) return false;
-  const actor = activity.actor;
-  const item = activity.item;
-  const spells = actor.system.spells ?? {};
-  const minimumLevel = item.system.level ?? 1;
-  const method = CONFIG.DND5E.spellcasting[item.system.method];
-  const options = Object.entries(spells).filter(([, slot]) => {
-    if ( !slot.max || !slot.type || (slot.level < minimumLevel) ) return false;
-    if ( method?.exclusive?.spells && (item.system.method !== slot.type) ) return false;
-    const model = CONFIG.DND5E.spellcasting[slot.type];
-    if ( model?.exclusive?.slots && (item.system.method !== slot.type) ) return false;
-    return true;
-  });
-  if ( options.length !== 1 ) return false;
-  const [key, slot] = options[0];
-  return (key === usageConfig.spell?.slot) && (slot.value > 0);
-}
 
 /**
  * Vista móvil a pantalla completa: encabezado, contenido por pestañas y barra de pestañas abajo.
@@ -93,7 +52,13 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       hpStep: BHDMobileApp.#onHpStep,
       hpApply: BHDMobileApp.#onHpApply,
       toggleInspiration: BHDMobileApp.#onToggleInspiration,
-      useItem: BHDMobileApp.#onUseItem,
+      bhdQuick: BHDMobileApp.#onQuick,
+      bhdEndCast: BHDMobileApp.#onEndCast,
+      bhdEndConcentration: BHDMobileApp.#onEndConcentration,
+      bhdConditionInfo: BHDMobileApp.#onConditionInfo,
+      bhdEffectInfo: BHDMobileApp.#onEffectInfo,
+      bhdSaveRoll: BHDMobileApp.#onSaveRoll,
+      bhdSaveDismiss: BHDMobileApp.#onSaveDismiss,
       itemInfo: BHDMobileApp.#onItemInfo,
       actionFilter: BHDMobileApp.#onActionFilter,
       closeTray: BHDMobileApp.#onCloseTray,
@@ -113,7 +78,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       bhdMoveUndo: BHDMobileApp.#onMoveUndo,
       bhdMoveReset: BHDMobileApp.#onMoveReset,
       bhdHudBlock: BHDMobileApp.#onHudBlock,
-      bhdHudUse: BHDMobileApp.#onHudUse,
       bhdHudBasic: BHDMobileApp.#onHudBasic,
       bhdHudMark: BHDMobileApp.#onHudMark,
       bhdHudCloseResult: BHDMobileApp.#onHudCloseResult,
@@ -137,6 +101,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         `${TEMPLATE_PATH}/mobile/action-row.hbs`,
         `${TEMPLATE_PATH}/mobile/combat.hbs`,
         `${TEMPLATE_PATH}/mobile/death-saves.hbs`,
+        `${TEMPLATE_PATH}/mobile/status.hbs`,
         `${TEMPLATE_PATH}/mobile/move.hbs`,
         `${TEMPLATE_PATH}/mobile/inventory.hbs`,
         `${TEMPLATE_PATH}/mobile/inventory-row.hbs`,
@@ -185,14 +150,20 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** ¿Se está usando un objeto? Evita usos dobles por tocar dos veces. */
   #using = false;
 
-  /**
-   * Uso de objeto en curso (para el registro paso a paso y los avisos si falla).
-   * @type {{id: number, itemId: string, name: string, started: number, posted: boolean}|null}
-   */
-  #currentUse = null;
+  /** Botones de tirada: nivel de espacio elegido, lanzamientos en curso y último ataque (crítico). */
+  #quick = new QuickActionState();
 
-  /** Número del último uso (para distinguir los usos en el registro). */
-  #useCounter = 0;
+  /** Objeto cuyas tarjetas y tiradas se ven en el panel de resultados. */
+  #trayItemId = null;
+
+  /**
+   * Salvaciones pendientes que pide el chat (la primera se ve en el aviso).
+   * @type {import("../save-prompts.js").SavePrompt[]}
+   */
+  #savePrompts = [];
+
+  /** Salvaciones ya avisadas (no se repiten si el mensaje se vuelve a crear o actualizar). */
+  #seenPrompts = new Set();
 
   /**
    * Mensajes del chat que se ven en el panel de resultados: la tarjeta del último objeto usado
@@ -209,15 +180,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @type {{target: HTMLElement, x: number, y: number, timer: number, fired: boolean}|null}
    */
   #longPress = null;
-
-  /** Objeto que se está usando con un toque rápido (sin ventanas si es sencillo). */
-  #quickUseItem = null;
-
-  /**
-   * Ventaja / desventaja elegida para el próximo ataque de un objeto.
-   * @type {{itemId: string, mode: string, time?: number}|null}
-   */
-  #pendingAttack = null;
 
   /** Objeto usado con "Más opciones": sus tiradas muestran las ventanas completas de dnd5e. */
   #fullOptionsItem = null;
@@ -275,13 +237,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #scrollToHud = false;
 
   /**
-   * Objeto que se acaba de usar desde el HUD y bloque del turno que gasta (un arma usada como
-   * ataque de oportunidad gasta la reacción, no la acción).
-   * @type {{itemId: string, block: string}|null}
-   */
-  #hudUse = null;
-
-  /**
    * Resultado del último uso desde el HUD: nombre, ataque, impactó o falló, daño.
    * @type {object|null}
    */
@@ -328,7 +283,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     context.character = actor ? { name: actor.name, img: actor.img } : null;
     context.sheet = (actor && (tab === "character")) ? prepareCharacterSheet(actor) : null;
     context.hpAmount = this.#hpAmount;
-    context.actions = (actor && (tab === "actions")) ? prepareActions(actor) : null;
+    context.actions = (actor && (tab === "actions")) ? prepareActions(actor, this.#quick) : null;
     context.spellSearch = this.#spellSearch;
     context.actionFilters = ["all", ...ACTION_FILTERS].map(id => ({
       id,
@@ -338,7 +293,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     // El combate se prepara siempre: la barra de pestañas y la barra "Es tu turno" lo usan.
     context.combat = prepareCombat(actor);
     context.deathSaves = prepareDeathSaves(actor);
-    context.hud = (actor && (tab === "combat")) ? prepareHud(actor, this.#hudBlock) : null;
+    context.status = ["character", "combat"].includes(tab) ? prepareStatus(actor) : null;
+    context.hud = (actor && (tab === "combat")) ? prepareHud(actor, this.#hudBlock, this.#quick) : null;
     context.hudResult = (tab === "combat") ? this.#hudResult : null;
     context.move = (tab === "move") ? prepareMovement(actor, this.#moveTokenId) : null;
     context.inventory = (actor && (tab === "inventory")) ? prepareInventory(actor, this.#openContainers) : null;
@@ -374,13 +330,13 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       <ol class="chat-log themed theme-dark bhd-tray-log"></ol>`;
     this.element.append(tray);
 
-    // Menú del toque largo: ventaja, normal, desventaja o todas las opciones de dnd5e.
+    // Menú del toque largo: ventaja / desventaja (Ataque) o normal / crítico (Daño).
     const chooser = document.createElement("div");
     chooser.className = "bhd-chooser";
     chooser.hidden = true;
     this.element.append(chooser);
 
-    // Toque largo en las filas de la pestaña Acciones. Se escucha en el contenedor (que no se
+    // Toque largo en los botones Ataque y Daño. Se escucha en el contenedor (que no se
     // vuelve a crear al redibujar), así sirve para todas las filas.
     this.element.addEventListener("pointerdown", this.#onPointerDown.bind(this));
     this.element.addEventListener("pointermove", this.#onPointerMove.bind(this));
@@ -389,7 +345,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     // Android abre un menú del navegador con el toque largo: lo evitamos en las filas.
     this.element.addEventListener("contextmenu", event => {
-      if ( event.target.closest(".bhd-action-use") ) event.preventDefault();
+      if ( event.target.closest(".bhd-roll-btn") ) event.preventDefault();
     });
 
     const toast = document.createElement("div");
@@ -405,6 +361,13 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     alert.setAttribute("role", "alertdialog");
     alert.hidden = true;
     this.element.append(alert);
+
+    // Aviso de salvación pendiente (hechizo del DM, concentración al recibir daño...).
+    const saveAlert = document.createElement("div");
+    saveAlert.className = "bhd-save-alert";
+    saveAlert.setAttribute("role", "alertdialog");
+    saveAlert.hidden = true;
+    this.element.append(saveAlert);
 
     // Panel de ajustes del teléfono (letra grande, pantalla encendida, música, instalar...).
     const settings = document.createElement("div");
@@ -449,6 +412,14 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#applyActionFilters();
     });
     this.#applyActionFilters();
+
+    // Nivel de espacio de los hechizos: cambia la fórmula de daño de la fila.
+    for ( const select of this.element.querySelectorAll("[data-bhd-slot]") ) {
+      select.addEventListener("change", event => {
+        this.#quick.slots.set(select.dataset.itemId, event.currentTarget.value);
+        this.render({ parts: ["main"] });
+      });
+    }
 
     // Inventario: monedas editables y contenedores abiertos o cerrados.
     for ( const input of this.element.querySelectorAll("[data-bhd-currency]") ) {
@@ -656,23 +627,23 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /* -------------------------------------------- */
-  /*  Toque rápido y toque largo                  */
+  /*  Botones de tirada (toque y toque largo)     */
   /* -------------------------------------------- */
 
   /**
-   * Empieza a contar un posible toque largo sobre una fila de la pestaña Acciones.
+   * Empieza a contar un posible toque largo sobre un botón Ataque o Daño.
    * @param {PointerEvent} event
    */
   #onPointerDown(event) {
     clearTimeout(this.#longPress?.timer);
     this.#longPress = null;
-    const target = event.target.closest(".bhd-action-use");
+    const target = event.target.closest('.bhd-roll-btn[data-kind="attack"], .bhd-roll-btn[data-kind="damage"]');
     if ( !target || (event.button !== 0) ) return;
     const press = this.#longPress = { target, x: event.clientX, y: event.clientY, fired: false };
     press.timer = setTimeout(() => {
       press.fired = true;
       navigator.vibrate?.(20);
-      this.#openChooser(target.dataset.itemId, target.dataset.hudBlock);
+      this.#openChooser(target);
     }, LONG_PRESS_MS);
   }
 
@@ -690,30 +661,33 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Muestra el menú del toque largo para un objeto.
-   * @param {string} itemId
-   * @param {string} [hudBlock]  Bloque del HUD de combate desde el que se usa (pasa por el selector de objetivos).
+   * Menú del toque largo: en Ataque, ventaja / normal / desventaja (y las ventanas de dnd5e para
+   * opciones raras, como la munición o el modo de ataque); en Daño, normal o crítico.
+   * @param {HTMLElement} button  Botón tocado (con data-kind, data-item-id, data-activity-id).
    */
-  #openChooser(itemId, hudBlock) {
+  #openChooser(button) {
+    const { kind, itemId, activityId, hudBlock } = button.dataset;
     const item = this.actor?.items.get(itemId);
     const chooser = this.element.querySelector(".bhd-chooser");
     if ( !item || !chooser ) return;
-    const hasAttack = !!item.system.activities?.getByType("attack").length;
-    const block = hudBlock ? ` data-hud-block="${hudBlock}"` : "";
-    const button = (mode, icon, label, cssClass) => `
-      <button type="button" class="${cssClass}" data-action="chooseUse" data-mode="${mode}" data-item-id="${item.id}"${block}>
+    const data = `data-kind="${kind}" data-item-id="${itemId}" data-activity-id="${activityId}"`
+      + (hudBlock ? ` data-hud-block="${hudBlock}"` : "");
+    const option = (mode, icon, label, cssClass) => `
+      <button type="button" class="${cssClass}" data-action="chooseUse" data-mode="${mode}" ${data}>
         <i class="${icon}" aria-hidden="true"></i><span>${game.i18n.localize(label)}</span>
       </button>`;
+    const modes = (kind === "attack") ? `
+        ${option("advantage", "fa-solid fa-angles-up", "BHD.Actions.Advantage", "bhd-mode bhd-mode-adv")}
+        ${option("normal", "fa-solid fa-dice-d20", "BHD.Actions.Normal", "bhd-mode")}
+        ${option("disadvantage", "fa-solid fa-angles-down", "BHD.Actions.Disadvantage", "bhd-mode bhd-mode-dis")}` : `
+        ${option("normal", "fa-solid fa-droplet", "BHD.Actions.NormalDamage", "bhd-mode")}
+        ${option("critical", "fa-solid fa-burst", "BHD.Actions.CriticalDamage", "bhd-mode bhd-mode-crit")}`;
     chooser.innerHTML = `
       <div class="bhd-chooser-backdrop" data-action="closeChooser"></div>
       <section class="bhd-chooser-sheet" role="dialog" aria-modal="true">
         <header class="bhd-chooser-header"><img src="" alt=""><span class="bhd-chooser-name"></span></header>
-        ${hasAttack ? `<div class="bhd-chooser-modes">
-          ${button("advantage", "fa-solid fa-angles-up", "BHD.Actions.Advantage", "bhd-mode bhd-mode-adv")}
-          ${button("normal", "fa-solid fa-dice-d20", "BHD.Actions.Normal", "bhd-mode")}
-          ${button("disadvantage", "fa-solid fa-angles-down", "BHD.Actions.Disadvantage", "bhd-mode bhd-mode-dis")}
-        </div>` : button("normal", "fa-solid fa-hand-sparkles", "BHD.Actions.Use", "bhd-mode bhd-mode-use")}
-        ${button("full", "fa-solid fa-sliders", "BHD.Actions.MoreOptions", "bhd-chooser-more")}
+        <div class="bhd-chooser-modes">${modes}</div>
+        ${(kind === "attack") ? option("full", "fa-solid fa-sliders", "BHD.Actions.MoreOptions", "bhd-chooser-more") : ""}
         <button type="button" class="bhd-chooser-cancel" data-action="closeChooser">${game.i18n.localize("BHD.Actions.Cancel")}</button>
       </section>`;
     chooser.querySelector(".bhd-chooser-header img").src = item.img;
@@ -728,199 +702,235 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Usa un objeto con el flujo de dnd5e.
+   * Un botón de tirada: Ataque, Daño, Salvación, Curar o Usar. Sin ventanas de dnd5e: todo se elige
+   * en la fila (nivel del hechizo) o con el toque largo (ventaja, crítico), con los objetivos marcados.
+   * Si el objeto gasta algo (espacio, usos, cantidad) y aún no se "lanzó", primero se lanza
+   * (`activity.use`, una sola vez); después, solo la tirada de ese botón.
+   * @param {"attack"|"damage"|"save"|"heal"|"use"} kind
    * @param {Item} item
-   * @param {"normal"|"advantage"|"disadvantage"|"full"} mode  "full" muestra todas las ventanas de dnd5e;
-   *   los demás saltan las ventanas cuando el uso es sencillo y tiran directo.
-   * @param {PointerEvent} event
-   * @param {HTMLElement} [target]  Fila tocada, para marcarla mientras se usa.
-   * @param {Activity} [activity]   Actividad concreta que usar (si no, dnd5e pregunta cuál si hay varias).
+   * @param {Activity|null} activity  Null en objetos sin actividades (botón Usar).
+   * @param {object} [options]
+   * @param {string} [options.mode="auto"]  "advantage" / "disadvantage" (ataque), "normal" / "critical" (daño).
+   * @param {Event} [options.event]
+   * @param {HTMLElement} [options.button]  Botón tocado, para marcarlo mientras se tira.
+   * @param {string} [options.hudBlock]     Bloque del HUD de combate (pasa por el selector de objetivos).
    */
-  async #useItem(item, mode, event, target, activity) {
+  async #runQuick(kind, item, activity, { mode="auto", event, button, hudBlock }={}) {
+    if ( !this.actor || (item.actor !== this.actor) ) return;
     if ( this.#using ) {
-      useWarn(`Uso ignorado (${item.name}): todavía hay otro uso en curso (${this.#currentUse?.name ?? "?"})`);
-      ui.notifications.info(game.i18n.format("BHD.Use.Busy", { name: this.#currentUse?.name ?? item.name }));
+      ui.notifications.info(game.i18n.format("BHD.Use.Busy", { name: item.name }));
       return;
     }
-    const quick = mode !== "full";
-    const use = { id: ++this.#useCounter, itemId: item.id, name: item.name, started: Date.now(), posted: false };
-    const tag = `Uso ${use.id} (${item.name})`;
+    this.#fullOptionsItem = null;
+
+    // HUD de combate: primero a quién (el daño usa los objetivos que ya se eligieron).
+    if ( hudBlock && activity && (kind !== "damage") ) {
+      const need = getTargetNeed([activity]);
+      if ( need ) {
+        const ids = await this.#pickTargets({ title: item.name, img: item.img, max: need.max });
+        if ( ids === null ) return;
+        setTargets(ids);
+      }
+    }
+
+    const tag = `${item.name} (${kind})`;
+    const block = (hudBlock === "opportunity") ? "reaction" : (hudBlock ?? activity?.activation?.type);
     this.#using = true;
-    this.#currentUse = use;
-    this.#quickUseItem = quick ? item.id : null;
-    this.#fullOptionsItem = quick ? null : item.id;
-    this.#pendingAttack = quick ? { itemId: item.id, mode } : null;
-    target?.classList.add("bhd-rolling");
-    beginUse();
-
-    // Deja de bloquear el teléfono (una sola vez por uso): al terminar o si tarda demasiado.
-    let released = false;
-    const release = () => {
-      if ( released ) return;
-      released = true;
-      endUse();
-      target?.classList.remove("bhd-rolling");
-      if ( this.#currentUse !== use ) return;
-      this.#using = false;
-      this.#currentUse = null;
-      this.#quickUseItem = null;
-      // El ataque automático llega justo después del uso; pasado un momento ya no se aplica.
-      if ( this.#pendingAttack ) this.#pendingAttack.time = Date.now();
-    };
-    const guard = setTimeout(() => {
-      useWarn(`${tag} | Sigue sin terminar tras ${USE_TIMEOUT / 1000} s: se deja usar otros objetos.`
-        + " ¿Hay una ventana o un botón de la tarjeta esperando?", { closedWindows: getBlockedWindows(use.started) });
-      if ( !use.posted ) ui.notifications.warn(game.i18n.format("BHD.Use.Stuck", { name: item.name }));
-      release();
-    }, USE_TIMEOUT);
-
-    const midi = !!game.modules.get("midi-qol")?.active;
-    useLog(`${tag} | 1. Toque recibido`, {
-      mode, activity: activity ? `${activity.name || activity.type} (${activity.type})` : "elige dnd5e",
-      targets: Array.from(game.user.targets).map(t => t.name), midiQOL: midi
-    });
+    button?.classList.add("bhd-rolling");
+    this.#prepareTray(item);
     try {
-      if ( shouldUseRemotely() ) {
-        await this.#useRemotely(item, activity, mode, tag);
+      useLog(`${tag} | Toque`, { mode, targets: Array.from(game.user.targets).map(t => t.name) });
+
+      // Objeto sin actividades (p. ej. un consumible sencillo): el uso normal de dnd5e.
+      if ( !activity ) {
+        const message = await item.use({ event }, { configure: false });
+        if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
+        this.#markUsed(block);
         return;
       }
-      // Con Midi QOL: los objetivos ya se eligieron en el teléfono. Su ventana de confirmar objetivos
-      // se maneja tocando fichas en el mapa (que el teléfono no tiene) y falla, así que no se pide.
-      const usage = { event };
-      if ( midi ) usage.midiOptions = { workflowOptions: { targetConfirmation: "none" } };
-      useLog(`${tag} | 2. Llamando a ${activity ? "activity.use()" : "item.use()"}${midi ? " (Midi QOL toma el control, sin confirmar objetivos)" : ""}`);
-      const result = await (activity ?? item).use(usage);
-      const message = result?.message ?? result;
-      if ( message instanceof foundry.documents.ChatMessage ) {
-        useLog(`${tag} | 6. Uso terminado`, { message: message.id });
-        this.#openTray(message);
+
+      let cast = this.#quick.getCast(item);
+      if ( cast && ((kind === "save") || (kind === "use")) ) {
+        ui.notifications.info(game.i18n.format("BHD.Actions.AlreadyCast", { name: item.name }));
+        const message = game.messages.get(cast.messageId);
+        if ( message ) this.#openTray(message);
+        return;
       }
-      else if ( use.posted ) useLog(`${tag} | 6. Uso terminado (la tarjeta ya está en el chat)`);
-      else {
-        const closed = getBlockedWindows(use.started);
-        useWarn(`${tag} | 6. El uso terminó sin tarjeta en el chat (cancelado o detenido)`, { result: String(result), closedWindows: closed });
-        ui.notifications.warn(game.i18n.format(closed.length ? "BHD.Use.WindowClosed" : "BHD.Use.NotUsed", { name: item.name }));
+      if ( !cast && ((kind === "save") || (kind === "use") || needsCast(item, activity)) ) {
+        cast = await this.#cast(item, activity, event, tag);
+        if ( !cast ) return;
+      }
+
+      // Las tiradas de un lanzamiento cuelgan de su tarjeta y usan el nivel del espacio gastado.
+      const rollActivity = getScaledActivity(activity, cast?.scaling ?? 0);
+      const message = cast?.messageId ? { data: { "flags.dnd5e.originatingMessage": cast.messageId } } : {};
+      const dialog = { configure: false };
+      switch ( kind ) {
+        case "attack": {
+          if ( hudBlock ) this.#startHudResult(item, true);
+          const config = { event };
+          if ( mode === "advantage" ) config.advantage = true;
+          else if ( mode === "disadvantage" ) config.disadvantage = true;
+          await rollActivity.rollAttack(config, dialog, message);
+          this.#markUsed(block);
+          break;
+        }
+        case "damage": {
+          const last = this.#quick.getLastAttack(activity);
+          const isCritical = (mode === "critical") || ((mode === "auto") && !!last?.critical);
+          const config = { event, isCritical };
+          if ( last?.attackMode ) config.attackMode = last.attackMode;
+          const ammunition = last?.ammunition ? this.actor.items.get(last.ammunition) : null;
+          if ( ammunition ) config.ammunition = ammunition;
+          await rollActivity.rollDamage(config, dialog, message);
+          if ( cast && !cast.sticky ) this.#quick.casts.delete(item.id);
+          break;
+        }
+        case "heal":
+          if ( hudBlock ) this.#startHudResult(item, true);
+          await rollActivity.rollDamage({ event }, dialog, message);
+          this.#markUsed(block);
+          if ( cast && !cast.sticky ) this.#quick.casts.delete(item.id);
+          break;
+        default:
+          // Salvación o Usar: la tarjeta del lanzamiento ya está en el chat (con la CD y sus botones).
+          if ( hudBlock ) this.#startHudResult(item, !!activity.damage?.parts?.length);
+          this.#markUsed(block);
+          if ( cast && !cast.sticky && !activity.damage?.parts?.length ) this.#quick.casts.delete(item.id);
       }
     } catch(err) {
-      useError(`${tag} | Error al usar`, err);
+      useError(`${tag} | Error`, err);
       ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: item.name, error: err?.message ?? String(err) }));
     } finally {
-      clearTimeout(guard);
-      release();
+      this.#using = false;
+      button?.classList.remove("bhd-rolling");
+      this.#renderRows();
     }
   }
 
   /**
-   * Respaldo sin mapa (modo ligero): el PC del DM usa la actividad con los objetivos del jugador.
-   * La actividad se elige aquí (si hay varias); el espacio de conjuro es el que dnd5e propone.
+   * "Lanza" una actividad: `activity.use` sin ventana y sin tiradas automáticas (las hace cada botón).
+   * dnd5e gasta el espacio elegido en la fila, los usos o la cantidad, empieza la concentración
+   * (terminando la anterior si hace falta), coloca el área y crea la tarjeta del chat.
    * @param {Item} item
-   * @param {Activity} [activity]
-   * @param {string} mode
+   * @param {Activity} activity
+   * @param {Event} [event]
    * @param {string} tag  Prefijo del registro.
+   * @returns {Promise<object|null>}  El lanzamiento, o null si no se pudo (dnd5e ya avisó por qué).
    */
-  async #useRemotely(item, activity, mode, tag) {
-    if ( !activity ) {
-      const usable = item.system.activities?.filter(a => a.canUse) ?? [];
-      if ( usable.length > 1 ) activity = await dnd5e.applications.activity.ActivityChoiceDialog.create(item);
-      else activity = usable[0];
+  async #cast(item, activity, event, tag) {
+    const actor = item.actor;
+    const usage = { event, subsequentActions: false };
+    const slot = this.#quick.getSlot(activity);
+    if ( slot ) usage.spell = { slot };
+    const concentrating = Array.from(actor.concentration?.effects ?? []).map(effect => ({
+      id: effect.id,
+      name: actor.items.get(effect.getFlag("dnd5e", "item")?.id)?.name ?? effect.name
+    }));
+    useLog(`${tag} | Lanzamiento`, { slot });
+    const results = await activity.use(usage, { configure: needsUsageDialog(activity) }, {});
+    if ( !results ) {
+      useLog(`${tag} | No se lanzó (sin espacios, sin usos o cancelado)`);
+      return null;
     }
-    if ( !activity ) {
-      useLog(`${tag} | No se eligió actividad`);
-      return;
+    for ( const previous of concentrating ) {
+      if ( !actor.effects.has(previous.id) ) {
+        ui.notifications.info(game.i18n.format("BHD.Status.ConcentrationReplaced", { name: previous.name }));
+      }
     }
-    const targetIds = getTargetIds();
-    useLog(`${tag} | 2. Sin mapa: se pide al PC del DM (socketlib)`, {
-      activity: `${activity.name || activity.type} (${activity.type})`, mode, targets: targetIds
+    const message = results.message;
+    if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
+    const cast = {
+      activityId: activity.id,
+      slot,
+      scaling: getScaling(activity, slot),
+      messageId: message?.id ?? null,
+      time: Date.now(),
+      turnKey: getTurnKey(),
+      sticky: item.type === "spell"
+    };
+    this.#quick.casts.set(item.id, cast);
+    return cast;
+  }
+
+  /**
+   * "Más opciones": el uso normal de dnd5e con todas sus ventanas (munición, modo de ataque...).
+   * @param {Item} item
+   * @param {Activity|null} activity
+   * @param {Event} [event]
+   */
+  async #useFull(item, activity, event) {
+    if ( this.#using ) return;
+    this.#using = true;
+    this.#fullOptionsItem = item.id;
+    this.#prepareTray(item);
+    try {
+      const result = await (activity ?? item).use({ event });
+      const message = result?.message ?? result;
+      if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
+    } catch(err) {
+      useError(`${item.name} (más opciones) | Error`, err);
+      ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: item.name, error: err?.message ?? String(err) }));
+    } finally {
+      this.#using = false;
+    }
+  }
+
+  /**
+   * Marca como usado en el turno un bloque (acción, adicional, reacción) si el personaje está en combate.
+   * @param {string} [block]
+   */
+  #markUsed(block) {
+    const own = getOwnCombatant(this.actor);
+    if ( !own || !ECONOMY_BLOCKS.includes(block) ) return;
+    setEconomy(own.combat, own.combatant, { [block]: true }).catch(err => {
+      console.error("BHD Companion | No se pudo marcar la acción como usada", err);
     });
-    const response = await requestRemoteUse(activity, { mode, targetIds, sceneId: game.scenes.active?.id ?? null });
-    if ( !response?.ok ) {
-      useWarn(`${tag} | 6. El PC del DM no lo usó`, response);
-      const reason = response?.reason ?? "Error";
-      ui.notifications.warn(game.i18n.format(`BHD.Remote.${reason}`, { name: item.name, error: response?.error ?? "" }));
-      return;
-    }
-    useLog(`${tag} | 6. Usado en el PC del DM`, { message: response.messageId });
-    // En el teléfono no salta dnd5e.postUseActivity: se marca aquí (acción usada, resultado, tarjeta).
-    this.onPostUseActivity(activity, { message: game.messages.get(response.messageId) });
+  }
+
+  /** Vuelve a dibujar las filas con botones (crítico, lanzamiento) si se ven. */
+  #renderRows() {
+    if ( ["actions", "combat"].includes(this.activeTab) ) this.render({ parts: ["main"] });
   }
 
   /**
-   * Prefijo del registro para una actividad del uso en curso (o null si no es de ese uso).
-   * @param {Activity} activity
-   * @returns {string|null}
-   */
-  #useTag(activity) {
-    const use = this.#currentUse;
-    if ( !use || (activity?.item?.id !== use.itemId) || (activity.actor !== this.actor) ) return null;
-    return `Uso ${use.id} (${use.name})`;
-  }
-
-  /**
-   * Hooks de Midi QOL: solo anotan en el registro por qué paso va su flujo.
-   * @param {string} hook
-   * @param {object} workflow
-   */
-  onMidiHook(hook, workflow) {
-    const activity = workflow?.activity ?? workflow;
-    const tag = this.#useTag(activity);
-    if ( !tag ) return;
-    const targets = workflow?.targets ? Array.from(workflow.targets).map(t => t?.name) : undefined;
-    useLog(`${tag} | Midi QOL: ${hook}`, targets ? { targets } : {});
-  }
-
-  /**
-   * Hook `dnd5e.preUseActivity`: con un toque rápido, salta la ventana de uso si no hay nada
-   * importante que elegir (trucos, armas, pociones...). Con hechizos de nivel la ventana sigue
-   * apareciendo para elegir el espacio de conjuro.
-   * @param {Activity} activity
-   * @param {object} usageConfig
-   * @param {object} dialogConfig
-   */
-  onPreUseActivity(activity, usageConfig, dialogConfig) {
-    const tag = this.#useTag(activity);
-    if ( tag ) useLog(`${tag} | 3. dnd5e.preUseActivity: ${activity.name || activity.type} (${activity.type})`);
-    if ( (activity.actor !== this.actor) || (activity.item.id !== this.#quickUseItem) ) return;
-    const simple = SIMPLE_ACTIVITY_TYPES.has(activity.type)
-      && ((usageConfig.scaling === false) || hasSingleSlotChoice(activity, usageConfig))
-      && !usageConfig.concentration?.end;          // no hay que terminar otra concentración
-    if ( simple ) dialogConfig.configure = false;
-    if ( tag ) useLog(`${tag} | 3b. Ventana de uso: ${simple ? "se salta (uso sencillo)" : "se muestra"}`);
-  }
-
-  /**
-   * Hooks `dnd5e.preRollAttackV2` / `dnd5e.preRollDamageV2`: en el teléfono los ataques y daños
-   * de este personaje se tiran sin ventana, con la ventaja / desventaja elegida con el toque largo.
-   * Si el jugador eligió "Más opciones", se deja la ventana normal de dnd5e.
+   * Hooks `dnd5e.preRollAttackV2` / `dnd5e.preRollDamageV2`: las tiradas de este personaje (también
+   * las de los botones de las tarjetas del panel) salen sin ventana. Con "Más opciones" se deja la
+   * ventana normal de dnd5e.
    * @param {"attack"|"damage"} type
    * @param {object} config  Configuración de la tirada (config.subject es la actividad).
    * @param {object} dialog  Configuración de la ventana.
    */
   onPreRoll(type, config, dialog) {
     const activity = config.subject;
-    if ( !activity || (activity.actor !== this.actor) ) return;
-    const tag = this.#useTag(activity);
-    if ( tag ) useLog(`${tag} | 5. Preparando tirada de ${type === "attack" ? "ataque" : "daño"}`);
-    if ( activity.item.id === this.#fullOptionsItem ) return;
+    if ( !activity || (activity.actor !== this.actor) || (activity.item.id === this.#fullOptionsItem) ) return;
     dialog.configure = false;
-    if ( type !== "attack" ) return;
-    const pending = this.#pendingAttack;
-    this.#pendingAttack = null;
-    const fresh = pending && (pending.itemId === activity.item.id) && (!pending.time || (Date.now() - pending.time < 3000));
-    if ( !fresh ) return;
-    if ( pending.mode === "advantage" ) config.advantage = true;
-    else if ( pending.mode === "disadvantage" ) config.disadvantage = true;
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Abre el panel de resultados con la tarjeta de un objeto recién usado.
+   * Prepara el panel de resultados para un objeto: si mostraba otro, se vacía.
+   * @param {Item} item
+   */
+  #prepareTray(item) {
+    if ( this.#trayItemId === item.id ) return;
+    this.#trayItemId = item.id;
+    this.#trayMessages = [];
+  }
+
+  /**
+   * Abre el panel de resultados con un mensaje (tarjeta del objeto o tirada).
    * @param {ChatMessage} message
    */
   #openTray(message) {
-    // Ya se muestra (p. ej. se abrió al crearse la tarjeta): no se pierden las tiradas añadidas.
-    if ( this.#trayMessages[0] === message.id ) return;
-    this.#trayMessages = [message.id];
+    const itemId = message.getFlag("dnd5e", "item.id");
+    if ( itemId && (itemId !== this.#trayItemId) ) {
+      this.#trayItemId = itemId;
+      this.#trayMessages = [];
+    }
+    if ( this.#trayMessages.includes(message.id) ) return;
+    this.#trayMessages.push(message.id);
     this.#renderTray();
   }
 
@@ -951,21 +961,29 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const wasHidden = tray.hidden;
     tray.hidden = false;
     // Muestra lo más reciente (la última tirada).
-    if ( wasHidden ) log.scrollTop = 0;
+    if ( wasHidden && (elements.length === 1) ) log.scrollTop = 0;
     else elements.at(-1)?.scrollIntoView({ block: "nearest" });
   }
 
   /**
-   * Llamado desde los hooks del chat: añade al panel las tiradas que salen de la tarjeta
-   * mostrada y lo actualiza si alguna de sus tarjetas cambia o se borra.
+   * Llamado desde los hooks del chat:
+   * - Avisa de las salvaciones que el mensaje pide al personaje.
+   * - Añade al panel las tiradas del objeto que se ve (las de sus botones y las de su tarjeta) y lo
+   *   actualiza si alguna de sus tarjetas cambia o se borra.
    * @param {ChatMessage} message
    * @param {"create"|"update"|"delete"} action
    */
   onChatMessage(message, action) {
-    if ( !this.#trayMessages.length ) return;
+    if ( action === "create" ) this.#checkSavePrompts(message);
+    else if ( action === "delete" ) this.#dropSavePrompts(message.id);
+
+    if ( !this.#trayItemId ) return;
     if ( action === "create" ) {
       const origin = message.getFlag("dnd5e", "originatingMessage");
-      if ( !this.#trayMessages.includes(origin) ) return;
+      const ownRoll = message.isAuthor && (message.getFlag("dnd5e", "item.id") === this.#trayItemId)
+        && (message.speaker?.actor === this.actor?.id);
+      if ( !ownRoll && !this.#trayMessages.includes(origin) ) return;
+      if ( this.#trayMessages.includes(message.id) ) return;
       this.#trayMessages.push(message.id);
     }
     else if ( !this.#trayMessages.includes(message.id) ) return;
@@ -975,7 +993,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Llamado desde los hooks de tiradas de dnd5e: muestra en el teléfono el total de un ataque o daño
-   * hecho por este personaje.
+   * hecho por este personaje y recuerda si el ataque fue crítico (el botón Daño lo tira crítico).
    * @param {"attack"|"damage"} type
    * @param {Roll[]} rolls
    * @param {Activity} [subject]
@@ -983,28 +1001,104 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   onActivityRoll(type, rolls, subject) {
     const actor = this.actor;
     if ( !actor || !rolls?.length || (subject?.actor !== actor) ) return;
-    const tag = this.#useTag(subject);
-    if ( tag ) useLog(`${tag} | 5b. Tirada de ${type === "attack" ? "ataque" : "daño"}: ${rolls.map(r => r.total).join(", ")}`);
     const name = subject.item?.name ?? "";
+    const key = `${subject.item.id}.${subject.id}`;
     const result = (this.#hudResult?.itemId === subject.item?.id) ? this.#hudResult : null;
     if ( type === "attack" ) {
       const roll = rolls[0];
+      useLog(`${name} | Ataque: ${roll.total}${roll.isCritical ? " (crítico)" : ""}`);
+      this.#quick.attacks.set(key, {
+        critical: !!roll.isCritical,
+        ammunition: roll.options?.ammunition || null,
+        attackMode: roll.options?.attackMode || null
+      });
       this.#showRollResult(`${name}: ${game.i18n.localize("BHD.Actions.Attack")}`, roll);
       if ( result ) {
         result.attack = { total: roll.total, crit: !!roll.isCritical, fumble: !!roll.isFumble };
         result.verdicts = this.#getAttackVerdicts(roll);
-        this.#renderCombatTab();
       }
+      if ( !this.#using ) this.#renderRows();
       return;
     }
     const total = rolls.reduce((sum, roll) => sum + (roll.total ?? 0), 0);
+    useLog(`${name} | Daño: ${total}`);
+    // El crítico ya se usó: el siguiente daño vuelve a ser normal.
+    this.#quick.attacks.delete(key);
     const label = subject.damageFlavor ?? game.i18n.localize("BHD.Actions.Damage");
-    this.#showRollResult(`${name}: ${label}`, { total });
+    this.#showRollResult(`${name}: ${label}`, { total, isCritical: rolls[0]?.isCritical });
     if ( result ) {
       result.damage = { total, label };
       result.hint = null;
-      this.#renderCombatTab();
     }
+    if ( !this.#using ) this.#renderRows();
+  }
+
+  /* -------------------------------------------- */
+  /*  Salvaciones pendientes                      */
+  /* -------------------------------------------- */
+
+  /**
+   * Si el mensaje pide una salvación al personaje, la pone en cola y muestra el aviso.
+   * @param {ChatMessage} message
+   */
+  #checkSavePrompts(message) {
+    let added = false;
+    for ( const prompt of findSavePrompts(message, this.actor) ) {
+      if ( this.#seenPrompts.has(prompt.id) ) continue;
+      this.#seenPrompts.add(prompt.id);
+      this.#savePrompts.push(prompt);
+      added = true;
+    }
+    if ( !added ) return;
+    useLog("Salvación pendiente", this.#savePrompts.at(-1));
+    this.#showSaveAlert(true);
+  }
+
+  /**
+   * Quita los avisos de un mensaje borrado.
+   * @param {string} messageId
+   */
+  #dropSavePrompts(messageId) {
+    const before = this.#savePrompts.length;
+    this.#savePrompts = this.#savePrompts.filter(p => p.messageId !== messageId);
+    if ( this.#savePrompts.length !== before ) this.#showSaveAlert(false);
+  }
+
+  /**
+   * Muestra el aviso de la primera salvación pendiente (o lo oculta si no queda ninguna).
+   * @param {boolean} vibrate
+   */
+  #showSaveAlert(vibrate) {
+    const alert = this.element?.querySelector(".bhd-save-alert");
+    const prompt = this.#savePrompts[0];
+    const actor = this.actor;
+    if ( !alert ) return;
+    if ( !prompt || !actor ) {
+      alert.hidden = true;
+      return;
+    }
+    const localize = key => game.i18n.localize(key);
+    const concentration = prompt.type === "concentration";
+    const more = this.#savePrompts.length - 1;
+    alert.innerHTML = `
+      <div class="bhd-save-alert-box ${concentration ? "bhd-save-concentration" : ""}">
+        <i class="fa-solid ${concentration ? "fa-brain" : "fa-shield-heart"} bhd-save-alert-icon" aria-hidden="true"></i>
+        <strong class="bhd-save-alert-title">${localize(concentration ? "BHD.Save.ConcentrationTitle" : "BHD.Save.Title")}</strong>
+        <span class="bhd-save-alert-source"></span>
+        <button type="button" class="bhd-big-btn bhd-save-alert-roll" data-action="bhdSaveRoll">
+          <i class="fa-solid fa-dice-d20" aria-hidden="true"></i> <span></span>
+        </button>
+        <button type="button" class="bhd-save-alert-later" data-action="bhdSaveDismiss">${localize("BHD.Save.Later")}</button>
+        ${more > 0 ? `<span class="bhd-save-alert-more">${game.i18n.format("BHD.Save.More", { count: more })}</span>` : ""}
+      </div>`;
+    alert.querySelector(".bhd-save-alert-source").textContent = prompt.source
+      ? game.i18n.format("BHD.Save.From", { source: prompt.source }) : "";
+    alert.querySelector(".bhd-save-alert-roll span").textContent = getSavePromptLabel(prompt, actor);
+    alert.hidden = false;
+    if ( !vibrate ) return;
+    try {
+      if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([200, 100, 200]);
+    } catch(err) {}
   }
 
   /* -------------------------------------------- */
@@ -1012,72 +1106,30 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /* -------------------------------------------- */
 
   /**
-   * Usa un objeto desde un bloque del HUD: si hace falta, primero abre el selector de objetivos
-   * y los marca (los recibe dnd5e, Midi QOL y se ven en la TV); después, el uso normal.
+   * Empieza a mostrar en el HUD el resultado de un uso (el ataque y el daño se completan al tirarlos).
    * @param {Item} item
-   * @param {string} block  "action", "bonus", "reaction" u "opportunity" (ataque de oportunidad).
-   * @param {"normal"|"advantage"|"disadvantage"|"full"} mode
-   * @param {PointerEvent} event
-   * @param {HTMLElement} [target]
+   * @param {boolean} hasDamage  ¿Mostrar la pista "toca Daño"?
    */
-  async #hudUseItem(item, block, mode, event, target) {
-    if ( this.#using ) return;
-    const activities = getBlockActivities(item, block);
-    const activity = (activities.length === 1) ? activities[0] : null;
-    const need = getTargetNeed(activities.length ? activities : (item.system.activities?.contents ?? []));
-    if ( need ) {
-      const ids = await this.#pickTargets({ title: item.name, img: item.img, max: need.max });
-      if ( ids === null ) {
-        useLog(`HUD (${item.name}) | Selector de objetivos cancelado`);
-        return;
-      }
-      setTargets(ids);
-      useLog(`HUD (${item.name}) | Objetivos elegidos`, Array.from(game.user.targets).map(t => t.name));
-    }
-    this.#hudUse = { itemId: item.id, block: (block === "opportunity") ? "reaction" : block };
-    try {
-      await this.#useItem(item, mode, event, target, activity);
-    } finally {
-      this.#hudUse = null;
-    }
-  }
-
-  /**
-   * Hook `dnd5e.postUseActivity`: el personaje usó algo (desde el HUD, la pestaña Acciones o la
-   * hoja). En combate, marca como usado el bloque de su tipo de acción; si fue desde el HUD,
-   * empieza a mostrar el resultado.
-   * @param {Activity} activity
-   */
-  onPostUseActivity(activity, results) {
-    if ( activity.actor !== this.actor ) return;
-    const tag = this.#useTag(activity);
-    if ( tag ) {
-      const message = results?.message;
-      useLog(`${tag} | 4. dnd5e.postUseActivity: tarjeta creada`, { message: message?.id ?? null });
-      this.#currentUse.posted = true;
-      // Con Midi QOL el uso puede tardar en terminar (espera su flujo): la tarjeta se muestra ya.
-      if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
-    }
-    const hud = (this.#hudUse?.itemId === activity.item.id) ? this.#hudUse : null;
-    const block = hud?.block ?? activity.activation?.type;
-    const own = getOwnCombatant(this.actor);
-    if ( own && ECONOMY_BLOCKS.includes(block) ) {
-      setEconomy(own.combat, own.combatant, { [block]: true }).catch(err => {
-        console.error("BHD Companion | No se pudo marcar la acción como usada", err);
-      });
-    }
-    if ( !hud ) return;
-    const hasDamage = !!activity.damage?.parts?.length || (activity.type === "heal");
+  #startHudResult(item, hasDamage) {
     this.#hudResult = {
-      itemId: activity.item.id,
-      name: activity.item.name,
-      img: activity.item.img,
+      itemId: item.id,
+      name: item.name,
+      img: item.img,
       attack: null,
       verdicts: [],
       damage: null,
       hint: hasDamage ? game.i18n.localize("BHD.Hud.Result.DamageHint") : null
     };
-    this.#renderCombatTab();
+  }
+
+  /**
+   * Hook `dnd5e.postUseActivity`: el personaje usó algo (desde otra parte que no son los botones de la
+   * vista, p. ej. un botón de una tarjeta). En combate, marca como usado el bloque de su tipo de acción.
+   * @param {Activity} activity
+   */
+  onPostUseActivity(activity) {
+    if ( (activity.actor !== this.actor) || this.#using ) return;
+    this.#markUsed(activity.activation?.type);
   }
 
   /**
@@ -1501,36 +1553,49 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Toque en una fila: usa el arma, hechizo, rasgo o consumible con el flujo normal de dnd5e
-   * (tarjeta en el chat, gasto de usos o espacio, tirada de ataque o daño, área en el mapa).
-   * Si el uso es sencillo, tira directo sin ventanas. Después muestra la tarjeta en el panel.
+   * Botón de tirada de una fila (Ataque, Daño, Salvación, Curar, Usar).
    * @this {BHDMobileApp}
    * @param {PointerEvent} event
    * @param {HTMLElement} target
    */
-  static async #onUseItem(event, target) {
-    // Al soltar un toque largo también llega un clic: ese ya abrió el menú, no se usa el objeto.
+  static async #onQuick(event, target) {
+    // Al soltar un toque largo también llega un clic: ese ya abrió el menú, no se tira.
     if ( this.#longPress?.fired && (this.#longPress.target === target) ) {
       this.#longPress = null;
       return;
     }
-    const item = this.actor?.items.get(target.dataset.itemId);
-    if ( item ) await this.#useItem(item, "normal", event, target);
+    const { kind, itemId, activityId, hudBlock } = target.dataset;
+    const item = this.actor?.items.get(itemId);
+    if ( !item ) return;
+    const activity = activityId ? item.system.activities?.get(activityId) : null;
+    await this.#runQuick(kind, item, activity ?? null, { event, button: target, hudBlock });
   }
 
   /**
-   * Botón del menú del toque largo: Ventaja, Normal, Desventaja, Usar o Más opciones.
+   * Botón del menú del toque largo: Ventaja, Normal, Desventaja, Crítico o Más opciones.
    * @this {BHDMobileApp}
    * @param {PointerEvent} event
    * @param {HTMLElement} target
    */
   static async #onChooseUse(event, target) {
     this.#closeChooser();
-    const item = this.actor?.items.get(target.dataset.itemId);
+    const { kind, itemId, activityId, hudBlock, mode } = target.dataset;
+    const item = this.actor?.items.get(itemId);
     if ( !item ) return;
-    const block = target.dataset.hudBlock;
-    if ( block ) await this.#hudUseItem(item, block, target.dataset.mode, event);
-    else await this.#useItem(item, target.dataset.mode, event);
+    const activity = activityId ? item.system.activities?.get(activityId) : null;
+    if ( mode === "full" ) await this.#useFull(item, activity, event);
+    else await this.#runQuick(kind, item, activity ?? null, { mode, event, hudBlock });
+  }
+
+  /**
+   * Termina el lanzamiento en curso de un hechizo: el próximo botón lo vuelve a lanzar (y gasta otro espacio).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onEndCast(event, target) {
+    this.#quick.casts.delete(target.dataset.itemId);
+    this.#renderRows();
   }
 
   /**
@@ -1570,6 +1635,114 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     content.insertAdjacentHTML("beforeend", description);
     await DialogV2.prompt({
       window: { title: item.name, icon: "fa-solid fa-circle-info" },
+      classes: ["bhd-dialog"],
+      content: content.outerHTML,
+      ok: { label: "BHD.Actions.Close", icon: "fa-solid fa-check" },
+      rejectClose: false
+    });
+  }
+
+  /**
+   * Tira la salvación del aviso con dnd5e (sin ventana) y muestra el resultado.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   */
+  static async #onSaveRoll(event) {
+    const actor = this.actor;
+    const prompt = this.#savePrompts.shift();
+    this.#showSaveAlert(false);
+    if ( !actor || !prompt ) return;
+    try {
+      const rolls = await rollSavePrompt(prompt, actor, event);
+      const roll = rolls?.[0];
+      if ( !roll ) return;
+      let label = getSavePromptLabel(prompt, actor);
+      if ( prompt.showDC && prompt.dc ) {
+        label += ` · ${game.i18n.localize(roll.total >= prompt.dc ? "BHD.Save.Success" : "BHD.Save.Failure")}`;
+      }
+      this.#showRollResult(label, roll);
+    } catch(err) {
+      useError("Salvación | Error", err);
+      ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: getSavePromptLabel(prompt, actor), error: err?.message ?? String(err) }));
+    }
+  }
+
+  /**
+   * Cierra el aviso de salvación sin tirar (se puede tirar desde la tarjeta del chat o la hoja).
+   * @this {BHDMobileApp}
+   */
+  static #onSaveDismiss() {
+    this.#savePrompts.shift();
+    this.#showSaveAlert(false);
+  }
+
+  /**
+   * Termina la concentración en un hechizo (pregunta antes, para no hacerlo por un toque sin querer).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onEndConcentration(event, target) {
+    const actor = this.actor;
+    const effect = actor?.effects.get(target.dataset.effectId);
+    if ( !effect ) return;
+    const name = target.dataset.name ?? effect.name;
+    const confirmed = await DialogV2.confirm({
+      window: { title: "BHD.Status.EndConcentrationTitle" },
+      classes: ["bhd-dialog"],
+      content: `<p>${foundry.utils.escapeHTML(game.i18n.format("BHD.Status.EndConcentrationContent", { name }))}</p>`,
+      rejectClose: false
+    });
+    if ( confirmed ) await actor.endConcentration(effect);
+  }
+
+  /**
+   * Explicación breve de una condición (Derribado, Envenenado...).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onConditionInfo(event, target) {
+    const info = await getConditionInfo(target.dataset.status, this.actor);
+    if ( !info ) return;
+    await this.#showInfo(info.name, info.img, info.html);
+  }
+
+  /**
+   * Descripción de un efecto activo que no es una condición (Bendición, Bane...).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onEffectInfo(event, target) {
+    const effect = await fromUuid(target.dataset.uuid);
+    if ( !effect ) return;
+    const html = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      effect.description || `<p>${foundry.utils.escapeHTML(game.i18n.localize("BHD.Status.NoDescription"))}</p>`,
+      { relativeTo: effect }
+    );
+    await this.#showInfo(effect.name, effect.img, html);
+  }
+
+  /**
+   * Ventana sencilla con un título, un icono y un texto.
+   * @param {string} title
+   * @param {string} img
+   * @param {string} html
+   */
+  async #showInfo(title, img, html) {
+    const content = document.createElement("div");
+    content.className = "bhd-item-info bhd-status-info";
+    if ( img ) {
+      const icon = document.createElement("img");
+      icon.className = "bhd-status-info-img";
+      icon.src = img;
+      icon.alt = "";
+      content.append(icon);
+    }
+    content.insertAdjacentHTML("beforeend", html);
+    await DialogV2.prompt({
+      window: { title },
       classes: ["bhd-dialog"],
       content: content.outerHTML,
       ok: { label: "BHD.Actions.Close", icon: "fa-solid fa-check" },
@@ -1748,22 +1921,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Toca una opción de un bloque del HUD (ataque, hechizo, rasgo, objeto).
-   * @this {BHDMobileApp}
-   * @param {PointerEvent} event
-   * @param {HTMLElement} target
-   */
-  static async #onHudUse(event, target) {
-    // Al soltar un toque largo también llega un clic: ese ya abrió el menú.
-    if ( this.#longPress?.fired && (this.#longPress.target === target) ) {
-      this.#longPress = null;
-      return;
-    }
-    const item = this.actor?.items.get(target.dataset.itemId);
-    if ( item ) await this.#hudUseItem(item, target.dataset.hudBlock, "normal", event, target);
-  }
-
-  /**
    * Toca una acción básica del bloque Acción (Esquivar, Correr...).
    * @this {BHDMobileApp}
    * @param {PointerEvent} event
@@ -1893,8 +2050,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       toggles: [
         { key: "largeText", icon: "fa-solid fa-text-height", on: get("largeText") },
         { key: "keepAwake", icon: "fa-solid fa-sun", on: get("keepAwake"), unsupported: !canKeepAwake() },
-        { key: "phoneMusic", icon: "fa-solid fa-music", on: get("phoneMusic") },
-        { key: "lightMode", icon: "fa-solid fa-feather", on: get("lightMode") }
+        { key: "phoneMusic", icon: "fa-solid fa-music", on: get("phoneMusic") }
       ],
       install: getInstallMode()
     });
@@ -1927,10 +2083,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static async #onToggleSetting(event, target) {
     const key = target.dataset.setting;
-    if ( !["largeText", "keepAwake", "phoneMusic", "lightMode"].includes(key) ) return;
+    if ( !["largeText", "keepAwake", "phoneMusic"].includes(key) ) return;
     await game.settings.set(MODULE_ID, key, !game.settings.get(MODULE_ID, key));
-    // El mapa se carga (o no) al abrir la página.
-    if ( key === "lightMode" ) return window.location.reload();
     if ( key === "largeText" ) applyLargeText();
     else if ( key === "keepAwake" ) updateWakeLock();
     else if ( key === "phoneMusic" ) syncPlaylistSounds();

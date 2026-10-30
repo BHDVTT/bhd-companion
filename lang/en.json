@@ -58,12 +58,12 @@
       "Empty": "Your character has no equipped weapons, spells, features or consumables to use.",
       "NoneForFilter": "Nothing of this type.",
       "NoSpellsFound": "No spells match your search.",
-      "TapToUse": "Tap to use and roll right away. Press and hold for advantage, disadvantage or more options. Rolls go to chat (on the TV).",
+      "TapToUse": "Tap Attack, Damage or the DC to roll (it shows in the TV chat). Hold Attack for advantage or disadvantage, and Damage to choose normal or critical. Tap the name to read the description.",
       "Advantage": "Advantage",
       "Normal": "Normal",
       "Disadvantage": "Disadvantage",
       "Use": "Use",
-      "MoreOptions": "More options…",
+      "MoreOptions": "dnd5e window (ammunition, attack mode…)",
       "Cancel": "Cancel",
       "Attack": "Attack",
       "Damage": "Damage",
@@ -72,7 +72,20 @@
       "TemplatePlaced": "Area placed on your token on the map. The DM can move or rotate it.",
       "TemplateNoScene": "There is no active scene to place the area on.",
       "TemplateNoPermission": "You don't have permission to place areas on the map. Ask the DM.",
-      "TemplateFailed": "The area could not be placed on the map."
+      "TemplateFailed": "The area could not be placed on the map.",
+      "Save": "Save",
+      "Critical": "Critical!",
+      "Heal": "Heal",
+      "SaveDC": "DC {dc} {ability}",
+      "SlotLevel": "Lv. {level} ({n})",
+      "SlotPact": "Pact lv. {level} ({n})",
+      "SlotChoose": "Spell slot level",
+      "Cast": "Cast",
+      "CastAt": "Cast lv. {level}",
+      "EndCast": "End this casting: the next button casts it again",
+      "AlreadyCast": "{name} is already cast. To cast it again, tap “Cast ✕” on its row.",
+      "NormalDamage": "Normal damage",
+      "CriticalDamage": "Critical damage (double dice)"
     },
     "Combat": {
       "None": "No combat",
@@ -111,20 +124,8 @@
         "Dead": "Your character has died."
       }
     },
-    "Remote": {
-      "NoSocketlib": "{name} could not be used: light mode needs the socketlib module active.",
-      "NoGM": "{name} could not be used: the DM is not connected.",
-      "GMNotViewing": "{name} could not be used: the DM is not viewing the TV scene.",
-      "NotOwner": "{name} could not be used: the DM does not see this character as yours.",
-      "NotFound": "{name} could not be used: the DM could not find the item.",
-      "Cancelled": "{name} was not used (it was cancelled or something was missing: a target, a spell slot or uses).",
-      "Error": "{name} could not be used on the DM's PC: {error}"
-    },
     "Use": {
       "Busy": "Wait: {name} is still being used.",
-      "NotUsed": "{name} was not used (it was cancelled or something was missing: a target, a spell slot or uses). If this keeps happening, tell the DM.",
-      "WindowClosed": "{name} was not used: a window it needed was closed. Tell the DM (details are in their console).",
-      "Stuck": "{name} is still waiting for something (a window or a chat card button). You can use something else now; if nothing shows up, tell the DM.",
       "Error": "{name} could not be used: {error}. Tell the DM (details are in their console)."
     },
     "Hud": {
@@ -156,7 +157,7 @@
         "Miss": "Miss",
         "Critical": "Critical!",
         "Fumble": "Fumble",
-        "DamageHint": "Tap “Damage” (or “Healing”) on the card below to roll it."
+        "DamageHint": "Tap “Damage” on the row to roll it."
       },
       "Picker": {
         "One": "Tap who you're aiming at. It shows on the TV.",
@@ -334,10 +335,6 @@
         "Hint": "The screen won't turn off by itself while the view is open. Uses a bit more battery.",
         "Unsupported": "This browser doesn't allow it (it needs HTTPS, like The Forge, and a recent browser)."
       },
-      "LightMode": {
-        "Name": "Light mode (slow devices)",
-        "Hint": "This device does not load the map. With Midi QOL, attacks and spells run on the DM's PC (needs socketlib). The page reloads."
-      },
       "PhoneMusic": {
         "Name": "Music on the phone",
         "Hint": "Music normally plays only on the TV. Turn this on to hear it here too (uses data and battery)."
@@ -381,6 +378,71 @@
         "Name": "Use the normal interface on this device",
         "Hint": "When checked, this browser will not show the mobile view even on a phone."
       }
+    },
+    "Status": {
+      "Title": "Status",
+      "Concentrating": "Concentrating on",
+      "EndConcentration": "End",
+      "EndConcentrationTitle": "End concentration?",
+      "EndConcentrationContent": "Stop concentrating on {name}? The spell ends.",
+      "ConcentrationReplaced": "You stop concentrating on {name}: you can only concentrate on one spell at a time.",
+      "ExhaustionLevel": "Level {level}",
+      "NoDescription": "No description."
+    },
+    "Save": {
+      "Title": "Roll a saving throw!",
+      "ConcentrationTitle": "Keep your concentration!",
+      "From": "Requested by: {source}",
+      "Button": "{ability} saving throw",
+      "ConcentrationButton": "Concentration ({ability})",
+      "ConcentrationSource": "You took damage",
+      "Later": "Not now",
+      "More": "+{count} more after this one",
+      "Success": "Success",
+      "Failure": "Failure"
+    },
+    "Conditions": {
+      "blinded": "You can't see. You fail checks that require sight. Your attacks have disadvantage and attacks against you have advantage.",
+      "charmed": "You can't attack or harm the charmer. The charmer has advantage on social checks against you.",
+      "deafened": "You can't hear. You fail checks that require hearing.",
+      "exhaustion": "Each level gives −2 to your d20 tests (attacks, checks and saves) and −5 feet of speed. A long rest removes one level. At level 6, you die.",
+      "exhaustionLegacy": "Level 1: disadvantage on ability checks. 2: speed halved. 3: disadvantage on attacks and saves. 4: hit point maximum halved. 5: speed 0. 6: death. A long rest removes one level.",
+      "frightened": "Disadvantage on checks and attacks while you can see the source of your fear. You can't willingly move closer to it.",
+      "grappled": "Your speed is 0. Disadvantage on attacks against anyone except the grappler. The grappler can drag you.",
+      "incapacitated": "You can't take actions, bonus actions or reactions, or speak. Your concentration breaks. Disadvantage on initiative.",
+      "invisible": "No one can see you. Advantage on initiative and on your attacks; attacks against you have disadvantage (unless they can see you some other way).",
+      "paralyzed": "You're incapacitated and your speed is 0. You fail Strength and Dexterity saves. Attacks against you have advantage and any hit within 5 feet is a critical hit.",
+      "petrified": "You're stone: incapacitated, speed 0, you fail Strength and Dexterity saves, resist all damage and are immune to poison. Attacks against you have advantage.",
+      "poisoned": "Disadvantage on attack rolls and ability checks.",
+      "prone": "You're on the ground: you can only crawl or stand up (costs half your speed). Your attacks have disadvantage. Against you: advantage within 5 feet, disadvantage from farther away.",
+      "restrained": "Your speed is 0. Your attacks and Dexterity saves have disadvantage. Attacks against you have advantage.",
+      "stunned": "You're incapacitated. You fail Strength and Dexterity saves. Attacks against you have advantage.",
+      "unconscious": "You're incapacitated, prone and drop what you hold. Speed 0, you fail Strength and Dexterity saves. Attacks against you have advantage and any hit within 5 feet is a critical hit.",
+      "surprised": "You were caught off guard: disadvantage on your initiative roll.",
+      "bleeding": "You're bleeding: you lose hit points until you're healed or the wound is stopped. The DM will tell you how much.",
+      "burning": "You're on fire: you take 1d4 fire damage at the start of each turn. Use an action to put it out (you fall prone).",
+      "cursed": "You're under a curse. The DM will tell you what it does.",
+      "diseased": "You have a disease. The DM will tell you its effects.",
+      "dehydration": "You lack water: you gain exhaustion levels until you drink.",
+      "malnutrition": "You lack food: you gain exhaustion levels until you eat.",
+      "suffocation": "You can't breathe: once you run out of breath, you gain an exhaustion level at the end of each turn.",
+      "falling": "You're falling. When you land you take 1d6 bludgeoning damage per 10 feet (max 20d6) and fall prone.",
+      "silenced": "You can't speak: you can't cast spells with a verbal component.",
+      "transformed": "Your form changed (for example Wild Shape or Polymorph): your statistics may be different.",
+      "dead": "Your character is dead.",
+      "dodging": "Until your next turn, attacks against you have disadvantage and you have advantage on Dexterity saves.",
+      "ethereal": "You're on the Ethereal Plane: you can't affect or be affected by the normal world (with some exceptions).",
+      "flying": "You're flying. If you fall prone or your speed drops to 0, you fall.",
+      "hovering": "You're hovering: you don't fall even if knocked prone.",
+      "burrowing": "You're burrowing underground.",
+      "hiding": "You're hidden: others don't know where you are and you have advantage on your next attack. It ends if you make noise, attack or are found.",
+      "marked": "You're marked by an effect (for example Hunter's Mark or Hex).",
+      "sleeping": "You're asleep: unconscious until you take damage or someone wakes you.",
+      "stable": "You're stable at 0 HP: no more death saves. You regain 1 HP after 1d4 hours.",
+      "coverHalf": "Half cover: +2 to your AC and Dexterity saves.",
+      "coverThreeQuarters": "Three-quarters cover: +5 to your AC and Dexterity saves.",
+      "coverTotal": "Total cover: you can't be targeted directly by attacks or spells.",
+      "bloodied": "You have half your hit points or fewer."
     }
   }
 }

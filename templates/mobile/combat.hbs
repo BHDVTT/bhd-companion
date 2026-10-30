@@ -49,6 +49,7 @@
   {{/if}}
 
   {{#if deathSaves}}{{> "modules/bhd-companion/templates/mobile/death-saves.hbs" deathSaves=deathSaves}}{{/if}}
+  {{#if status}}{{> "modules/bhd-companion/templates/mobile/status.hbs" status=status}}{{/if}}
 
   {{#if hud}}
   {{!-- Objetivos marcados (se ven resaltados en la TV) --}}
@@ -176,6 +177,7 @@
 
   {{else}}
   {{#if deathSaves}}{{> "modules/bhd-companion/templates/mobile/death-saves.hbs" deathSaves=deathSaves}}{{/if}}
+  {{#if status}}{{> "modules/bhd-companion/templates/mobile/status.hbs" status=status}}{{/if}}
   <div class="bhd-placeholder">
     <i class="fa-solid fa-swords" aria-hidden="true"></i>
     <h2>{{localize "BHD.Combat.None"}}</h2>

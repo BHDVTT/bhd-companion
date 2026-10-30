@@ -127,15 +127,6 @@ export function registerSettings() {
     type: new foundry.data.fields.BooleanField({ initial: true })
   });
 
-  // Modo ligero (aparatos lentos): sin mapa; con Midi QOL, los usos los hace el PC del DM (socketlib).
-  game.settings.register(MODULE_ID, "lightMode", {
-    name: "BHD.Settings.LightMode.Name",
-    hint: "BHD.Settings.LightMode.Hint",
-    scope: "client",
-    config: false,
-    type: new foundry.data.fields.BooleanField({ initial: false })
-  });
-
   game.settings.register(MODULE_ID, "phoneMusic", {
     name: "BHD.Settings.PhoneMusic.Name",
     hint: "BHD.Settings.PhoneMusic.Hint",

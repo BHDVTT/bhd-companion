@@ -4,11 +4,11 @@
     {{!-- Solo se dibuja la pestaña visible (más rápido en teléfonos viejos). --}}
     {{#if tab.active}}
     {{#if (eq tab.id "character")}}
-    {{> "modules/bhd-companion/templates/mobile/character.hbs" sheet=@root.sheet choices=@root.choices hpAmount=@root.hpAmount deathSaves=@root.deathSaves}}
+    {{> "modules/bhd-companion/templates/mobile/character.hbs" sheet=@root.sheet choices=@root.choices hpAmount=@root.hpAmount deathSaves=@root.deathSaves status=@root.status}}
     {{else if (eq tab.id "actions")}}
     {{> "modules/bhd-companion/templates/mobile/actions.hbs" actions=@root.actions filters=@root.actionFilters spellSearch=@root.spellSearch}}
     {{else if (eq tab.id "combat")}}
-    {{> "modules/bhd-companion/templates/mobile/combat.hbs" combat=@root.combat hud=@root.hud hudResult=@root.hudResult deathSaves=@root.deathSaves}}
+    {{> "modules/bhd-companion/templates/mobile/combat.hbs" combat=@root.combat hud=@root.hud hudResult=@root.hudResult deathSaves=@root.deathSaves status=@root.status}}
     {{else if (eq tab.id "move")}}
     {{> "modules/bhd-companion/templates/mobile/move.hbs" move=@root.move}}
     {{else if (eq tab.id "inventory")}}
