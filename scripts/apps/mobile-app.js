@@ -1,10 +1,11 @@
-import { MODULE_ID, TEMPLATE_PATH } from "../constants.js";
+import { isMidiActive, MODULE_ID, TEMPLATE_PATH } from "../constants.js";
 import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "./character-data.js";
 import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.js";
 import { getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
 import { BASIC_ACTIONS, getTargetNeed, prepareHud, prepareTargetCards, prepareTargetChips } from "./combat-hud-data.js";
 import { ECONOMY_BLOCKS, getEconomy, getOwnCombatant, setEconomy } from "../economy.js";
-import { setTargets, toggleTarget } from "../targets.js";
+import { getTargetIds, setTargets, toggleTarget } from "../targets.js";
+import { getRemoteBlock, requestMidiUse } from "../midi-remote.js";
 import { prepareInventory } from "./inventory-data.js";
 import { getMoveToken, prepareMovement } from "./move-data.js";
 import { requestMovement } from "../movement.js";
@@ -13,8 +14,10 @@ import { applyLargeText, syncPlaylistSounds } from "../mobile-mode.js";
 import { canKeepAwake, updateWakeLock } from "../wake-lock.js";
 import { getInstallMode, promptInstall } from "../home-screen.js";
 import { reloadWithoutUrlMode } from "../device.js";
-import { useError, useLog } from "../use-log.js";
-import { getScaledActivity, getScaling, getTurnKey, needsCast, needsUsageDialog, QuickActionState, ROLL_KINDS } from "../quick-actions.js";
+import { useError, useLog, useWarn } from "../use-log.js";
+import {
+  getScaledActivity, getScaling, getSlotOptions, getTurnKey, needsCast, needsUsageDialog, QuickActionState, ROLL_KINDS
+} from "../quick-actions.js";
 import { applyEnchantment, prepareEnchantPicker, removeEnchantment } from "../enchantments.js";
 import { getConditionInfo, prepareStatus } from "./status-data.js";
 import { findSavePrompts, getSavePromptLabel, rollSavePrompt } from "../save-prompts.js";
@@ -24,6 +27,9 @@ const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applicat
 
 /** Cuánto tiempo (ms) se ve el resultado de una tirada en el teléfono. */
 const TOAST_DURATION = 4000;
+
+/** Cuánto tiempo (ms) se ve el resultado de un uso hecho por el DM con Midi QOL. */
+const MIDI_RESULT_DURATION = 12000;
 
 /** Cuánto hay que mantener el dedo (ms) en Ataque o Daño para abrir el menú (ventaja / crítico). */
 const LONG_PRESS_MS = 450;
@@ -65,6 +71,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       actionFilter: BHDMobileApp.#onActionFilter,
       closeTray: BHDMobileApp.#onCloseTray,
       chooseUse: BHDMobileApp.#onChooseUse,
+      bhdChooseSlot: BHDMobileApp.#onChooseSlot,
+      bhdMidiResultClose: BHDMobileApp.#onMidiResultClose,
+      bhdReactionUse: BHDMobileApp.#onReactionUse,
+      bhdReactionPass: BHDMobileApp.#onReactionPass,
       bhdEnchantOpen: BHDMobileApp.#onEnchantOpen,
       bhdEnchantPick: BHDMobileApp.#onEnchantPick,
       bhdEnchantRemove: BHDMobileApp.#onEnchantRemove,
@@ -179,6 +189,18 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Contador para descartar dibujos del panel que ya quedaron viejos. */
   #trayRender = 0;
+
+  /** Tarjeta del chat de un uso hecho por el DM que aún no llegó a este teléfono (se abre al llegar). */
+  #pendingTrayId = null;
+
+  /** Temporizador del resultado de un uso con Midi QOL. */
+  #midiResultTimeout;
+
+  /**
+   * Aviso de reacción abierto (Midi ofrece Shield, Hellish Rebuke...).
+   * @type {{activities: Activity[], resolve: Function, timer: number, tick: number}|null}
+   */
+  #reaction = null;
 
   /**
    * Toque largo en curso sobre una fila de la pestaña Acciones.
@@ -373,6 +395,18 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     saveAlert.setAttribute("role", "alertdialog");
     saveAlert.hidden = true;
     this.element.append(saveAlert);
+
+    // Con Midi QOL: reacciones que ofrece Midi (con tiempo límite) y resultado de cada uso hecho por el DM.
+    const reactionAlert = document.createElement("div");
+    reactionAlert.className = "bhd-reaction-alert";
+    reactionAlert.setAttribute("role", "alertdialog");
+    reactionAlert.hidden = true;
+    this.element.append(reactionAlert);
+    const midiResult = document.createElement("section");
+    midiResult.className = "bhd-midi-result";
+    midiResult.setAttribute("role", "status");
+    midiResult.hidden = true;
+    this.element.append(midiResult);
 
     // Panel de ajustes del teléfono (letra grande, pantalla encendida, música, instalar...).
     const settings = document.createElement("div");
@@ -642,7 +676,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #onPointerDown(event) {
     clearTimeout(this.#longPress?.timer);
     this.#longPress = null;
-    const target = event.target.closest('.bhd-roll-btn[data-kind="attack"], .bhd-roll-btn[data-kind="damage"]');
+    const target = event.target.closest(
+      '.bhd-roll-btn[data-kind="attack"], .bhd-roll-btn[data-kind="damage"], .bhd-roll-btn[data-kind="midi"]'
+    );
     if ( !target || (event.button !== 0) ) return;
     const press = this.#longPress = { target, x: event.clientX, y: event.clientY, fired: false };
     press.timer = setTimeout(() => {
@@ -681,16 +717,40 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       <button type="button" class="${cssClass}" data-action="chooseUse" data-mode="${mode}" ${data}>
         <i class="${icon}" aria-hidden="true"></i><span>${game.i18n.localize(label)}</span>
       </button>`;
-    const modes = (kind === "attack") ? `
+    const adv = `
         ${option("advantage", "fa-solid fa-angles-up", "BHD.Actions.Advantage", "bhd-mode bhd-mode-adv")}
         ${option("normal", "fa-solid fa-dice-d20", "BHD.Actions.Normal", "bhd-mode")}
-        ${option("disadvantage", "fa-solid fa-angles-down", "BHD.Actions.Disadvantage", "bhd-mode bhd-mode-dis")}` : `
+        ${option("disadvantage", "fa-solid fa-angles-down", "BHD.Actions.Disadvantage", "bhd-mode bhd-mode-dis")}`;
+    let modes;
+    let slots = "";
+    if ( kind === "midi" ) {
+      // Con Midi: ventaja / desventaja si es un ataque, y el nivel del hechizo (si hay más de uno para elegir).
+      const activity = item.system.activities?.get(activityId);
+      const verb = (item.type === "spell") ? "Cast" : ((activity?.type === "attack") ? "Attack" : "Use");
+      modes = (activity?.type === "attack") ? adv
+        : option("normal", "fa-solid fa-hand-sparkles", `BHD.Midi.${verb}`, "bhd-mode bhd-mode-single");
+      const options = getSlotOptions(activity);
+      if ( options?.length > 1 ) {
+        const current = this.#quick.getSlot(activity);
+        const escape = foundry.utils.escapeHTML;
+        slots = `
+        <h4 class="bhd-chooser-heading">${escape(game.i18n.localize("BHD.Actions.SlotChoose"))}</h4>
+        <div class="bhd-chooser-slots">${options.map(o => `
+          <button type="button" class="bhd-slot-chip ${o.value === current ? "bhd-on" : ""}" data-action="bhdChooseSlot"
+                  data-item-id="${itemId}" data-slot="${escape(o.value)}" aria-pressed="${o.value === current}" ${o.disabled ? "disabled" : ""}>
+            ${escape(o.label)}
+          </button>`).join("")}
+        </div>`;
+      }
+    }
+    else modes = (kind === "attack") ? adv : `
         ${option("normal", "fa-solid fa-droplet", "BHD.Actions.NormalDamage", "bhd-mode")}
         ${option("critical", "fa-solid fa-burst", "BHD.Actions.CriticalDamage", "bhd-mode bhd-mode-crit")}`;
     chooser.innerHTML = `
       <div class="bhd-chooser-backdrop" data-action="closeChooser"></div>
       <section class="bhd-chooser-sheet" role="dialog" aria-modal="true">
         <header class="bhd-chooser-header"><img src="" alt=""><span class="bhd-chooser-name"></span></header>
+        ${slots}
         <div class="bhd-chooser-modes">${modes}</div>
         ${(kind === "attack") ? option("full", "fa-solid fa-sliders", "BHD.Actions.MoreOptions", "bhd-chooser-more") : ""}
         <button type="button" class="bhd-chooser-cancel" data-action="closeChooser">${game.i18n.localize("BHD.Actions.Cancel")}</button>
@@ -849,6 +909,194 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       button?.classList.remove("bhd-rolling");
       this.#renderRows();
     }
+  }
+
+  /**
+   * Con Midi QOL: el botón principal de la fila (Atacar, Lanzar o Usar). El teléfono no ejecuta nada: elige
+   * los objetivos (si la actividad los necesita), manda la petición al DM y muestra lo que el DM devuelve
+   * (impacta o falla, crítico, daño). La tarjeta de Midi se ve en el panel de resultados.
+   * @param {Item} item
+   * @param {Activity} activity
+   * @param {object} [options]
+   * @param {string} [options.mode="normal"]  "normal", "advantage" o "disadvantage".
+   * @param {HTMLElement} [options.button]
+   * @param {string} [options.hudBlock]       Bloque del HUD de combate (para marcar lo usado en el turno).
+   */
+  async #runMidi(item, activity, { mode="normal", button, hudBlock }={}) {
+    if ( !this.actor || (item.actor !== this.actor) || !activity ) return;
+    if ( this.#using ) {
+      ui.notifications.info(game.i18n.format("BHD.Use.Busy", { name: item.name }));
+      return;
+    }
+    const tag = `${item.name} (Midi)`;
+    const blocked = getRemoteBlock();
+    if ( blocked ) {
+      useWarn(`${tag} | No se puede pedir al DM: ${blocked}`);
+      ui.notifications.warn(game.i18n.format(`BHD.Midi.Reason.${blocked}`, { name: item.name }));
+      return;
+    }
+
+    // Objetivos: los elige el jugador aquí (el DM los usa tal cual). Con área o sobre uno mismo, ninguno.
+    let targetIds = [];
+    const need = getTargetNeed([activity]);
+    if ( need ) {
+      const ids = await this.#pickTargets({ title: item.name, img: item.img, max: need.max });
+      if ( ids === null ) return;
+      setTargets(ids);
+      targetIds = getTargetIds();
+    }
+    const slot = this.#quick.getSlot(activity);
+    const block = (hudBlock === "opportunity") ? "reaction" : (hudBlock ?? activity.activation?.type);
+
+    this.#using = true;
+    button?.classList.add("bhd-rolling");
+    this.#prepareTray(item);
+    this.#showWaiting(item);
+    try {
+      useLog(`${tag} | 1. Petición al DM`, {
+        activity: activity.name, type: activity.type, mode, slot,
+        targets: targetIds.map(id => game.scenes.active?.tokens.get(id)?.name ?? id)
+      });
+      const result = await requestMidiUse(activity, { targetIds, slot, mode });
+      this.#hideToast();
+      if ( !result?.ok ) {
+        useWarn(`${tag} | 2. El DM no lo usó: ${result?.reason}`, result?.error ?? "");
+        ui.notifications.warn(game.i18n.format(`BHD.Midi.Reason.${result?.reason ?? "Error"}`, {
+          name: item.name, error: result?.error ?? ""
+        }));
+        return;
+      }
+      useLog(`${tag} | 2. Resultado del DM`, result);
+      this.#markUsed(block);
+      if ( result.messageId ) this.#openTrayById(result.messageId);
+      this.#showMidiResult(item, result);
+      if ( hudBlock ) this.#hudResult = this.#toHudResult(item, result);
+    } catch(err) {
+      this.#hideToast();
+      useError(`${tag} | Error`, err);
+      ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: item.name, error: err?.message ?? String(err) }));
+    } finally {
+      this.#using = false;
+      button?.classList.remove("bhd-rolling");
+      this.#renderRows();
+    }
+  }
+
+  /**
+   * Aviso "Esperando al DM…" mientras el DM ejecuta el uso (no se quita solo).
+   * @param {Item} item
+   */
+  #showWaiting(item) {
+    const toast = this.element.querySelector(".bhd-toast");
+    if ( !toast ) return;
+    clearTimeout(this.#toastTimeout);
+    toast.classList.remove("bhd-crit", "bhd-fumble");
+    toast.innerHTML = `<span class="bhd-toast-label"></span>
+      <span class="bhd-toast-total bhd-toast-wait"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i></span>`;
+    toast.querySelector(".bhd-toast-label").textContent = game.i18n.format("BHD.Midi.Waiting", { name: item.name });
+    toast.hidden = false;
+  }
+
+  /** Quita el aviso de tirada (o el de espera). */
+  #hideToast() {
+    clearTimeout(this.#toastTimeout);
+    const toast = this.element?.querySelector(".bhd-toast");
+    if ( toast ) toast.hidden = true;
+  }
+
+  /**
+   * Muestra el resultado de un uso hecho por el DM: ataque (crítico, pifia), cada objetivo (impacta o falla,
+   * salva o no) y el daño que recibió. Impacta / falla solo con el ajuste del DM "showAttackResult".
+   * @param {Item} item
+   * @param {object} result  Lo que devuelve el DM (midi-remote.js).
+   */
+  #showMidiResult(item, result) {
+    const panel = this.element.querySelector(".bhd-midi-result");
+    if ( !panel ) return;
+    const escape = foundry.utils.escapeHTML;
+    const localize = key => escape(game.i18n.localize(key));
+    const attack = result.attack;
+    const tags = [];
+    if ( attack?.critical ) tags.push(`<span class="bhd-midi-tag bhd-crit">${localize("BHD.Hud.Result.Critical")}</span>`);
+    if ( attack?.fumble ) tags.push(`<span class="bhd-midi-tag bhd-fumble">${localize("BHD.Hud.Result.Fumble")}</span>`);
+
+    const damageText = amount => {
+      if ( !Number.isFinite(amount) ) return "";
+      return (amount < 0) ? game.i18n.format("BHD.Midi.Healed", { n: -amount }) : game.i18n.format("BHD.Midi.Damage", { n: amount });
+    };
+    const rows = (result.targets ?? []).map(target => {
+      let verdict = "";
+      let css = "";
+      if ( (target.hit !== null) && result.showHits ) {
+        verdict = game.i18n.localize(target.hit ? "BHD.Hud.Result.Hit" : "BHD.Hud.Result.Miss");
+        css = target.hit ? "bhd-hit" : "bhd-miss";
+      }
+      else if ( target.saved !== null ) {
+        verdict = game.i18n.localize(target.saved ? "BHD.Midi.Saved" : "BHD.Midi.Failed");
+        css = target.saved ? "bhd-miss" : "bhd-hit";
+      }
+      const damage = damageText(target.damage);
+      return `<li class="bhd-midi-target ${css}">
+        <span class="bhd-midi-target-name">${escape(target.name)}</span>
+        ${verdict ? `<strong class="bhd-midi-verdict">${escape(verdict)}</strong>` : ""}
+        ${damage ? `<span class="bhd-midi-damage">${escape(damage)}</span>` : ""}
+      </li>`;
+    }).join("");
+    let summary = "";
+    if ( !rows && Number.isFinite(result.damageTotal) && result.damageTotal ) summary = damageText(result.damageTotal);
+    else if ( !rows && !attack ) summary = game.i18n.localize("BHD.Midi.Done");
+
+    panel.innerHTML = `
+      <header class="bhd-midi-result-head">
+        <img src="${escape(item.img)}" alt="">
+        <strong class="bhd-midi-result-name">${escape(item.name)}</strong>
+        ${tags.join("")}
+        <button type="button" class="bhd-midi-result-close" data-action="bhdMidiResultClose" aria-label="${localize("BHD.Actions.Close")}">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </header>
+      ${attack ? `<p class="bhd-midi-attack"><i class="fa-solid fa-dice-d20" aria-hidden="true"></i>
+        ${localize("BHD.Actions.Attack")}: <strong>${escape(String(attack.total ?? "?"))}</strong></p>` : ""}
+      ${rows ? `<ul class="bhd-midi-targets">${rows}</ul>` : ""}
+      ${summary ? `<p class="bhd-midi-summary">${escape(summary)}</p>` : ""}`;
+    panel.classList.toggle("bhd-crit", !!attack?.critical);
+    panel.hidden = false;
+    clearTimeout(this.#midiResultTimeout);
+    this.#midiResultTimeout = setTimeout(() => panel.hidden = true, MIDI_RESULT_DURATION);
+  }
+
+  /**
+   * El mismo resultado en el formato del HUD de combate.
+   * @param {Item} item
+   * @param {object} result
+   * @returns {object}
+   */
+  #toHudResult(item, result) {
+    const verdicts = (result.targets ?? []).filter(t => (t.hit !== null) && result.showHits).map(t => ({
+      id: t.hit ? "hit" : "miss",
+      name: t.name,
+      label: game.i18n.localize(t.hit ? "BHD.Hud.Result.Hit" : "BHD.Hud.Result.Miss")
+    }));
+    const damage = (result.targets ?? []).reduce((sum, t) => sum + (Number.isFinite(t.damage) && (t.damage > 0) ? t.damage : 0), 0);
+    return {
+      itemId: item.id,
+      name: item.name,
+      img: item.img,
+      attack: result.attack ? { total: result.attack.total, crit: result.attack.critical, fumble: result.attack.fumble } : null,
+      verdicts,
+      damage: damage ? { total: damage, label: game.i18n.localize("BHD.Actions.Damage") } : null,
+      hint: null
+    };
+  }
+
+  /**
+   * Abre en el panel de resultados la tarjeta de un uso hecho por el DM (o espera a que llegue).
+   * @param {string} messageId
+   */
+  #openTrayById(messageId) {
+    const message = game.messages.get(messageId);
+    if ( message ) this.#openTray(message);
+    else this.#pendingTrayId = messageId;
   }
 
   /**
@@ -1041,6 +1289,12 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( action === "create" ) this.#checkSavePrompts(message);
     else if ( action === "delete" ) this.#dropSavePrompts(message.id);
 
+    // Tarjeta de Midi de un uso que hizo el DM: llegó después de su resultado.
+    if ( (action === "create") && (message.id === this.#pendingTrayId) ) {
+      this.#pendingTrayId = null;
+      this.#openTray(message);
+      return;
+    }
     if ( !this.#trayItemId ) return;
     if ( action === "create" ) {
       const origin = message.getFlag("dnd5e", "originatingMessage");
@@ -1107,7 +1361,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   #checkSavePrompts(message) {
     let added = false;
-    for ( const prompt of findSavePrompts(message, this.actor) ) {
+    for ( const prompt of findSavePrompts(message, this.actor, { midi: isMidiActive() }) ) {
       if ( this.#seenPrompts.has(prompt.id) ) continue;
       this.#seenPrompts.add(prompt.id);
       this.#savePrompts.push(prompt);
@@ -1135,7 +1389,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #showSaveAlert(vibrate) {
     const alert = this.element?.querySelector(".bhd-save-alert");
     const prompt = this.#savePrompts[0];
-    const actor = this.actor;
+    const actor = prompt?.actor ?? this.actor;
     if ( !alert ) return;
     if ( !prompt || !actor ) {
       alert.hidden = true;
@@ -1143,26 +1397,169 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     const localize = key => game.i18n.localize(key);
     const concentration = prompt.type === "concentration";
+    const title = concentration ? "BHD.Save.ConcentrationTitle"
+      : (["check", "skill", "tool"].includes(prompt.type) ? "BHD.Save.CheckTitle" : "BHD.Save.Title");
     const more = this.#savePrompts.length - 1;
+    // Midi espera la tirada: no hay "Ahora no" (si Midi tiene tiempo límite, se tira sola al acabarse).
+    const later = prompt.midi
+      ? (prompt.timeout ? `<span class="bhd-save-alert-more">${game.i18n.format("BHD.Save.AutoRoll", { seconds: prompt.timeout })}</span>` : "")
+      : `<button type="button" class="bhd-save-alert-later" data-action="bhdSaveDismiss">${localize("BHD.Save.Later")}</button>`;
     alert.innerHTML = `
       <div class="bhd-save-alert-box ${concentration ? "bhd-save-concentration" : ""}">
         <i class="fa-solid ${concentration ? "fa-brain" : "fa-shield-heart"} bhd-save-alert-icon" aria-hidden="true"></i>
-        <strong class="bhd-save-alert-title">${localize(concentration ? "BHD.Save.ConcentrationTitle" : "BHD.Save.Title")}</strong>
+        <strong class="bhd-save-alert-title">${localize(title)}</strong>
         <span class="bhd-save-alert-source"></span>
         <button type="button" class="bhd-big-btn bhd-save-alert-roll" data-action="bhdSaveRoll">
           <i class="fa-solid fa-dice-d20" aria-hidden="true"></i> <span></span>
         </button>
-        <button type="button" class="bhd-save-alert-later" data-action="bhdSaveDismiss">${localize("BHD.Save.Later")}</button>
+        ${later}
         ${more > 0 ? `<span class="bhd-save-alert-more">${game.i18n.format("BHD.Save.More", { count: more })}</span>` : ""}
       </div>`;
-    alert.querySelector(".bhd-save-alert-source").textContent = prompt.source
-      ? game.i18n.format("BHD.Save.From", { source: prompt.source }) : "";
+    const source = [(actor !== this.actor) ? actor.name : "", prompt.source].filter(_ => _).join(" · ");
+    alert.querySelector(".bhd-save-alert-source").textContent = source
+      ? game.i18n.format("BHD.Save.From", { source }) : "";
     alert.querySelector(".bhd-save-alert-roll span").textContent = getSavePromptLabel(prompt, actor);
     alert.hidden = false;
     if ( !vibrate ) return;
     try {
       if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([200, 100, 200]);
     } catch(err) {}
+  }
+
+  /* -------------------------------------------- */
+  /*  Peticiones de Midi QOL (midi-prompts.js)    */
+  /* -------------------------------------------- */
+
+  /**
+   * Midi pide una salvación o prueba: sale el aviso grande y se espera a que el jugador toque "Tirar"
+   * (o a que se acabe el tiempo límite de Midi, si tiene).
+   * @param {object} prompt  Como un SavePrompt, con `midi: true`, `actor` y `timeout` (segundos, 0 = sin límite).
+   * @returns {Promise<boolean>}  true si el jugador tocó Tirar; false si se acabó el tiempo.
+   */
+  promptMidiRoll(prompt) {
+    return new Promise(resolve => {
+      const finish = tapped => {
+        clearTimeout(prompt.timer);
+        const index = this.#savePrompts.indexOf(prompt);
+        if ( index >= 0 ) {
+          this.#savePrompts.splice(index, 1);
+          this.#showSaveAlert(false);
+        }
+        resolve(tapped);
+      };
+      prompt.resolve = finish;
+      if ( prompt.timeout > 0 ) prompt.timer = setTimeout(() => finish(false), prompt.timeout * 1000);
+      this.#savePrompts.push(prompt);
+      this.#showSaveAlert(true);
+    });
+  }
+
+  /**
+   * La tirada que pidió Midi ya se hizo: muestra el total (y éxito / fallo si se ve la CD).
+   * @param {object} prompt
+   * @param {Roll[]|Roll|object} result  Lo que devuelve Midi.
+   */
+  onMidiRollDone(prompt, result) {
+    const roll = Array.isArray(result) ? result[0] : result;
+    if ( !Number.isFinite(roll?.total) ) return;
+    const actor = prompt.actor ?? this.actor;
+    let label = getSavePromptLabel(prompt, actor);
+    if ( prompt.showDC && prompt.dc ) {
+      label += ` · ${game.i18n.localize(roll.total >= prompt.dc ? "BHD.Save.Success" : "BHD.Save.Failure")}`;
+    }
+    useLog(`Tirada de Midi: ${label} = ${roll.total}`);
+    this.#showRollResult(label, roll);
+  }
+
+  /**
+   * Midi ofrece reacciones: aviso con la lista, una cuenta atrás y "Pasar".
+   * @param {object} options
+   * @param {Activity[]} options.activities
+   * @param {string} options.flavor   Qué la provoca (texto de Midi).
+   * @param {string} options.trigger  Quién la provoca.
+   * @param {number} options.timeout  Segundos.
+   * @returns {Promise<Activity|null>}  La elegida, o null si pasa o se acaba el tiempo.
+   */
+  promptReaction({ activities, flavor, trigger, timeout }) {
+    this.#closeReaction(null);
+    const alert = this.element?.querySelector(".bhd-reaction-alert");
+    if ( !alert ) return Promise.resolve(null);
+    const escape = foundry.utils.escapeHTML;
+    const localize = key => escape(game.i18n.localize(key));
+    const options = activities.map((activity, index) => {
+      const name = (activity.name && (activity.name !== activity.item.name)) ? `${activity.item.name}: ${activity.name}` : activity.item.name;
+      return `<button type="button" class="bhd-reaction-option" data-action="bhdReactionUse" data-index="${index}">
+        <img src="${escape(activity.item.img)}" alt=""><span>${escape(name)}</span>
+      </button>`;
+    }).join("");
+    alert.innerHTML = `
+      <div class="bhd-reaction-box">
+        <i class="fa-solid fa-bolt bhd-reaction-icon" aria-hidden="true"></i>
+        <strong class="bhd-reaction-title">${localize("BHD.Reaction.Title")}</strong>
+        ${trigger ? `<span class="bhd-reaction-trigger">${escape(game.i18n.format("BHD.Reaction.Trigger", { name: trigger }))}</span>` : ""}
+        ${flavor ? `<span class="bhd-reaction-flavor">${escape(flavor)}</span>` : ""}
+        <div class="bhd-reaction-timer"><span class="bhd-reaction-bar"></span></div>
+        <span class="bhd-reaction-seconds"></span>
+        <div class="bhd-reaction-options">${options}</div>
+        <button type="button" class="bhd-reaction-pass" data-action="bhdReactionPass">${localize("BHD.Reaction.Pass")}</button>
+      </div>`;
+    alert.hidden = false;
+    try {
+      if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([200, 80, 200, 80, 200]);
+    } catch(err) {}
+
+    return new Promise(resolve => {
+      const ends = Date.now() + (timeout * 1000);
+      const bar = alert.querySelector(".bhd-reaction-bar");
+      const seconds = alert.querySelector(".bhd-reaction-seconds");
+      const update = () => {
+        const left = Math.max(0, ends - Date.now());
+        if ( bar ) bar.style.transform = `scaleX(${left / (timeout * 1000)})`;
+        if ( seconds ) seconds.textContent = game.i18n.format("BHD.Reaction.Seconds", { seconds: Math.ceil(left / 1000) });
+      };
+      update();
+      this.#reaction = {
+        activities,
+        resolve,
+        tick: setInterval(update, 250),
+        timer: setTimeout(() => {
+          useLog("Reacción: se acabó el tiempo");
+          this.#closeReaction(null);
+        }, timeout * 1000)
+      };
+    });
+  }
+
+  /**
+   * Cierra el aviso de reacción y devuelve lo elegido.
+   * @param {Activity|null} activity
+   */
+  #closeReaction(activity) {
+    const reaction = this.#reaction;
+    this.#reaction = null;
+    const alert = this.element?.querySelector(".bhd-reaction-alert");
+    if ( alert ) alert.hidden = true;
+    if ( !reaction ) return;
+    clearTimeout(reaction.timer);
+    clearInterval(reaction.tick);
+    reaction.resolve(activity);
+  }
+
+  /**
+   * El DM terminó (o no pudo) la reacción elegida.
+   * @param {Activity} activity
+   * @param {object} result
+   */
+  onReactionDone(activity, result) {
+    if ( result?.uuid ) {
+      this.#showRollResult(game.i18n.format("BHD.Reaction.Used", { name: activity.item.name }), { total: "✓" });
+      this.#markUsed("reaction");
+      return;
+    }
+    const reason = result?.reason;
+    ui.notifications.warn(reason
+      ? game.i18n.format(`BHD.Midi.Reason.${reason}`, { name: activity.item.name, error: result?.error ?? "" })
+      : game.i18n.format("BHD.Reaction.NotUsed", { name: activity.item.name }));
   }
 
   /* -------------------------------------------- */
@@ -1632,7 +2029,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const item = this.actor?.items.get(itemId);
     if ( !item ) return;
     const activity = activityId ? item.system.activities?.get(activityId) : null;
-    await this.#runQuick(kind, item, activity ?? null, { event, button: target, hudBlock });
+    if ( kind === "midi" ) await this.#runMidi(item, activity, { button: target, hudBlock });
+    else await this.#runQuick(kind, item, activity ?? null, { event, button: target, hudBlock });
   }
 
   /**
@@ -1647,7 +2045,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const item = this.actor?.items.get(itemId);
     if ( !item ) return;
     const activity = activityId ? item.system.activities?.get(activityId) : null;
-    if ( mode === "full" ) await this.#useFull(item, activity, event);
+    if ( kind === "midi" ) await this.#runMidi(item, activity, { mode, hudBlock });
+    else if ( mode === "full" ) await this.#useFull(item, activity, event);
     else await this.#runQuick(kind, item, activity ?? null, { mode, event, hudBlock });
   }
 
@@ -1746,6 +2145,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {PointerEvent} event
    */
   static async #onSaveRoll(event) {
+    // Petición de Midi: la tirada la hace Midi (midi-prompts.js) en cuanto el jugador toca.
+    if ( this.#savePrompts[0]?.midi ) {
+      this.#savePrompts[0].resolve(true);
+      return;
+    }
     const actor = this.actor;
     const prompt = this.#savePrompts.shift();
     this.#showSaveAlert(false);
@@ -1770,8 +2174,54 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @this {BHDMobileApp}
    */
   static #onSaveDismiss() {
+    if ( this.#savePrompts[0]?.midi ) return;   // Midi espera la tirada
     this.#savePrompts.shift();
     this.#showSaveAlert(false);
+  }
+
+  /**
+   * Toca una reacción del aviso: la ejecuta el DM.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onReactionUse(event, target) {
+    const activity = this.#reaction?.activities[Number(target.dataset.index)];
+    if ( activity ) this.#closeReaction(activity);
+  }
+
+  /**
+   * No usa ninguna reacción.
+   * @this {BHDMobileApp}
+   */
+  static #onReactionPass() {
+    this.#closeReaction(null);
+  }
+
+  /**
+   * Cierra el resultado de un uso con Midi.
+   * @this {BHDMobileApp}
+   */
+  static #onMidiResultClose() {
+    clearTimeout(this.#midiResultTimeout);
+    const panel = this.element.querySelector(".bhd-midi-result");
+    if ( panel ) panel.hidden = true;
+  }
+
+  /**
+   * Elige el nivel del hechizo en el menú del toque largo (con Midi).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onChooseSlot(event, target) {
+    this.#quick.slots.set(target.dataset.itemId, target.dataset.slot);
+    for ( const chip of this.element.querySelectorAll(".bhd-chooser [data-action=bhdChooseSlot]") ) {
+      const on = chip === target;
+      chip.classList.toggle("bhd-on", on);
+      chip.setAttribute("aria-pressed", String(on));
+    }
+    this.#renderRows();
   }
 
   /**

@@ -6,7 +6,8 @@
  * en cuanto aparecen. Se dejan:
  * - Las ventanas de dnd5e para usar y tirar (`Dialog5e`: uso de actividad, opciones de tirada,
  *   descansos) y la de elegir actividad.
- * - Las ventanas propias del módulo (clase `bhd-dialog`).
+ * - Las ventanas propias del módulo (clase `bhd-dialog`), también las preguntas que reenvía el DM.
+ * - Las preguntas de Chris's Premades y de Midi QOL que llegan al teléfono durante un uso.
  * - Otros diálogos (`DialogV2` o el `Dialog` antiguo) solo si el jugador acaba de tocar la pantalla:
  *   son la respuesta a algo que pidió (p. ej. una confirmación de dnd5e). Los que salen solos se cierran.
  *
@@ -79,6 +80,13 @@ function isAllowed(app, element) {
   const dnd5eApps = globalThis.dnd5e?.applications;
   if ( dnd5eApps?.api?.Dialog5e && (app instanceof dnd5eApps.api.Dialog5e) ) return true;
   if ( dnd5eApps?.activity?.ActivityChoiceDialog && (app instanceof dnd5eApps.activity.ActivityChoiceDialog) ) {
+    return true;
+  }
+  // Preguntas que Chris's Premades y Midi QOL mandan al dueño del personaje durante un uso (llegan solas).
+  const asked = [globalThis.chrisPremades?.DialogApp, ...Object.entries(globalThis.MidiQOL?.apps ?? {})
+    .filter(([name]) => name.endsWith("Dialog")).map(([, cls]) => cls)];
+  if ( asked.some(cls => (typeof cls === "function") && (app instanceof cls) ) ) {
+    console.log(`BHD Companion | Pregunta de ${app.constructor?.name} en el teléfono`);
     return true;
   }
   const isDialog = (app instanceof foundry.applications.api.DialogV2) || (app instanceof foundry.appv1.api.Dialog);

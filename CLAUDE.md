@@ -22,6 +22,11 @@ hechizo o rasgo. Textos, números y botones salen de lo que calcula dnd5e (`item
 (`activity.use`, `rollAttack`, `rollDamage`, `applyEnchantment`...). Si algo no se puede mostrar bien en la
 vista, se abre la ventana nativa de dnd5e (compacta); nunca se inventa ni se esconde.
 
+**Con Midi QOL activo, todo se ejecuta en el cliente del DM.** El teléfono no usa ataques, hechizos ni rasgos:
+manda la petición por socketlib y el DM la ejecuta con `MidiQOL.completeActivityUse`. Lo que Midi, DAE o
+Chris's Premades calculan o preguntan sale de ellos (resultado del `workflow`, sus ventanas, sus peticiones de
+salvación y reacción); la vista solo lo muestra. Sin Midi, el teléfono usa el flujo nativo de dnd5e como antes.
+
 ## Reglas técnicas
 
 - Solo APIs de Foundry v13: `foundry.applications.api.ApplicationV2` +
@@ -47,6 +52,10 @@ vista, se abre la ventana nativa de dnd5e (compacta); nunca se inventa ni se esc
 - Sin Node en el PATH. Para comprobar sintaxis: copiar el `.js` como `.mjs` a la carpeta
   scratchpad y ejecutar `Foundry Virtual Tabletop.exe --check archivo.mjs` con
   `ELECTRON_RUN_AS_NODE=1`.
+- Sin Foundry ni Node en el PC: copiar `scripts/` al scratchpad, servirlo con un `HttpListener` de PowerShell
+  (localhost) y abrir con `chrome.exe --headless=new --dump-dom` una página que define `foundry`, `game`, `Hooks`...
+  como un Proxy que se devuelve a sí mismo e importa cada archivo: un `SyntaxError` (también un `import` con un
+  nombre que no existe) sale en la página. Desde `file://` Chrome no ejecuta los módulos.
 - El código fuente de Foundry v13 instalado (`C:\Program Files\Foundry Virtual Tabletop\resources\app\client`)
   es la referencia para verificar APIs antes de usarlas.
 
@@ -74,6 +83,10 @@ scripts/quick-actions.js     botones de tirada de cada fila (Ataque / Daño / CD
 scripts/item-details.js      detalle de una fila (ficha emergente de dnd5e + actividades con sus etiquetas)
 scripts/enchantments.js      encantar objetos desde el teléfono (arma de pacto...): lista en lugar de arrastrar
 scripts/save-prompts.js      salvaciones pendientes que pide el chat (hechizo del DM, concentración, petición)
+scripts/remote-socket.js     canal de socketlib del módulo (funciones por nombre)
+scripts/midi-remote.js       con Midi: el teléfono pide y el DM ejecuta (usos y reacciones), resultado, áreas sin clic en el DM
+scripts/midi-prompts.js      con Midi: salvaciones y reacciones que Midi pide al teléfono, en los avisos de la vista
+scripts/dialog-relay.js      con Midi: ventanas que salen en el DM durante un uso del teléfono → al teléfono y vuelta
 scripts/apps/status-data.js  concentración, condiciones (con explicación) y efectos activos
 scripts/mobile-templates.js  áreas de hechizo (plantillas) e invocaciones sin clic en el mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
@@ -263,6 +276,48 @@ lang/es.json, en.json        traducciones
   casillas libres más cercanas a la ficha del personaje (el DM las mueve). El jugador debe ser dueño del actor
   invocado (lo exige dnd5e).
 - `forceAll` no afecta a un televisor (user agent de TV).
+
+## Midi QOL en el cliente del DM (0.13.0, sin probar)
+
+- **Cuándo:** `isMidiActive()` (`constants.js`, módulo `midi-qol` activo). Sin Midi, nada de esto corre.
+- **Teléfono sin mapa:** con Midi, `enterMobileMode` usa `disableCanvas` (lo de la 0.10.0) en lugar del mapa oculto
+  y no parchea áreas ni invocaciones. Las fichas solo hacen falta en el DM (objetivos, alcance, animaciones).
+- **Canal:** `remote-socket.js` registra el módulo en socketlib (`socketlib.ready`, durante "init"); comparte
+  `module.bhd-companion` con los mensajes propios (los `type` de socketlib son números; cada uno ignora los del otro).
+  Funciones: `midiUse` y `midiReaction` (las ejecuta el DM activo, `executeAsGM`) y `relayDialog` (el jugador).
+- **Uso** (`midi-remote.js`): un solo botón por fila (`kind: "midi"`, Atacar / Lanzar / Usar, `prepareMidiButton`)
+  → `#runMidi`: objetivos con el selector si `getTargetNeed`, `requestMidiUse` con `{ actorUuid, itemId, activityId,
+  targetIds, slot, mode, sceneId }`. Sin DM (`getRemoteBlock`) avisa. El DM, en cola (`gmQueue`): comprueba dueño,
+  objetivos = uuids de fichas de la escena de la TV (si el DM mira otra escena: `GMNotViewing`), y
+  `MidiQOL.completeActivityUse(activity, { midiOptions: { targetUuids, ignoreUserTargets, fastForward*, advantage /
+  disadvantage, workflowOptions: { targetConfirmation: "none", autoRollAttack, autoFastAttack, fastForwardAttack,
+  autoRollDamage: "onHit", fastForwardDamage } }, spell: { slot } }, { configure: needsUsageDialog(activity) })`.
+  Devuelve `summarizeWorkflow`: tarjeta, ataque (total, crítico, pifia), por objetivo `hitTargets` / `saves` y
+  `damageList[].totalDamage` (negativo = curación). Impacta / falla solo con `showAttackResult`. El teléfono lo
+  muestra en `.bhd-midi-result` (y en el HUD), abre la tarjeta en el panel y marca el bloque usado.
+  Toque largo: ventaja / normal / desventaja (si es ataque) y nivel del hechizo (`bhdChooseSlot`). Timeout 150 s.
+- **Áreas e invocaciones en el DM** (`enableGmRemoteHelpers` en "setup"): `patchGmTemplatePlacement` solo cambia
+  `drawPreview` de las áreas que dnd5e crea (Midi lee su `document`; emanaciones y trampas no llaman a `drawPreview`)
+  y `patchTokenPlacement(() => isRemoteRun())`. Solo durante un uso remoto; los del DM, como siempre.
+- **Ventanas durante el uso** (`dialog-relay.js`): `startRemoteRun` / `endRemoteRun` marcan el uso en curso; en el DM,
+  `renderApplicationV2` / `renderApplication` de `DialogV2`, `Dialog` V1, `chrisPremades.DialogApp`, `Dialog5e` y las
+  ventanas de Midi (`MIDI_DIALOGS`, no `ReactionDialog`) se ocultan (`.bhd-relayed`) y se copian (contenido sin
+  botones ni scripts, valores actuales, botones de respuesta con `data-bhd-choice`). El teléfono las muestra en un
+  `DialogV2` propio (`bhd-relay-dialog`) y devuelve `{ button, fields }` (campos por orden); el DM pone los valores y
+  pulsa el botón real. No se reenvían: ventanas de otro actor (`getRelatedActor`), las abiertas ≤ 1,5 s tras un toque
+  del DM; si el teléfono no contesta, o la ventana sigue abierta 2,5 s después, se muestra al DM.
+  Límite conocido: un `DialogApp` de Chris's Premades sin actor (p. ej. de una criatura del DM) que salga durante el
+  uso de un jugador también va a ese jugador.
+- **Lo que Midi pide al teléfono** (`midi-prompts.js`, en "ready" en vista móvil): se envuelven las funciones del canal
+  de Midi (`socketlib.modules.get("midi-qol").functions`): `rollAbility(V2)` y `rollConcentration` → aviso grande
+  (`promptMidiRoll`, sin "Ahora no"; con `playerSaveTimeout` se tira sola al acabarse) y luego la función de Midi con
+  `fastForward`; `chooseReactions` → `.bhd-reaction-alert` con cuenta atrás (`reactionTimeout`, si no 30 s),
+  y la elegida la ejecuta el DM (`midiReaction`, sin cola, mismas opciones que `reactionDialog` de Midi; devuelve
+  `{ name, uuid, itemName, itemUuid }`). Sin reacciones en la lista, Midi sigue con lo suyo. Con Midi,
+  `findSavePrompts` solo lee del chat las peticiones del DM. `mobile-windows.js` deja pasar `chrisPremades.DialogApp`
+  y las ventanas `*Dialog` de Midi que lleguen al teléfono.
+- **Registro:** cada paso sale en la consola del teléfono (`useLog`, también en la del DM) y del DM
+  (`BHD Companion | [jugador] objeto | 1. / 2. / 3.`).
 
 ## Pestaña Combate (decisiones de la etapa 4)
 
@@ -503,3 +558,7 @@ lang/es.json, en.json        traducciones
 10. **Todo desde Foundry** (0.12.0, sin probar) — acciones por tiempo de activación de cada actividad,
     pasivos sin botón, detalle nativo, ventana de dnd5e solo cuando el sistema la pide, encantar desde el
     teléfono (arma de pacto), invocaciones sin clic en el mapa.
+11. **Midi QOL en el DM** (0.13.0, sin probar; sintaxis comprobada con Chrome sin pantalla) — con Midi, DAE y
+    Chris's Premades: el teléfono pide y el DM ejecuta, un botón por fila, resultado impacta / falla / daño,
+    preguntas de Midi y Chris's Premades en el teléfono, salvaciones y reacciones de Midi en avisos, aviso sin DM,
+    teléfono sin mapa.

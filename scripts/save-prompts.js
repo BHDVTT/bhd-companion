@@ -18,12 +18,15 @@
  */
 
 /**
- * Salvaciones que este mensaje pide al personaje.
+ * Salvaciones que este mensaje pide al personaje. Con Midi QOL, las de los hechizos y la concentración las
+ * pide Midi directamente al teléfono (midi-prompts.js): del chat solo se leen las peticiones del DM.
  * @param {ChatMessage} message
  * @param {Actor} actor
+ * @param {object} [options]
+ * @param {boolean} [options.midi]  ¿Midi QOL está activo?
  * @returns {SavePrompt[]}
  */
-export function findSavePrompts(message, actor) {
+export function findSavePrompts(message, actor, { midi=false }={}) {
   if ( !actor || !message.visible || !message.content?.includes("data-action") ) return [];
   const template = document.createElement("template");
   template.innerHTML = message.content;
@@ -44,7 +47,7 @@ export function findSavePrompts(message, actor) {
   };
 
   // Concentración: el mensaje habla como el personaje que se concentra.
-  if ( message.speaker?.actor === actor.id ) {
+  if ( !midi && (message.speaker?.actor === actor.id) ) {
     root.querySelectorAll('[data-action="concentration"]').forEach((button, i) => {
       add("concentration", button, `c${i}`, game.i18n.localize("BHD.Save.ConcentrationSource"));
     });
@@ -52,7 +55,7 @@ export function findSavePrompts(message, actor) {
 
   // Tarjeta de una actividad de salvación con el personaje entre sus objetivos.
   const flags = message.flags?.dnd5e ?? {};
-  if ( (flags.activity?.type === "save") && (message.speaker?.actor !== actor.id) ) {
+  if ( !midi && (flags.activity?.type === "save") && (message.speaker?.actor !== actor.id) ) {
     const targeted = (flags.targets ?? []).some(t => t.uuid === actor.uuid);
     if ( targeted ) {
       const source = message.speaker?.alias || message.author?.name || "";
@@ -73,7 +76,7 @@ export function findSavePrompts(message, actor) {
 }
 
 /**
- * Texto del botón: "Salvación de Destreza (CD 15)".
+ * Texto del botón: "Salvación de Destreza (CD 15)" (o prueba, habilidad o herramienta si las pide Midi).
  * @param {SavePrompt} prompt
  * @param {Actor} actor
  * @returns {string}
@@ -81,11 +84,21 @@ export function findSavePrompts(message, actor) {
 export function getSavePromptLabel(prompt, actor) {
   let ability = prompt.ability;
   if ( (prompt.type === "concentration") && !ability ) {
-    ability = actor.system.attributes?.concentration?.ability || CONFIG.DND5E.defaultAbilities.concentration;
+    ability = actor?.system.attributes?.concentration?.ability || CONFIG.DND5E.defaultAbilities.concentration;
   }
   const abilityLabel = CONFIG.DND5E.abilities[ability]?.label ?? "";
-  const key = (prompt.type === "concentration") ? "BHD.Save.ConcentrationButton" : "BHD.Save.Button";
-  const label = game.i18n.format(key, { ability: abilityLabel });
+  const keys = {
+    concentration: "BHD.Save.ConcentrationButton",
+    check: "BHD.Save.CheckButton",
+    skill: "BHD.Save.SkillButton",
+    tool: "BHD.Save.ToolButton"
+  };
+  const tool = prompt.tool ? (dnd5e.documents?.Trait?.keyLabel?.(prompt.tool, { trait: "tool" }) ?? prompt.tool) : "";
+  const label = game.i18n.format(keys[prompt.type] ?? "BHD.Save.Button", {
+    ability: abilityLabel,
+    skill: CONFIG.DND5E.skills[prompt.skill]?.label ?? prompt.skill ?? "",
+    tool
+  });
   return (prompt.showDC && prompt.dc) ? `${label} (${game.i18n.format("BHD.Actions.DC", { dc: prompt.dc })})` : label;
 }
 

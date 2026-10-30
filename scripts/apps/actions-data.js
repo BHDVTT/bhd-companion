@@ -4,6 +4,7 @@
  * Solo lee valores ya calculados por dnd5e (actividades, etiquetas, usos, espacios de conjuro).
  */
 
+import { isMidiActive } from "../constants.js";
 import { getUsableActivities, prepareRowButtons } from "../quick-actions.js";
 
 /** Tipos de activación que tienen filtro propio en la pestaña. */
@@ -96,6 +97,7 @@ export function prepareActions(actor, state) {
       attack: Number.isFinite(spellAttributes.attack) ? signed(spellAttributes.attack) : null
     } : null,
     passive: passive.sort(byName).map(item => prepareRow(item, { state, activities: [] })),
+    hint: game.i18n.localize(isMidiActive() ? "BHD.Midi.TapToUse" : "BHD.Actions.TapToUse"),
     isEmpty: !sections.length && !spellbook.length && !passive.length
   };
 }

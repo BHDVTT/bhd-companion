@@ -410,7 +410,47 @@
       "Later": "Ahora no",
       "More": "+{count} más después de esta",
       "Success": "Éxito",
-      "Failure": "Fallo"
+      "Failure": "Fallo",
+      "CheckTitle": "¡Tirada pedida!",
+      "CheckButton": "Prueba de {ability}",
+      "SkillButton": "Tirada de {skill}",
+      "ToolButton": "Prueba con {tool}",
+      "AutoRoll": "Si no tiras en {seconds} s, se tira sola."
+    },
+    "Midi": {
+      "Attack": "Atacar",
+      "Cast": "Lanzar",
+      "Use": "Usar",
+      "TapToUse": "Toca Atacar, Lanzar o Usar: elige a quién y el PC del DM lo hace todo con Midi QOL (ataque y, si impacta, daño). Aquí ves si impactó y cuánto daño hizo; la tarjeta sale en el chat de la TV. Mantén presionado para ventaja, desventaja o el nivel del hechizo. Toca el nombre para ver la descripción.",
+      "Waiting": "{name}: esperando al DM…",
+      "Saved": "Salva",
+      "Failed": "Falla la salvación",
+      "Damage": "{n} de daño",
+      "Healed": "+{n} PG",
+      "Done": "Hecho. Mira el chat de la TV.",
+      "Reason": {
+        "NoGM": "No hay ningún DM conectado: no se puede usar {name}. Pide al DM que abra Foundry.",
+        "NoSocketlib": "Falta el módulo socketlib (lo necesita Midi QOL): no se puede usar {name}. Avisa al DM.",
+        "GMOutdated": "El PC del DM tiene una versión vieja de BHD Companion. Pide al DM que recargue Foundry (F5).",
+        "NotOwner": "No eres dueño de este personaje: el DM no puede usar {name} por ti.",
+        "NotFound": "El DM no encuentra {name} en tu personaje. Prueba otra vez en un momento.",
+        "NoMidi": "Midi QOL no está listo en el PC del DM: no se puede usar {name}.",
+        "GMNotViewing": "El PC del DM está mirando otra escena: pídele que vuelva a la escena de la TV para usar {name}.",
+        "Cancelled": "{name} no se completó (sin espacios o usos, cancelado o tardó demasiado). Mira el chat.",
+        "Timeout": "El DM no respondió a tiempo con {name}. Revisa que su Foundry siga abierto.",
+        "Error": "No se pudo usar {name} en el PC del DM: {error}"
+      }
+    },
+    "Reaction": {
+      "Title": "¡Reacción!",
+      "Trigger": "Por: {name}",
+      "Pass": "Pasar",
+      "Seconds": "Quedan {seconds} s",
+      "Used": "Reacción: {name}",
+      "NotUsed": "No se pudo usar {name}. Mira el chat."
+    },
+    "Relay": {
+      "Title": "El DM pregunta"
     },
     "Conditions": {
       "blinded": "No ves. Fallas las pruebas que necesitan la vista. Tus ataques tienen desventaja y los ataques contra ti tienen ventaja.",

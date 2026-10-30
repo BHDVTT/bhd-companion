@@ -2,7 +2,7 @@
  * BHD Companion — punto de entrada del módulo.
  */
 
-import { MODULE_ID } from "./constants.js";
+import { isMidiActive, MODULE_ID } from "./constants.js";
 import { registerSettings } from "./settings.js";
 import { canUseMobileView, reloadWithoutUrlMode, shouldUseMobileView } from "./device.js";
 import { enterMobileMode } from "./mobile-mode.js";
@@ -15,9 +15,16 @@ import { updateWakeLock } from "./wake-lock.js";
 import { registerMovementSocket } from "./movement.js";
 import { broadcastTargets, pruneTargets } from "./targets.js";
 import { registerUseLogSocket } from "./use-log.js";
+import { enableGmRemoteHelpers, registerMidiRemote } from "./midi-remote.js";
+import { registerDialogRelay } from "./dialog-relay.js";
+import { registerMidiPrompts } from "./midi-prompts.js";
 
 /** ¿Este cliente está en vista móvil? Se decide una sola vez al cargar. */
 let mobileView = false;
+
+// Con Midi QOL los teléfonos piden al DM que use sus objetos (socketlib avisa durante "init").
+registerMidiRemote();
+registerDialogRelay();
 
 Hooks.once("init", () => {
   console.log(`BHD Companion ${game.modules.get(MODULE_ID)?.version ?? ""} cargado`);
@@ -28,6 +35,8 @@ Hooks.once("init", () => {
 Hooks.once("setup", () => {
   mobileView = shouldUseMobileView();
   if ( mobileView ) enterMobileMode();
+  // El DM ejecuta lo que piden los teléfonos: sus áreas e invocaciones se colocan solas.
+  if ( game.user.isGM && isMidiActive() ) enableGmRemoteHelpers();
 });
 
 Hooks.once("ready", () => {
@@ -51,6 +60,8 @@ function openMobileView() {
   game.modules.get(MODULE_ID).api = { app };
   watchConnection();
   updateWakeLock();
+  // Con Midi QOL: sus salvaciones y reacciones salen en los avisos de la vista.
+  registerMidiPrompts(app);
 
   // Varios cambios seguidos (p. ej. el GM aplica daño y un estado) producen un solo redibujado.
   // Con la pantalla apagada o en otra app no se dibuja nada (ahorra batería): se hace una vez al volver.

@@ -3723,3 +3723,329 @@ body.bhd-mobile .bhd-item-details .bhd-detail-passive {
   margin: 8px 0;
   font-weight: bold;
 }
+
+/* ------------------------------------------ */
+/*  Midi QOL: lo hace el PC del DM             */
+/* ------------------------------------------ */
+
+/* PC del DM: ventana enviada al teléfono del jugador (no se ve aquí mientras el jugador elige) */
+.bhd-relayed {
+  display: none !important;
+}
+
+/* Botón principal de la fila (Atacar / Lanzar / Usar) */
+#bhd-mobile-app .bhd-roll-midi {
+  flex: 1 1 auto;
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold-soft);
+}
+
+#bhd-mobile-app .bhd-roll-midi .bhd-roll-caption {
+  color: var(--bhd-gold);
+}
+
+/* Menú del toque largo con Midi: un solo modo ocupa toda la fila; niveles del hechizo */
+#bhd-mobile-app .bhd-mode-single {
+  grid-column: 1 / -1;
+}
+
+#bhd-mobile-app .bhd-chooser-heading {
+  margin: 0;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+  color: var(--bhd-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#bhd-mobile-app .bhd-chooser-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-chooser-sheet .bhd-slot-chip {
+  flex: 1 1 30%;
+  min-height: 48px;
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-chooser-sheet .bhd-slot-chip.bhd-on {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold-soft);
+  color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-chooser-sheet .bhd-slot-chip:disabled {
+  opacity: 0.4;
+}
+
+#bhd-mobile-app .bhd-toast-wait {
+  font-size: calc(22px * var(--bhd-text-scale, 1));
+  color: var(--bhd-gold);
+}
+
+/* Resultado de un uso hecho por el DM */
+#bhd-mobile-app .bhd-midi-result {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--bhd-nav-height) + var(--bhd-turn-bar) + 12px + env(safe-area-inset-bottom, 0px));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 12px 14px;
+  border: 2px solid var(--bhd-gold);
+  border-radius: 16px;
+  background: var(--bhd-surface-2);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65);
+  animation: bhd-toast-in 0.2s ease-out;
+}
+
+#bhd-mobile-app .bhd-midi-result[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-midi-result.bhd-crit {
+  border-color: #ffcf5a;
+  box-shadow: 0 0 18px rgba(255, 207, 90, 0.5);
+}
+
+#bhd-mobile-app .bhd-midi-result-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+#bhd-mobile-app .bhd-midi-result-head img {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+#bhd-mobile-app .bhd-midi-result-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: calc(17px * var(--bhd-text-scale, 1));
+  color: var(--bhd-gold);
+  overflow-wrap: anywhere;
+}
+
+#bhd-mobile-app .bhd-midi-tag {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-midi-tag.bhd-crit {
+  background: var(--bhd-red);
+  color: #ffcf5a;
+}
+
+#bhd-mobile-app .bhd-midi-tag.bhd-fumble {
+  background: var(--bhd-surface);
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-midi-result-close {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--bhd-text-muted);
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-midi-attack,
+#bhd-mobile-app .bhd-midi-summary {
+  margin: 0;
+  font-size: calc(16px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-midi-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#bhd-mobile-app .bhd-midi-target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 6px 10px;
+  border-left: 4px solid var(--bhd-border);
+  border-radius: 8px;
+  background: var(--bhd-surface);
+  font-size: calc(15px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-midi-target.bhd-hit {
+  border-left-color: #3f9a4a;
+}
+
+#bhd-mobile-app .bhd-midi-target.bhd-miss {
+  border-left-color: var(--bhd-red-bright);
+}
+
+#bhd-mobile-app .bhd-midi-target-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#bhd-mobile-app .bhd-midi-target.bhd-hit .bhd-midi-verdict {
+  color: #7fd08a;
+}
+
+#bhd-mobile-app .bhd-midi-target.bhd-miss .bhd-midi-verdict {
+  color: var(--bhd-red-bright);
+}
+
+#bhd-mobile-app .bhd-midi-damage {
+  font-weight: bold;
+  color: var(--bhd-gold);
+}
+
+/* Reacción que ofrece Midi (encima de todos los avisos) */
+#bhd-mobile-app .bhd-reaction-alert {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+  background: radial-gradient(circle, rgba(110, 60, 10, 0.96) 0%, rgba(10, 8, 12, 0.98) 75%);
+  animation: bhd-alert-in 0.25s ease-out;
+}
+
+#bhd-mobile-app .bhd-reaction-alert[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-reaction-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+#bhd-mobile-app .bhd-reaction-icon {
+  font-size: calc(56px * var(--bhd-text-scale, 1));
+  color: #ffb347;
+  animation: bhd-pulse 1s ease-in-out infinite;
+}
+
+#bhd-mobile-app .bhd-reaction-title {
+  font-size: calc(34px * var(--bhd-text-scale, 1));
+  line-height: 1.1;
+  color: #fff;
+}
+
+#bhd-mobile-app .bhd-reaction-trigger,
+#bhd-mobile-app .bhd-reaction-flavor,
+#bhd-mobile-app .bhd-reaction-seconds {
+  font-size: calc(16px * var(--bhd-text-scale, 1));
+  color: var(--bhd-text);
+}
+
+#bhd-mobile-app .bhd-reaction-timer {
+  width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+#bhd-mobile-app .bhd-reaction-bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #ffb347;
+  transform-origin: left center;
+  transition: transform 0.25s linear;
+}
+
+#bhd-mobile-app .bhd-reaction-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+#bhd-mobile-app .bhd-reaction-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: auto;
+  min-height: 64px;
+  padding: 8px 14px;
+  border: 2px solid #ffb347;
+  border-radius: 14px;
+  background: rgba(255, 179, 71, 0.18);
+  color: #fff;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+  text-align: left;
+}
+
+#bhd-mobile-app .bhd-reaction-option img {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+#bhd-mobile-app .bhd-reaction-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#bhd-mobile-app .bhd-reaction-option:active {
+  filter: brightness(1.3);
+}
+
+#bhd-mobile-app .bhd-reaction-pass {
+  height: auto;
+  min-height: var(--bhd-touch);
+  padding: 0 24px;
+  border: none;
+  background: transparent;
+  color: var(--bhd-text-muted);
+  font-size: calc(17px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+/* Pregunta reenviada por el DM: los campos copiados ocupan el ancho de la ventana */
+body.bhd-mobile .bhd-relay-dialog .bhd-relay-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #bhd-mobile-app .bhd-reaction-icon {
+    animation: none;
+  }
+}

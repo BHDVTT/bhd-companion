@@ -9,7 +9,7 @@
 
 /**
  * Sustituye `AbilityTemplate.fromActivity` de dnd5e en este cliente. Debe llamarse en "setup"
- * y solo en vista móvil.
+ * y solo en vista móvil (sin Midi QOL: con Midi el teléfono no usa nada).
  */
 export function patchAbilityTemplates() {
   const AbilityTemplate = dnd5e.canvas?.AbilityTemplate;
@@ -42,6 +42,30 @@ export function patchAbilityTemplates() {
     return Array.fromRange(count).map(() => ({
       drawPreview: () => placeTemplate(activity, templateData)
     }));
+  };
+}
+
+/**
+ * Cliente del DM con Midi QOL: las áreas de los usos que pide un teléfono se colocan solas, centradas en la
+ * ficha del personaje (el DM no tiene que hacer clic en el mapa; luego puede moverlas). dnd5e prepara el área
+ * como siempre (Midi lee su documento); solo cambia `drawPreview`, el paso que espera al ratón. Las áreas que
+ * Midi coloca por su cuenta (emanaciones, trampas) no llaman a `drawPreview` y no cambian. Llamar en "setup".
+ * @param {function(Activity): boolean} shouldPlace  ¿Colocar sola el área de esta actividad?
+ */
+export function patchGmTemplatePlacement(shouldPlace) {
+  const AbilityTemplate = dnd5e.canvas?.AbilityTemplate;
+  if ( !AbilityTemplate ) return;
+  const original = AbilityTemplate.fromActivity;
+  AbilityTemplate.fromActivity = function(activity, options={}) {
+    const templates = original.call(this, activity, options);
+    if ( !shouldPlace(activity) || !Array.isArray(templates) ) return templates;
+    for ( const template of templates ) {
+      template.drawPreview = () => {
+        console.log(`BHD Companion | Área de ${activity.item?.name} colocada sola junto a la ficha (uso del teléfono)`);
+        return placeTemplate(activity, template.document.toObject());
+      };
+    }
+    return templates;
   };
 }
 
@@ -89,13 +113,16 @@ const SUMMON_SEARCH_RINGS = 8;
  * Criaturas invocadas (actividad "Invocar" de dnd5e). dnd5e las coloca con `TokenPlacement.place`, que espera
  * a que el jugador haga clic en el mapa; en el teléfono el mapa está oculto y se quedaría esperando. Aquí se
  * colocan solas en las casillas libres más cercanas a la ficha del personaje (el DM las mueve en la TV).
- * El resto lo hace dnd5e igual que siempre (qué criatura, cuántas, sus cambios). Llamar en "setup", solo en
- * vista móvil.
+ * El resto lo hace dnd5e igual que siempre (qué criatura, cuántas, sus cambios). Llamar en "setup": en vista
+ * móvil (sin Midi), o en el DM con Midi para los usos que pide un teléfono.
+ * @param {function(object): boolean} [shouldPlace]  ¿Colocar solas estas fichas? Si no, como siempre (clic).
  */
-export function patchTokenPlacement() {
+export function patchTokenPlacement(shouldPlace=() => true) {
   const TokenPlacement = dnd5e.canvas?.TokenPlacement;
   if ( !TokenPlacement ) return;
+  const original = TokenPlacement.place;
   TokenPlacement.place = async function(config) {
+    if ( !shouldPlace(config) ) return original.call(this, config);
     const scene = canvas.scene;
     if ( !scene ) return [];
     const spots = findFreeSpots(scene, config.origin ?? null, config.tokens);

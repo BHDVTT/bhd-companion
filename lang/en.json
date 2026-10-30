@@ -410,7 +410,47 @@
       "Later": "Not now",
       "More": "+{count} more after this one",
       "Success": "Success",
-      "Failure": "Failure"
+      "Failure": "Failure",
+      "CheckTitle": "Roll requested!",
+      "CheckButton": "{ability} check",
+      "SkillButton": "{skill} check",
+      "ToolButton": "{tool} check",
+      "AutoRoll": "If you don't roll within {seconds} s, it rolls by itself."
+    },
+    "Midi": {
+      "Attack": "Attack",
+      "Cast": "Cast",
+      "Use": "Use",
+      "TapToUse": "Tap Attack, Cast or Use: choose who, and the DM's PC does everything with Midi QOL (attack and, if it hits, damage). Here you see whether it hit and how much damage it did; the card shows up in the TV chat. Press and hold for advantage, disadvantage or the spell level. Tap the name to read the description.",
+      "Waiting": "{name}: waiting for the DM…",
+      "Saved": "Saves",
+      "Failed": "Fails the save",
+      "Damage": "{n} damage",
+      "Healed": "+{n} HP",
+      "Done": "Done. Check the TV chat.",
+      "Reason": {
+        "NoGM": "No DM is connected: {name} can't be used. Ask the DM to open Foundry.",
+        "NoSocketlib": "The socketlib module is missing (Midi QOL needs it): {name} can't be used. Tell the DM.",
+        "GMOutdated": "The DM's PC has an old version of BHD Companion. Ask the DM to reload Foundry (F5).",
+        "NotOwner": "You don't own this character: the DM can't use {name} for you.",
+        "NotFound": "The DM can't find {name} on your character. Try again in a moment.",
+        "NoMidi": "Midi QOL isn't ready on the DM's PC: {name} can't be used.",
+        "GMNotViewing": "The DM's PC is looking at another scene: ask them to go back to the TV scene to use {name}.",
+        "Cancelled": "{name} didn't finish (no slots or uses, cancelled or it took too long). Check the chat.",
+        "Timeout": "The DM didn't answer in time for {name}. Check that their Foundry is still open.",
+        "Error": "{name} couldn't be used on the DM's PC: {error}"
+      }
+    },
+    "Reaction": {
+      "Title": "Reaction!",
+      "Trigger": "Triggered by: {name}",
+      "Pass": "Pass",
+      "Seconds": "{seconds} s left",
+      "Used": "Reaction: {name}",
+      "NotUsed": "{name} couldn't be used. Check the chat."
+    },
+    "Relay": {
+      "Title": "The DM asks"
     },
     "Conditions": {
       "blinded": "You can't see. You fail checks that require sight. Your attacks have disadvantage and attacks against you have advantage.",

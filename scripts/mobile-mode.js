@@ -1,4 +1,4 @@
-import { MODULE_ID } from "./constants.js";
+import { isMidiActive, MODULE_ID } from "./constants.js";
 import { patchAbilityTemplates, patchTokenPlacement } from "./mobile-templates.js";
 import { registerCompactDialogs } from "./mobile-dialogs.js";
 import { registerMobileWindows } from "./mobile-windows.js";
@@ -35,13 +35,20 @@ function getSilencedNotifications() {
 export function enterMobileMode() {
   document.body.classList.add("bhd-mobile");
   applyLargeText();
-  prepareHiddenCanvas();
+  // Con Midi QOL todo se ejecuta en el cliente del DM (midi-remote.js): el teléfono no necesita el mapa.
+  // Sin Midi, el teléfono usa sus objetos con dnd5e y carga el mapa oculto para Automated Animations.
+  if ( isMidiActive() ) {
+    console.log("BHD Companion | Midi QOL activo: el teléfono no carga el mapa; los usos los ejecuta el DM");
+    disableCanvas();
+  } else {
+    prepareHiddenCanvas();
+    patchAbilityTemplates();
+    patchTokenPlacement();
+  }
   disableDiceSoNice();
   drawNoSequencerEffects();
   silenceDesktopNotifications();
   patchPlaylistSounds();
-  patchAbilityTemplates();
-  patchTokenPlacement();
   registerCompactDialogs();
   registerMobileWindows();
   enableHomeScreenApp();
@@ -117,6 +124,33 @@ function prepareHiddenCanvas() {
   const syncPositions = SoundsLayer.prototype._syncPositions;
   SoundsLayer.prototype._syncPositions = function(listeners, options) {
     return syncPositions.call(this, game.settings.get(MODULE_ID, "phoneMusic") ? listeners : [], options);
+  };
+}
+
+/**
+ * Con Midi QOL el mapa (WebGL) no se crea en el teléfono: ahorra batería y memoria (los usos y sus
+ * animaciones los hace el cliente del DM, que sí tiene las fichas).
+ * No se toca el ajuste "Disable Game Canvas" (core.noCanvas), ni guardado ni leído: The Forge
+ * sincroniza los ajustes de cliente y avisaba de una diferencia. Se hace lo mismo que Foundry hace
+ * con ese ajuste activo: `Canvas#initialize` sale sin crear nada, así que `canvas.initialized`
+ * y `canvas.ready` quedan en false y `Scene#view` no dibuja.
+ */
+function disableCanvas() {
+  foundry.canvas.Canvas.prototype.initialize = function() {};
+
+  // Lo que Foundry evita por su cuenta cuando el ajuste está activo y necesitaría el mapa:
+  // la pestaña de fichas de la escena y las miniaturas de vídeo.
+  const Placeables = CONFIG.ui.placeables;
+  if ( Placeables ) {
+    CONFIG.ui.placeables = class BHDPlaceableDirectory extends Placeables {
+      _canRender() {
+        return false;
+      }
+    };
+  }
+  const VideoHelper = foundry.helpers.media.VideoHelper;
+  VideoHelper.prototype.createThumbnail = async function() {
+    return "icons/svg/video.svg";
   };
 }
 

@@ -15,6 +15,8 @@
  * cuelga del último uso.
  */
 
+import { isMidiActive } from "./constants.js";
+
 /** Cuánto dura un lanzamiento de hechizo fuera de combate (ms). */
 const CAST_TTL = 2 * 60 * 1000;
 
@@ -243,6 +245,7 @@ export function needsUsageDialog(activity) {
  * @returns {{buttons: object[], slots: object[]|null, cast: object|null}}
  */
 export function prepareRowButtons(item, activities, state) {
+  if ( isMidiActive() ) return prepareMidiButton(item, activities, state);
   const { attack, save, damage, heal, use, primary } = getRowActivities(item, activities);
   // Solo los hechizos que gastan espacio muestran su lanzamiento en curso ("Lanzado ✕").
   const active = state?.getCast(item) ?? null;
@@ -299,6 +302,51 @@ export function prepareRowButtons(item, activities, state) {
         ? game.i18n.format("BHD.Actions.CastAt", { level: item.actor?.system.spells?.[cast.slot]?.level ?? "" })
         : game.i18n.localize("BHD.Actions.Cast")
     } : null
+  };
+}
+
+/**
+ * Con Midi QOL: un solo botón por fila (Atacar, Lanzar o Usar) que hace todo el flujo de Midi en el cliente
+ * del DM (ataque y, si impacta, daño; o salvación y daño). Muestra el bono de ataque o la CD y el daño, tal
+ * como los calcula dnd5e. El nivel del hechizo se elige en la fila (o con el toque largo).
+ * @param {Item} item
+ * @param {Activity[]} activities
+ * @param {QuickActionState} [state]
+ * @returns {{buttons: object[], slots: object[]|null, cast: null}}
+ */
+function prepareMidiButton(item, activities, state) {
+  const { attack, save, damage, heal, primary } = getRowActivities(item, activities);
+  if ( !primary ) return { buttons: [], slots: null, cast: null };
+
+  const options = getSlotOptions(primary);
+  const slot = options ? (state?.getSlot(primary) ?? null) : null;
+  const scaling = getScaling(primary, slot);
+  const slots = (options?.length > 1) ? options.map(o => ({ ...o, selected: o.value === slot })) : null;
+
+  const verb = (item.type === "spell") ? "Cast" : (attack ? "Attack" : "Use");
+  let value = attack ? (attack.labels?.toHit ?? "") : (save ? getSaveLabel(save) : "");
+  let detail = "";
+  const rolled = damage ?? heal;
+  if ( rolled ) {
+    const labels = getScaledActivity(rolled, scaling).labels?.damage ?? [];
+    const formula = labels.map(l => l.formula).filter(_ => _).join(" + ");
+    const types = labels.map(damageTypeLabel).filter(_ => _).join(", ");
+    if ( value ) detail = [formula, types].filter(_ => _).join(" ");
+    else [value, detail] = [formula, types];
+  }
+  const caption = game.i18n.localize(`BHD.Midi.${verb}`);
+  const icon = { Attack: "fa-solid fa-dice-d20", Cast: "fa-solid fa-wand-sparkles", Use: "fa-solid fa-hand-sparkles" }[verb];
+  return {
+    buttons: [{
+      kind: "midi",
+      activityId: primary.id,
+      caption: value ? caption : "",
+      value: value || caption,
+      detail,
+      icon
+    }],
+    slots,
+    cast: null
   };
 }
 
