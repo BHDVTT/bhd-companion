@@ -127,7 +127,10 @@ export function canUseMobileView() {
   const mode = getViewMode();
   if ( mode === "normal" ) return false;
   if ( mode === "mobile" ) return true;
-  return game.settings.get(MODULE_ID, "forceAll") || isMobileDevice();
+  // "Forzar en todos" es para probar en PC: un televisor (si entra con una cuenta de jugador) sigue normal.
+  const device = describeDevice();
+  if ( game.settings.get(MODULE_ID, "forceAll") && !device.tv ) return true;
+  return isMobileDevice(device);
 }
 
 /**

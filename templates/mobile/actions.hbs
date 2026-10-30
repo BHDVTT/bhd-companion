@@ -8,15 +8,15 @@
     {{/each}}
   </div>
 
-  {{!-- Ataques con armas --}}
-  {{#if actions.attacks.length}}
-  <section class="bhd-action-group">
-    <h3 class="bhd-section-title">{{localize "BHD.Actions.Attacks"}}</h3>
+  {{!-- Lo que se usa en el turno, por el tiempo de activación de cada actividad (Acción, Adicional, Reacción, Otras) --}}
+  {{#each actions.sections}}
+  <section class="bhd-action-group bhd-activation-{{id}}">
+    <h3 class="bhd-section-title">{{label}}</h3>
     <div class="bhd-action-list">
-      {{#each actions.attacks}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
+      {{#each rows}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
     </div>
   </section>
-  {{/if}}
+  {{/each}}
 
   {{!-- Hechizos por nivel --}}
   {{#if actions.spellbook.length}}
@@ -53,24 +53,14 @@
   </section>
   {{/if}}
 
-  {{!-- Rasgos y habilidades --}}
-  {{#if actions.features.length}}
-  <section class="bhd-action-group">
-    <h3 class="bhd-section-title">{{localize "BHD.Actions.Features"}}</h3>
+  {{!-- Rasgos sin actividades (pasivos): sin botones; tocar el nombre muestra la descripción --}}
+  {{#if actions.passive.length}}
+  <details class="bhd-action-group bhd-passive">
+    <summary class="bhd-section-title">{{localize "BHD.Actions.Passive"}} <span class="bhd-count">{{actions.passive.length}}</span></summary>
     <div class="bhd-action-list">
-      {{#each actions.features}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
+      {{#each actions.passive}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
     </div>
-  </section>
-  {{/if}}
-
-  {{!-- Consumibles --}}
-  {{#if actions.consumables.length}}
-  <section class="bhd-action-group">
-    <h3 class="bhd-section-title">{{localize "BHD.Actions.Consumables"}}</h3>
-    <div class="bhd-action-list">
-      {{#each actions.consumables}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
-    </div>
-  </section>
+  </details>
   {{/if}}
 
   {{#if actions.isEmpty}}

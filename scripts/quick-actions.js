@@ -19,10 +19,11 @@
 const CAST_TTL = 2 * 60 * 1000;
 
 /**
- * Tipos de actividad que se usan sin la ventana de dnd5e. Los demás (invocar, encantar, transformar...)
- * tienen opciones que solo se eligen en su ventana.
+ * Botones que hacen ellos mismos la tirada: su lanzamiento no debe tirar nada más (`subsequentActions: false`).
+ * Los demás (Usar, Salvación) dejan que dnd5e haga lo que la actividad haga después de usarse
+ * (p. ej. un encantamiento sobre el propio objeto).
  */
-const QUICK_TYPES = new Set(["attack", "damage", "heal", "save", "check", "utility"]);
+export const ROLL_KINDS = new Set(["attack", "damage", "heal"]);
 
 /**
  * Estado de los botones de tirada en este teléfono: nivel de espacio elegido, lanzamientos en curso
@@ -103,6 +104,16 @@ export function getTurnKey() {
   const combat = game.combats.find(c => c.active && c.started && (!c.scene || (c.scene === game.scenes.active)))
     ?? game.combats.find(c => c.active && c.started);
   return combat ? `${combat.id}.${combat.round}.${combat.turn}` : null;
+}
+
+/**
+ * Actividades del objeto que se pueden usar ahora (las que dnd5e ofrece en la hoja: `canUse`).
+ * Sin ninguna, el objeto es pasivo: no tiene botones.
+ * @param {Item} item
+ * @returns {Activity[]}
+ */
+export function getUsableActivities(item) {
+  return item.system.activities?.filter(a => a.canUse) ?? [];
 }
 
 /**
@@ -197,12 +208,29 @@ export function needsCast(item, activity) {
 }
 
 /**
- * ¿El uso de esta actividad necesita la ventana de dnd5e (invocar, encantar...)?
+ * ¿El uso de esta actividad necesita la ventana de dnd5e? Se le pregunta al propio sistema
+ * (`_requiresConfigurationDialog`) sin lo que la vista ya resuelve por su cuenta (nivel del espacio en la fila,
+ * concentración, gasto de recursos y áreas sin mapa). Queda lo que solo se elige en esa ventana: cuál de varios
+ * encantamientos o transformaciones, órdenes de bastión, cuánto gastar de un recurso (Imposición de manos,
+ * cargas) o qué criatura, tamaño o tipo invocar.
  * @param {Activity} activity
  * @returns {boolean}
  */
 export function needsUsageDialog(activity) {
-  return !QUICK_TYPES.has(activity.type);
+  let config;
+  try {
+    config = activity._prepareUsageConfig({
+      concentration: { begin: false }, consume: false, scaling: false, create: false
+    });
+    if ( activity._requiresConfigurationDialog(config) ) return true;
+  } catch(err) {
+    console.warn("BHD Companion | No se pudo saber si la actividad necesita su ventana", err);
+    return true;
+  }
+  if ( activity.consumption?.scaling?.allowed && !activity.isSpell ) return true;
+  // Invocar: dnd5e solo pregunta en su ventana si hay más de una criatura, tamaño o tipo.
+  const several = value => (value?.length ?? value?.size ?? 0) > 1;
+  return several(activity.availableProfiles) || several(activity.creatureSizes) || several(activity.creatureTypes);
 }
 
 /* -------------------------------------------- */
@@ -244,7 +272,7 @@ export function prepareRowButtons(item, activities, state) {
     add("damage", damage, {
       caption: game.i18n.localize(critical ? "BHD.Actions.Critical" : "BHD.Actions.Damage"),
       value: labels.map(l => l.formula).filter(_ => _).join(" + ") || "—",
-      detail: labels.map(l => damageTypeLabel(l.damageType)).filter(_ => _).join(", "),
+      detail: labels.map(damageTypeLabel).filter(_ => _).join(", "),
       icon: critical ? "fa-solid fa-burst" : "fa-solid fa-droplet",
       critical
     });
@@ -257,7 +285,7 @@ export function prepareRowButtons(item, activities, state) {
       icon: "fa-solid fa-heart-pulse"
     });
   }
-  if ( use || !primary ) add("use", use, {
+  if ( use ) add("use", use, {
     caption: "",
     value: game.i18n.localize("BHD.Actions.Use"),
     icon: "fa-solid fa-hand-sparkles"
@@ -286,11 +314,12 @@ function getSaveLabel(activity) {
 }
 
 /**
- * Nombre de un tipo de daño o curación.
- * @param {string|null} type
+ * Tipos de daño de una etiqueta de daño de dnd5e ("1d10 + 3 Fuerza") sin la fórmula ("Fuerza").
+ * dnd5e ya los escribe en `label` detrás de la fórmula (varios tipos juntos si los hay).
+ * @param {{formula: string, label: string}} label
  * @returns {string}
  */
-function damageTypeLabel(type) {
-  if ( !type ) return "";
-  return CONFIG.DND5E.damageTypes[type]?.label ?? CONFIG.DND5E.healingTypes[type]?.label ?? "";
+function damageTypeLabel({ formula, label }) {
+  if ( !label || (label === formula) ) return "";
+  return (formula && label.startsWith(formula)) ? label.slice(formula.length).trim() : label;
 }

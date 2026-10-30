@@ -14,6 +14,14 @@ teléfono, el módulo reemplaza la interfaz normal de Foundry por una vista móv
 - Trabaja en Windows. Prueba primero en Foundry local; la partida real está en **The Forge**,
   donde los módulos se instalan con un enlace de manifest.
 
+## Principio permanente
+
+**"La app nunca adivina; todo sale de Foundry."** No hay reglas de D&D propias ni código especial por clase,
+hechizo o rasgo. Textos, números y botones salen de lo que calcula dnd5e (`item.system`, `item.labels`,
+`activity.labels`, `item.system.activities`, `CONFIG.DND5E`); las acciones van por las APIs de dnd5e
+(`activity.use`, `rollAttack`, `rollDamage`, `applyEnchantment`...). Si algo no se puede mostrar bien en la
+vista, se abre la ventana nativa de dnd5e (compacta); nunca se inventa ni se esconde.
+
 ## Reglas técnicas
 
 - Solo APIs de Foundry v13: `foundry.applications.api.ApplicationV2` +
@@ -63,9 +71,11 @@ scripts/movement.js          mover fichas desde el teléfono: reglas, canal del 
 scripts/economy.js           acción / adicional / reacción / Correr usados en el turno (flag del combatiente)
 scripts/targets.js           objetivos: fichas del mapa oculto (sin mapa, PhoneTarget) y aviso a la TV
 scripts/quick-actions.js     botones de tirada de cada fila (Ataque / Daño / CD / Curar / Usar), nivel, lanzamientos
+scripts/item-details.js      detalle de una fila (ficha emergente de dnd5e + actividades con sus etiquetas)
+scripts/enchantments.js      encantar objetos desde el teléfono (arma de pacto...): lista en lugar de arrastrar
 scripts/save-prompts.js      salvaciones pendientes que pide el chat (hechizo del DM, concentración, petición)
 scripts/apps/status-data.js  concentración, condiciones (con explicación) y efectos activos
-scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
+scripts/mobile-templates.js  áreas de hechizo (plantillas) e invocaciones sin clic en el mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
 scripts/mobile-windows.js    qué ventanas se permiten en vista móvil (cierra las de otros módulos), una a la vez
 scripts/use-log.js           registro de los usos del teléfono (consola del teléfono y del DM)
@@ -220,6 +230,39 @@ lang/es.json, en.json        traducciones
   espacio para dos ataques), Magic Missile, Cure Wounds, Bless, crítico y ventaja.
 - Los clics dentro del panel con `data-action` desconocido llegan también a `BHDMobileApp`, que
   los ignora; no usar en la app nombres de acción que use dnd5e en sus tarjetas.
+
+## Todo desde dnd5e (0.12.0)
+
+- **Agrupación** (`actions-data.js`): la pestaña Acciones agrupa por el `activation.type` de **cada actividad**
+  (Acción / Acción adicional / Reacción / Otras); un objeto con actividades de dos tipos sale en las dos
+  secciones, cada fila con los botones de sus actividades. Qué objetos entran (`isActionItem`, también en el HUD):
+  rasgos, consumibles con cantidad (sin munición) y el resto si está equipado. Hechizos aparte, por nivel con
+  sus espacios (como la hoja). Sin actividades usables (`getUsableActivities` = `canUse`) = pasivo: sin
+  botones, en "Rasgos pasivos" (plegado), tocar = descripción. Agonizing Blast del SRD no tiene actividades:
+  su bono solo aparece en el daño de Eldritch Blast si el DM lo añade al hechizo (nota secreta del objeto).
+- **Detalle** (`item-details.js`): `item.system.richTooltip()` (la ficha emergente de la hoja nativa, con
+  bloque de hechizo: lanzamiento / ritual, alcance, objetivo, V/S/M y materiales, duración / concentración) +
+  cada actividad con `labels` (activation, range, target, duration, toHit, save, damage[].label, usos y
+  `labels.recovery` / `recharge`). El CSS del tooltip de dnd5e solo aplica en `#tooltip`: se estiliza en
+  `.bhd-item-details`.
+- **¿Ventana de dnd5e?** (`needsUsageDialog`): se pregunta a `activity._requiresConfigurationDialog` con
+  `_prepareUsageConfig({ concentration: { begin: false }, consume: false, scaling: false, create: false })`
+  (lo que la vista resuelve sola), más `consumption.scaling.allowed` fuera de hechizos (cuánto gastar) y
+  varios `availableProfiles` / `creatureSizes` / `creatureTypes`. Quedan: órdenes, varios encantamientos o
+  transformaciones, invocaciones con elección.
+- **subsequentActions**: `false` solo si el botón tira (`ROLL_KINDS`: attack / damage / heal); con Usar o
+  Salvación dnd5e hace lo suyo después (p. ej. `enchant.self`).
+- **Encantar** (`enchantments.js`): tras usar una actividad con `use.enchantmentProfile` (y sin `enchant.self`)
+  se abre una lista en `.bhd-chooser`: lo encantado (`dnd5e.registry.enchantments.applied(activity.uuid)`,
+  Quitar = `effect.delete({ chatMessageOrigin })`) y los objetos de `enchantableTypes` con
+  `canEnchant(item) === true`; elegir = `activity.applyEnchantment(profile, item, { chatMessage, concentration })`
+  (lo que hace `<enchantment-application>` al soltar). En el panel, la zona de soltar de la tarjeta lleva un
+  botón "Elegir objeto" (`bhdEnchantOpen`). Pact of the Blade 2024: encantar (adicional) armas simples / marciales
+  cuerpo a cuerpo; la actividad de ataque es un "rider" que aparece en el arma encantada.
+- **Invocar sin clic** (`patchTokenPlacement`): `dnd5e.canvas.TokenPlacement.place` coloca las fichas en las
+  casillas libres más cercanas a la ficha del personaje (el DM las mueve). El jugador debe ser dueño del actor
+  invocado (lo exige dnd5e).
+- `forceAll` no afecta a un televisor (user agent de TV).
 
 ## Pestaña Combate (decisiones de la etapa 4)
 
@@ -457,3 +500,6 @@ lang/es.json, en.json        traducciones
 9. **Tiradas estilo D&D Beyond** ✅ (0.10.0, probada en Foundry local) — botones Ataque / Daño / CD /
    Curar / Usar en cada fila, crítico, nivel del hechizo en la fila, salvaciones pendientes, concentración y
    condiciones; sin Midi QOL ni mapa oculto.
+10. **Todo desde Foundry** (0.12.0, sin probar) — acciones por tiempo de activación de cada actividad,
+    pasivos sin botón, detalle nativo, ventana de dnd5e solo cuando el sistema la pide, encantar desde el
+    teléfono (arma de pacto), invocaciones sin clic en el mapa.

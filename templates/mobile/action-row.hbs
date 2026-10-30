@@ -1,6 +1,6 @@
 {{!-- Fila de un objeto usable: nombre (toca para ver la descripción) y botones de tirada a la derecha.
      En el HUD de combate (row.hudBlock) los botones pasan por el selector de objetivos. --}}
-<div class="bhd-action {{#if row.cast}}bhd-cast-active{{/if}}" data-activation="{{row.activation}}" data-search="{{row.search}}">
+<div class="bhd-action {{#if row.cast}}bhd-cast-active{{/if}} {{#if row.passive}}bhd-passive-row{{/if}}" data-activation="{{row.activation}}" data-search="{{row.search}}">
   <button type="button" class="bhd-action-main" data-action="itemInfo" data-item-id="{{row.id}}"
           aria-label="{{row.name}} · {{localize 'BHD.Actions.Info'}}">
     <img class="bhd-action-img" src="{{row.img}}" alt="">
@@ -17,6 +17,7 @@
     </span>
     {{/if}}
   </button>
+  {{#unless row.passive}}
   <div class="bhd-action-controls">
     {{#if row.slots}}
     <label class="bhd-slot-select">
@@ -47,4 +48,5 @@
       {{/each}}
     </div>
   </div>
+  {{/unless}}
 </div>

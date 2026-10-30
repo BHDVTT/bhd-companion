@@ -1,5 +1,5 @@
 import { MODULE_ID } from "./constants.js";
-import { patchAbilityTemplates } from "./mobile-templates.js";
+import { patchAbilityTemplates, patchTokenPlacement } from "./mobile-templates.js";
 import { registerCompactDialogs } from "./mobile-dialogs.js";
 import { registerMobileWindows } from "./mobile-windows.js";
 import { enableHomeScreenApp } from "./home-screen.js";
@@ -41,6 +41,7 @@ export function enterMobileMode() {
   silenceDesktopNotifications();
   patchPlaylistSounds();
   patchAbilityTemplates();
+  patchTokenPlacement();
   registerCompactDialogs();
   registerMobileWindows();
   enableHomeScreenApp();
