@@ -4239,3 +4239,194 @@ body.bhd-mobile .bhd-relay-dialog .bhd-relay-content img {
     font-size: calc(22px * var(--bhd-text-scale, 1));
   }
 }
+
+/* ------------------------------------------ */
+/*  Colocar área (con Midi)                    */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-place {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+#bhd-mobile-app .bhd-place[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-place-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 100%;
+  margin: 0 auto;
+  padding: 14px 16px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  border-top: 2px solid var(--bhd-gold);
+  border-radius: 18px 18px 0 0;
+  background: var(--bhd-surface);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.6);
+  animation: bhd-tray-in 0.18s ease-out;
+}
+
+#bhd-mobile-app .bhd-place-sheet * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+#bhd-mobile-app .bhd-place-range,
+#bhd-mobile-app .bhd-place-self {
+  margin: 0;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-place-inside {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-place-inside ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#bhd-mobile-app .bhd-place-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 14px;
+  background: var(--bhd-surface-2);
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-place-chip small {
+  font-size: calc(11px * var(--bhd-text-scale, 1));
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-place-chip.bhd-side-enemy {
+  border-color: var(--bhd-red-bright);
+}
+
+#bhd-mobile-app .bhd-place-chip.bhd-side-ally,
+#bhd-mobile-app .bhd-place-chip.bhd-side-self {
+  border-color: #3f9a4a;
+}
+
+#bhd-mobile-app .bhd-place-msg {
+  margin: 0;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+  color: var(--bhd-red-bright);
+}
+
+#bhd-mobile-app .bhd-place-msg[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-place-pad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto;
+}
+
+#bhd-mobile-app .bhd-place-pad.bhd-shake {
+  animation: bhd-shake 0.35s;
+}
+
+#bhd-mobile-app .bhd-place-arrow,
+#bhd-mobile-app .bhd-place-center {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#bhd-mobile-app .bhd-place-arrow {
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 2px solid var(--bhd-gold);
+  border-radius: 14px;
+  background: var(--bhd-surface-2);
+  box-shadow: 0 3px 0 #0d0b10;
+  color: var(--bhd-gold);
+  font-size: calc(24px * var(--bhd-text-scale, 1));
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#bhd-mobile-app .bhd-place-arrow i {
+  margin: 0;
+  pointer-events: none;
+}
+
+#bhd-mobile-app .bhd-place-arrow:active {
+  transform: translateY(2px);
+  box-shadow: none;
+  filter: brightness(1.3);
+}
+
+#bhd-mobile-app .bhd-place-center {
+  color: var(--bhd-text-muted);
+  font-size: calc(22px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-place-rotate {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-place-rotate button,
+#bhd-mobile-app .bhd-place-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: auto;
+  min-height: 52px;
+  margin: 0;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text);
+  font-size: calc(16px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-place-rotate i,
+#bhd-mobile-app .bhd-place-cancel i,
+#bhd-mobile-app .bhd-place-confirm i {
+  margin: 0;
+}
+
+#bhd-mobile-app .bhd-place-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-place-confirm {
+  min-height: 60px;
+  margin: 0;
+}

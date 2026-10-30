@@ -465,6 +465,44 @@
       "NoneForFilter": "Ningún hechizo coincide con los filtros.",
       "Hint": "Toca un hechizo para leerlo entero. Toca los círculos de cada nivel para gastar o recuperar espacios a mano. Los botones de la derecha funcionan igual que en Acciones."
     },
+    "Place": {
+      "Title": "Colocar área",
+      "Range": "Alcance: {range}",
+      "SelfHint": "Sale desde tu personaje: solo se puede girar.",
+      "Inside": "{n} dentro del área:",
+      "Nobody": "Nadie dentro del área.",
+      "Ally": "aliado",
+      "Enemy": "enemigo",
+      "Neutral": "neutral",
+      "Self": "tú",
+      "Unknown": "¿?",
+      "UnknownCreature": "Criatura desconocida",
+      "OutOfRange": "No puede ir más lejos: fuera del alcance del hechizo.",
+      "RotateLeft": "Girar",
+      "RotateRight": "Girar",
+      "Confirm": "Confirmar",
+      "Cancel": "Cancelar",
+      "GMPlaced": "El DM colocó el área de {name}.",
+      "Dir": {
+        "NW": "Arriba a la izquierda",
+        "N": "Arriba",
+        "NE": "Arriba a la derecha",
+        "W": "Izquierda",
+        "E": "Derecha",
+        "SW": "Abajo a la izquierda",
+        "S": "Abajo",
+        "SE": "Abajo a la derecha"
+      },
+      "Reason": {
+        "NoToken": "Tu ficha no está en la escena de la TV: no se puede colocar el área de {name}.",
+        "NoArea": "dnd5e no pudo preparar el área de {name}.",
+        "Expired": "La colocación del área de {name} ya terminó. Vuelve a lanzarlo."
+      },
+      "GMTitle": "Área esperando",
+      "GMContent": "{user} lleva un minuto colocando el área de {name}. Puedes colocarla tú con el ratón (clic para colocar, rueda para girar).",
+      "GMPlace": "Colocarla yo",
+      "GMWait": "Esperar"
+    },
     "Relay": {
       "Title": "El DM pregunta"
     },

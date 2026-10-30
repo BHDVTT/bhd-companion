@@ -64,12 +64,25 @@ export function registerDialogRelay() {
  * @param {User} user
  * @param {Actor} actor
  * @param {string} label  Para el registro.
+ * @param {object} [extra]  Datos del uso (p. ej. `template`: dónde colocó el área el jugador).
  * @returns {object}  Lo que hay que pasar a `endRemoteRun`.
  */
-export function startRemoteRun(user, actor, label) {
-  const run = { user, actor, label };
+export function startRemoteRun(user, actor, label, extra={}) {
+  const run = { user, actor, label, ...extra };
   runs.push(run);
   return run;
+}
+
+/**
+ * Si se está usando algo de este actor por un jugador, dónde colocar su área: la posición que eligió en el
+ * teléfono (`{ x, y, direction, fillColor }`) o un objeto vacío (junto a la ficha). Null si no es un uso remoto.
+ * @param {Actor} actor
+ * @returns {object|null}
+ */
+export function getRemotePlacement(actor) {
+  const run = runs.findLast(r => sameActor(r.actor, actor));
+  if ( !run ) return null;
+  return run.template ? { ...run.template, fillColor: run.user.color?.css ?? run.user.color } : {};
 }
 
 /**

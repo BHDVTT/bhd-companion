@@ -16,7 +16,7 @@
 
 import { MODULE_ID } from "./constants.js";
 import { getSocket, registerSocketHandler } from "./remote-socket.js";
-import { endRemoteRun, isRemoteRun, startRemoteRun } from "./dialog-relay.js";
+import { endRemoteRun, getRemotePlacement, isRemoteRun, startRemoteRun } from "./dialog-relay.js";
 import { needsUsageDialog } from "./quick-actions.js";
 import { patchGmTemplatePlacement, patchTokenPlacement } from "./mobile-templates.js";
 
@@ -40,7 +40,7 @@ export function registerMidiRemote() {
  * que siempre. Llamar en "setup".
  */
 export function enableGmRemoteHelpers() {
-  patchGmTemplatePlacement(activity => isRemoteRun(activity?.actor));
+  patchGmTemplatePlacement(activity => getRemotePlacement(activity?.actor));
   patchTokenPlacement(() => isRemoteRun());
   console.log("BHD Companion | Midi QOL activo: este cliente del DM ejecuta los usos de los teléfonos");
 }
@@ -68,7 +68,7 @@ export function getRemoteBlock() {
  * @param {string} options.mode         "normal", "advantage" o "disadvantage".
  * @returns {Promise<object>}  `{ ok: true, ...resultado }` o `{ ok: false, reason, error? }`.
  */
-export async function requestMidiUse(activity, { targetIds=[], slot=null, mode="normal" }={}) {
+export async function requestMidiUse(activity, { targetIds=[], slot=null, mode="normal", template=null }={}) {
   const block = getRemoteBlock();
   if ( block ) return { ok: false, reason: block };
   return askGM("midiUse", {
@@ -78,6 +78,7 @@ export async function requestMidiUse(activity, { targetIds=[], slot=null, mode="
     targetIds,
     slot,
     mode,
+    template,
     sceneId: game.scenes.active?.id ?? null
   });
 }
@@ -134,7 +135,7 @@ function gmMidiUse(data) {
  * @param {string} userId
  * @param {object} data
  */
-async function runMidiUse(userId, { actorUuid, itemId, activityId, targetIds=[], slot=null, mode="normal", sceneId }) {
+async function runMidiUse(userId, { actorUuid, itemId, activityId, targetIds=[], slot=null, mode="normal", template=null, sceneId }) {
   const user = game.users.get(userId);
   const actor = fromUuidSync(actorUuid);
   const item = actor?.items?.get(itemId);
@@ -189,7 +190,8 @@ async function runMidiUse(userId, { actorUuid, itemId, activityId, targetIds=[],
   // La ventana de dnd5e solo si el sistema la pide (invocar con elección, encantamientos...): va al teléfono.
   const dialog = { configure: needsUsageDialog(activity) };
 
-  const remote = startRemoteRun(user, actor, item.name);
+  // Área colocada en el teléfono (template-placement.js): se crea ahí cuando dnd5e la pida.
+  const remote = startRemoteRun(user, actor, item.name, template ? { template } : {});
   try {
     console.log(`${tag} | 2. Midi QOL empieza (objetivos: ${targetUuids.length}, ventana de dnd5e: ${dialog.configure}, `
       + `consumos: ${activity.consumption?.targets?.length ?? 0})`);

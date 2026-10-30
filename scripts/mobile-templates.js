@@ -46,23 +46,26 @@ export function patchAbilityTemplates() {
 }
 
 /**
- * Cliente del DM con Midi QOL: las áreas de los usos que pide un teléfono se colocan solas, centradas en la
- * ficha del personaje (el DM no tiene que hacer clic en el mapa; luego puede moverlas). dnd5e prepara el área
- * como siempre (Midi lee su documento); solo cambia `drawPreview`, el paso que espera al ratón. Las áreas que
- * Midi coloca por su cuenta (emanaciones, trampas) no llaman a `drawPreview` y no cambian. Llamar en "setup".
- * @param {function(Activity): boolean} shouldPlace  ¿Colocar sola el área de esta actividad?
+ * Cliente del DM con Midi QOL: las áreas de los usos que pide un teléfono se colocan solas donde las colocó el
+ * jugador en su teléfono (template-placement.js) o, si no, centradas en su ficha (el DM no hace clic en el mapa).
+ * dnd5e prepara el área como siempre (Midi lee su documento); solo cambia `drawPreview`, el paso que espera al
+ * ratón. Las áreas que Midi coloca por su cuenta (emanaciones, trampas) no llaman a `drawPreview`. Llamar en "setup".
+ * @param {function(Activity): (object|null)} getPlacement  Null si no es un uso del teléfono; si lo es, la
+ *   posición elegida `{ x, y, direction }` (o un objeto vacío: junto a la ficha).
  */
-export function patchGmTemplatePlacement(shouldPlace) {
+export function patchGmTemplatePlacement(getPlacement) {
   const AbilityTemplate = dnd5e.canvas?.AbilityTemplate;
   if ( !AbilityTemplate ) return;
   const original = AbilityTemplate.fromActivity;
   AbilityTemplate.fromActivity = function(activity, options={}) {
     const templates = original.call(this, activity, options);
-    if ( !shouldPlace(activity) || !Array.isArray(templates) ) return templates;
+    const placement = getPlacement(activity);
+    if ( !placement || !Array.isArray(templates) ) return templates;
     for ( const template of templates ) {
       template.drawPreview = () => {
-        console.log(`BHD Companion | Área de ${activity.item?.name} colocada sola junto a la ficha (uso del teléfono)`);
-        return placeTemplate(activity, template.document.toObject());
+        const where = Number.isFinite(placement.x) ? "donde la colocó el jugador" : "junto a la ficha";
+        console.log(`BHD Companion | Área de ${activity.item?.name} colocada ${where} (uso del teléfono)`, placement);
+        return placeTemplate(activity, template.document.toObject(), placement);
       };
     }
     return templates;
@@ -70,12 +73,13 @@ export function patchGmTemplatePlacement(shouldPlace) {
 }
 
 /**
- * Crea la plantilla en la escena activa, centrada en la ficha del personaje.
+ * Crea la plantilla en la escena activa: en la posición dada o centrada en la ficha del personaje.
  * @param {Activity} activity
  * @param {object} data  Datos de la plantilla preparados por dnd5e.
+ * @param {{x?: number, y?: number, direction?: number}} [placement]  Posición elegida en el teléfono.
  * @returns {Promise<MeasuredTemplateDocument|null>}
  */
-async function placeTemplate(activity, data) {
+async function placeTemplate(activity, data, placement={}) {
   const scene = game.scenes.active;
   if ( !scene ) {
     ui.notifications.warn("BHD.Actions.TemplateNoScene", { localize: true });
@@ -95,10 +99,14 @@ async function placeTemplate(activity, data) {
     y: dims.sceneY + (dims.sceneHeight / 2)
   };
 
+  const chosen = Number.isFinite(placement.x) && Number.isFinite(placement.y);
+  const position = chosen ? { x: placement.x, y: placement.y } : { x, y };
+  if ( Number.isFinite(placement.direction) ) position.direction = placement.direction;
+  if ( placement.fillColor ) position.fillColor = placement.fillColor;
   const [template] = await scene.createEmbeddedDocuments("MeasuredTemplate", [{
-    ...foundry.utils.deepClone(data), x, y
+    ...foundry.utils.deepClone(data), ...position
   }]);
-  if ( template ) ui.notifications.info("BHD.Actions.TemplatePlaced", { localize: true });
+  if ( template && !chosen ) ui.notifications.info("BHD.Actions.TemplatePlaced", { localize: true });
   return template ?? null;
 }
 

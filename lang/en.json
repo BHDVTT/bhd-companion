@@ -465,6 +465,44 @@
       "NoneForFilter": "No spell matches the filters.",
       "Hint": "Tap a spell to read all of it. Tap the circles of each level to spend or recover slots by hand. The buttons on the right work the same as in Actions."
     },
+    "Place": {
+      "Title": "Place area",
+      "Range": "Range: {range}",
+      "SelfHint": "It comes out of your character: you can only rotate it.",
+      "Inside": "{n} inside the area:",
+      "Nobody": "Nobody inside the area.",
+      "Ally": "ally",
+      "Enemy": "enemy",
+      "Neutral": "neutral",
+      "Self": "you",
+      "Unknown": "?",
+      "UnknownCreature": "Unknown creature",
+      "OutOfRange": "It can't go any farther: out of the spell's range.",
+      "RotateLeft": "Rotate",
+      "RotateRight": "Rotate",
+      "Confirm": "Confirm",
+      "Cancel": "Cancel",
+      "GMPlaced": "The DM placed the area of {name}.",
+      "Dir": {
+        "NW": "Up left",
+        "N": "Up",
+        "NE": "Up right",
+        "W": "Left",
+        "E": "Right",
+        "SW": "Down left",
+        "S": "Down",
+        "SE": "Down right"
+      },
+      "Reason": {
+        "NoToken": "Your token isn't in the TV scene: the area of {name} can't be placed.",
+        "NoArea": "dnd5e couldn't prepare the area of {name}.",
+        "Expired": "Placing the area of {name} already ended. Cast it again."
+      },
+      "GMTitle": "Area waiting",
+      "GMContent": "{user} has been placing the area of {name} for a minute. You can place it yourself with the mouse (click to place, wheel to rotate).",
+      "GMPlace": "Place it myself",
+      "GMWait": "Wait"
+    },
     "Relay": {
       "Title": "The DM asks"
     },

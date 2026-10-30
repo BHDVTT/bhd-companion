@@ -7,6 +7,9 @@ import { BASIC_ACTIONS, getTargetNeed, prepareHud, prepareTargetCards, prepareTa
 import { ECONOMY_BLOCKS, getEconomy, getOwnCombatant, setEconomy } from "../economy.js";
 import { getTargetIds, setTargets, toggleTarget } from "../targets.js";
 import { getRemoteBlock, requestMidiUse } from "../midi-remote.js";
+import {
+  needsAreaPlacement, requestPlacementEnd, requestPlacementMove, requestPlacementStart, ROTATE_STEP, waitForGmPlacement
+} from "../template-placement.js";
 import { prepareInventory } from "./inventory-data.js";
 import { getMoveToken, prepareMovement } from "./move-data.js";
 import { requestMovement } from "../movement.js";
@@ -73,6 +76,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       closeTray: BHDMobileApp.#onCloseTray,
       chooseUse: BHDMobileApp.#onChooseUse,
       bhdChooseSlot: BHDMobileApp.#onChooseSlot,
+      bhdPlaceRotate: BHDMobileApp.#onPlaceRotate,
+      bhdPlaceConfirm: BHDMobileApp.#onPlaceConfirm,
+      bhdPlaceCancel: BHDMobileApp.#onPlaceCancel,
       bhdSpellToggle: BHDMobileApp.#onSpellToggle,
       bhdSpellActivation: BHDMobileApp.#onSpellActivation,
       bhdSlotPip: BHDMobileApp.#onSlotPip,
@@ -202,6 +208,15 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Temporizador del resultado de un uso con Midi QOL. */
   #midiResultTimeout;
+
+  /**
+   * Colocación de un área en curso (con Midi): sesión en el DM, último estado y a quién devolver la posición.
+   * @type {{sessionId: string, item: Item, state: object, busy: boolean, resolve: Function}|null}
+   */
+  #place = null;
+
+  /** Flecha de "Colocar área" que se mantiene pulsada (para mover rápido). */
+  #placeHold = null;
 
   /**
    * Aviso de reacción abierto (Midi ofrece Shield, Hellish Rebuke...).
@@ -447,6 +462,19 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     for ( const type of ["pointerup", "pointercancel"] ) {
       this.element.addEventListener(type, () => clearTimeout(this.#longPress?.timer));
     }
+    // Flechas de "Colocar área": un toque mueve una casilla; mantener pulsado mueve seguido.
+    this.element.addEventListener("pointerdown", event => {
+      const arrow = event.target.closest(".bhd-place-arrow");
+      if ( arrow && (event.button === 0) ) this.#startPlaceHold(arrow);
+    });
+    for ( const type of ["pointerup", "pointercancel", "pointerleave"] ) {
+      this.element.addEventListener(type, () => {
+        if ( this.#placeHold ) this.#placeHold.active = false;
+      });
+    }
+    this.element.addEventListener("contextmenu", event => {
+      if ( event.target.closest(".bhd-place-arrow") ) event.preventDefault();
+    });
     // Enlaces de las descripciones (reglas, condiciones, otros hechizos u objetos): en el teléfono no se abren
     // hojas ni diarios, así que lo enlazado se enseña en una ventana de la vista.
     document.addEventListener("click", event => {
@@ -500,6 +528,12 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     settings.className = "bhd-settings";
     settings.hidden = true;
     this.element.append(settings);
+
+    // "Colocar área" (con Midi): cruceta, girar, quién queda dentro, Confirmar / Cancelar.
+    const place = document.createElement("div");
+    place.className = "bhd-place";
+    place.hidden = true;
+    this.element.append(place);
 
     // Selector de objetivos del HUD de combate.
     const picker = document.createElement("div");
@@ -1068,16 +1102,23 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       return;
     }
 
-    // Objetivos: los elige el jugador aquí (el DM los usa tal cual). Con área o sobre uno mismo, ninguno.
-    let targetIds = [];
-    const need = getTargetNeed([activity]);
-    if ( need ) {
-      const ids = await this.#pickTargets({ title: item.name, img: item.img, max: need.max });
-      if ( ids === null ) return;
-      setTargets(ids);
-      targetIds = getTargetIds();
-    }
+    // Área (Fireball, Burning Hands...): el jugador la coloca antes de que empiece el uso; si cancela, no se
+    // pide nada al DM y no se gasta nada. Objetivos: los elige el jugador aquí; con área o sobre uno mismo, ninguno.
     const slot = this.#quick.getSlot(activity);
+    let targetIds = [];
+    let template = null;
+    if ( needsAreaPlacement(activity) ) {
+      template = await this.#placeArea(item, activity, slot);
+      if ( !template ) return;
+    } else {
+      const need = getTargetNeed([activity]);
+      if ( need ) {
+        const ids = await this.#pickTargets({ title: item.name, img: item.img, max: need.max });
+        if ( ids === null ) return;
+        setTargets(ids);
+        targetIds = getTargetIds();
+      }
+    }
     const block = (hudBlock === "opportunity") ? "reaction" : (hudBlock ?? activity.activation?.type);
 
     this.#using = true;
@@ -1089,7 +1130,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         activity: activity.name, type: activity.type, mode, slot,
         targets: targetIds.map(id => game.scenes.active?.tokens.get(id)?.name ?? id)
       });
-      const result = await requestMidiUse(activity, { targetIds, slot, mode });
+      const result = await requestMidiUse(activity, { targetIds, slot, mode, template });
       this.#hideToast();
       if ( !result?.ok ) {
         useWarn(`${tag} | 2. El DM no lo usó: ${result?.reason}`, result?.error ?? "", result?.notices ?? []);
@@ -1114,6 +1155,180 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       button?.classList.remove("bhd-rolling");
       this.#renderRows();
     }
+  }
+
+  /**
+   * "Colocar área": el DM enseña la vista previa en la TV y el jugador la mueve desde aquí.
+   * @param {Item} item
+   * @param {Activity} activity
+   * @param {string|null} slot
+   * @returns {Promise<{x: number, y: number, direction: number}|null>}  Null si cancela o no se pudo.
+   */
+  async #placeArea(item, activity, slot) {
+    const tag = `${item.name} (área)`;
+    useLog(`${tag} | 1. Pedir vista previa al DM`, { slot });
+    const start = await requestPlacementStart(activity, slot);
+    if ( !start?.ok ) {
+      useWarn(`${tag} | No se pudo empezar: ${start?.reason}`, start?.error ?? "");
+      this.#warnPlaceReason(start?.reason, item, start?.error);
+      return null;
+    }
+    const panel = this.element.querySelector(".bhd-place");
+    if ( !panel ) return null;
+    return new Promise(resolve => {
+      this.#place = { sessionId: start.sessionId, item, state: start, busy: false, resolve };
+      // Si el jugador tarda, el DM puede colocarla él: la posición llega aquí.
+      waitForGmPlacement(start.sessionId, data => {
+        useLog(`${tag} | 2. La colocó el DM`, data);
+        ui.notifications.info(game.i18n.format("BHD.Place.GMPlaced", { name: item.name }));
+        this.#finishPlace({ x: data.x, y: data.y, direction: data.direction });
+      });
+      this.#renderPlace(true);
+    });
+  }
+
+  /**
+   * Aviso de por qué no se pudo colocar el área.
+   * @param {string} reason
+   * @param {Item} item
+   * @param {string} [error]
+   */
+  #warnPlaceReason(reason, item, error="") {
+    const own = ["NoToken", "NoArea", "Expired"].includes(reason);
+    const key = own ? `BHD.Place.Reason.${reason}` : `BHD.Midi.Reason.${reason ?? "Error"}`;
+    ui.notifications.warn(game.i18n.format(key, { name: item.name, error }));
+  }
+
+  /**
+   * Dibuja el panel "Colocar área" (la primera vez entero; luego solo lo que cambia: quién queda dentro).
+   * @param {boolean} [full]
+   */
+  #renderPlace(full=false) {
+    const panel = this.element?.querySelector(".bhd-place");
+    const place = this.#place;
+    if ( !panel || !place ) return;
+    const escape = foundry.utils.escapeHTML;
+    const localize = key => escape(game.i18n.localize(key));
+    const state = place.state;
+    if ( full ) {
+      const arrows = [
+        [-1, -1, "fa-arrow-up-left", "NW"], [0, -1, "fa-arrow-up", "N"], [1, -1, "fa-arrow-up-right", "NE"],
+        [-1, 0, "fa-arrow-left", "W"], null, [1, 0, "fa-arrow-right", "E"],
+        [-1, 1, "fa-arrow-down-left", "SW"], [0, 1, "fa-arrow-down", "S"], [1, 1, "fa-arrow-down-right", "SE"]
+      ].map(arrow => arrow ? `
+        <button type="button" class="bhd-place-arrow" data-dx="${arrow[0]}" data-dy="${arrow[1]}"
+                aria-label="${localize(`BHD.Place.Dir.${arrow[3]}`)}"><i class="fa-solid ${arrow[2]}" aria-hidden="true"></i></button>`
+        : `<span class="bhd-place-center"><i class="fa-solid fa-crosshairs" aria-hidden="true"></i></span>`).join("");
+      const rotate = state.canRotate ? `
+        <div class="bhd-place-rotate">
+          <button type="button" data-action="bhdPlaceRotate" data-deg="${-ROTATE_STEP}" aria-label="${localize("BHD.Place.RotateLeft")}">
+            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> ${localize("BHD.Place.RotateLeft")}</button>
+          <button type="button" data-action="bhdPlaceRotate" data-deg="${ROTATE_STEP}" aria-label="${localize("BHD.Place.RotateRight")}">
+            ${localize("BHD.Place.RotateRight")} <i class="fa-solid fa-rotate-right" aria-hidden="true"></i></button>
+        </div>` : "";
+      panel.innerHTML = `
+        <div class="bhd-chooser-backdrop"></div>
+        <section class="bhd-place-sheet" role="dialog" aria-modal="true">
+          <header class="bhd-chooser-header">
+            <img src="${escape(place.item.img)}" alt="">
+            <span class="bhd-chooser-name">${localize("BHD.Place.Title")}: ${escape(place.item.name)}</span>
+          </header>
+          ${state.range ? `<p class="bhd-place-range">${escape(game.i18n.format("BHD.Place.Range", { range: state.range }))}</p>` : ""}
+          <div class="bhd-place-inside" aria-live="polite"></div>
+          <p class="bhd-place-msg" hidden></p>
+          ${state.canMove ? `<div class="bhd-place-pad">${arrows}</div>` : `<p class="bhd-place-self">${localize("BHD.Place.SelfHint")}</p>`}
+          ${rotate}
+          <div class="bhd-place-actions">
+            <button type="button" class="bhd-place-cancel" data-action="bhdPlaceCancel">
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i> ${localize("BHD.Place.Cancel")}</button>
+            <button type="button" class="bhd-big-btn bhd-place-confirm" data-action="bhdPlaceConfirm">
+              <i class="fa-solid fa-check" aria-hidden="true"></i> ${localize("BHD.Place.Confirm")}</button>
+          </div>
+        </section>`;
+      panel.hidden = false;
+    }
+
+    // Quién queda dentro (aliados y enemigos), según el DM.
+    const sides = { ally: "BHD.Place.Ally", enemy: "BHD.Place.Enemy", neutral: "BHD.Place.Neutral", self: "BHD.Place.Self", unknown: "BHD.Place.Unknown" };
+    const inside = state.inside ?? [];
+    const chips = inside.map(c => `<li class="bhd-place-chip bhd-side-${c.side}">
+      ${escape(c.name || game.i18n.localize("BHD.Place.UnknownCreature"))} <small>${localize(sides[c.side] ?? sides.neutral)}</small></li>`).join("");
+    const insideEl = panel.querySelector(".bhd-place-inside");
+    if ( insideEl ) insideEl.innerHTML = inside.length
+      ? `<strong>${escape(game.i18n.format("BHD.Place.Inside", { n: inside.length }))}</strong><ul>${chips}</ul>`
+      : `<strong>${localize("BHD.Place.Nobody")}</strong>`;
+  }
+
+  /**
+   * Mueve o gira la vista previa (una petición a la vez). Si choca con el alcance o el borde, vibra y avisa.
+   * @param {{dx?: number, dy?: number, rotate?: number}} change
+   * @returns {Promise<boolean>}  false si no se movió (para parar el movimiento rápido).
+   */
+  async #placeStep(change) {
+    const place = this.#place;
+    if ( !place || place.busy ) return true;
+    place.busy = true;
+    try {
+      const result = await requestPlacementMove(place.sessionId, change);
+      if ( this.#place !== place ) return false;
+      if ( !result?.ok ) {
+        useWarn(`${place.item.name} (área) | Error al mover: ${result?.reason}`, result?.error ?? "");
+        this.#warnPlaceReason(result?.reason, place.item, result?.error);
+        if ( result?.reason === "Expired" ) this.#finishPlace(null);
+        return false;
+      }
+      place.state = result;
+      this.#renderPlace();
+      const message = this.element.querySelector(".bhd-place-msg");
+      if ( message ) message.hidden = !result.blocked;
+      if ( result.blocked ) {
+        if ( message ) message.textContent = game.i18n.localize("BHD.Place.OutOfRange");
+        try {
+          if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([60, 40, 60]);
+        } catch(err) {}
+        const pad = this.element.querySelector(".bhd-place-pad");
+        if ( pad ) {
+          pad.classList.remove("bhd-shake");
+          void pad.offsetWidth;
+          pad.classList.add("bhd-shake");
+        }
+        return false;
+      }
+      return true;
+    } finally {
+      place.busy = false;
+    }
+  }
+
+  /**
+   * Flecha pulsada: una casilla al momento y, si se mantiene, una tras otra hasta soltarla o chocar.
+   * @param {HTMLElement} arrow
+   */
+  async #startPlaceHold(arrow) {
+    const change = { dx: Number(arrow.dataset.dx), dy: Number(arrow.dataset.dy) };
+    const hold = this.#placeHold = { active: true };
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    navigator.vibrate?.(10);
+    if ( !await this.#placeStep(change) ) return;
+    await sleep(380);
+    while ( hold.active && (this.#placeHold === hold) && this.#place ) {
+      if ( !await this.#placeStep(change) ) break;
+      await sleep(70);
+    }
+  }
+
+  /**
+   * Termina la colocación y devuelve el resultado a quien la pidió.
+   * @param {{x: number, y: number, direction: number}|null} result
+   */
+  #finishPlace(result) {
+    const place = this.#place;
+    this.#place = null;
+    if ( this.#placeHold ) this.#placeHold.active = false;
+    waitForGmPlacement(null);
+    const panel = this.element?.querySelector(".bhd-place");
+    if ( panel ) panel.hidden = true;
+    place?.resolve(result);
   }
 
   /**
@@ -2345,6 +2560,48 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     clearTimeout(this.#midiResultTimeout);
     const panel = this.element.querySelector(".bhd-midi-result");
     if ( panel ) panel.hidden = true;
+  }
+
+  /**
+   * "Colocar área": girar el cono o la línea.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onPlaceRotate(event, target) {
+    await this.#placeStep({ rotate: Number(target.dataset.deg) || 0 });
+  }
+
+  /**
+   * "Colocar área": confirmar. El DM quita la vista previa y devuelve la posición; luego se pide el uso.
+   * @this {BHDMobileApp}
+   */
+  static async #onPlaceConfirm() {
+    const place = this.#place;
+    if ( !place || place.busy ) return;
+    place.busy = true;
+    const result = await requestPlacementEnd(place.sessionId, true);
+    if ( this.#place !== place ) return;
+    place.busy = false;
+    if ( !result?.ok || !Number.isFinite(result.x) ) {
+      this.#warnPlaceReason(result?.reason ?? "Expired", place.item, result?.error);
+      this.#finishPlace(null);
+      return;
+    }
+    useLog(`${place.item.name} (área) | 2. Confirmada`, result);
+    this.#finishPlace({ x: result.x, y: result.y, direction: result.direction });
+  }
+
+  /**
+   * "Colocar área": cancelar. No se usa nada (no se gasta el espacio ni el uso).
+   * @this {BHDMobileApp}
+   */
+  static async #onPlaceCancel() {
+    const place = this.#place;
+    if ( !place ) return;
+    useLog(`${place.item.name} (área) | Cancelada: no se usa nada`);
+    this.#finishPlace(null);
+    await requestPlacementEnd(place.sessionId, false);
   }
 
   /**

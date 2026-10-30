@@ -18,6 +18,7 @@ import { registerUseLogSocket } from "./use-log.js";
 import { enableGmRemoteHelpers, registerMidiRemote } from "./midi-remote.js";
 import { registerDialogRelay } from "./dialog-relay.js";
 import { registerMidiPrompts } from "./midi-prompts.js";
+import { registerTemplatePlacement } from "./template-placement.js";
 
 /** ¿Este cliente está en vista móvil? Se decide una sola vez al cargar. */
 let mobileView = false;
@@ -25,6 +26,7 @@ let mobileView = false;
 // Con Midi QOL los teléfonos piden al DM que use sus objetos (socketlib avisa durante "init").
 registerMidiRemote();
 registerDialogRelay();
+registerTemplatePlacement();
 
 Hooks.once("init", () => {
   console.log(`BHD Companion ${game.modules.get(MODULE_ID)?.version ?? ""} cargado`);

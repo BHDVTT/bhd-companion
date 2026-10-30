@@ -87,6 +87,7 @@ scripts/save-prompts.js      salvaciones pendientes que pide el chat (hechizo de
 scripts/remote-socket.js     canal de socketlib del módulo (funciones por nombre)
 scripts/midi-remote.js       con Midi: el teléfono pide y el DM ejecuta (usos y reacciones), resultado, áreas sin clic en el DM
 scripts/midi-prompts.js      con Midi: salvaciones y reacciones que Midi pide al teléfono, en los avisos de la vista
+scripts/template-placement.js con Midi: colocar el área desde el teléfono (vista previa en el DM y la TV, alcance, quién queda dentro)
 scripts/dialog-relay.js      con Midi: ventanas que salen en el DM durante un uso del teléfono → al teléfono y vuelta
 scripts/apps/status-data.js  concentración, condiciones (con explicación) y efectos activos
 scripts/mobile-templates.js  áreas de hechizo (plantillas) e invocaciones sin clic en el mapa en vista móvil
@@ -349,6 +350,31 @@ lang/es.json, en.json        traducciones
   (fase de captura) y se enseña en una ventana propia (objeto → `renderItemDetails`, diario → texto enriquecido).
 - **Barra:** botones `flex: 1 1 0`, texto 9,5 px (11 px desde 480 px de ancho) e icono 20 px para que quepan 7.
 
+## Colocar áreas desde el teléfono (0.15.0, sin probar)
+
+- **Cuándo** (`needsAreaPlacement`, `template-placement.js`): con Midi, la actividad tiene área que dnd5e pediría
+  colocar (`target.template.type` con forma en `areaTargetTypes` y `target.prompt`), salvo lo que Midi coloca solo
+  (`activityHasAutoPlaceTemplate`: radio / cuadrado con alcance "Self"; y `emanationNoTemplate`).
+- **Antes del uso, no durante:** dnd5e gasta el espacio antes de colocar el área (`_finalizeUsage` → `#placeTemplate`)
+  y Midi solo espera 90 s a un uso. Por eso el jugador coloca primero (`#placeArea` en `#runMidi`) y luego se pide
+  `midiUse` con `template: { x, y, direction }`; cancelar = no se pide nada (no se gasta nada).
+- **DM:** `templateStart` (socketlib) prepara el área con `AbilityTemplate.fromActivity` de la actividad escalada,
+  `user` / `fillColor` del jugador; empieza frente a la ficha (`rotation + 90`; casilla de enfrente o, con "Self",
+  el borde de la ficha). Vista previa sin documento (`new CONFIG.MeasuredTemplate.objectClass(doc)` en
+  `canvas.templates.preview`, como dnd5e) en el DM y, por el mensaje propio `templatePreview`, en la TV.
+  `templateMove`: una casilla (`grid.sizeX/sizeY`) o 15°; no sale de la escena ni pasa del alcance
+  (`activity.range`, `convertLength` si hace falta; tacto = 1 casilla; sin número = sin límite) medido con
+  `grid.measurePath` desde el centro de la ficha + media ficha. Dentro = fichas visibles con alguna casilla de
+  `_getGridHighlightPositions()` de la vista previa (sin cuadrícula: centro en `shape`); aliado / enemigo por
+  disposición respecto al lanzador. `templateEnd` devuelve la posición y quita la vista previa.
+- **Al usar:** `startRemoteRun(..., { template })`; `patchGmTemplatePlacement(getRemotePlacement)` cambia
+  `drawPreview` para crear el área en esa posición (Midi la recibe en `results.templates` y marca objetivos).
+- **60 s:** `DialogV2` en el DM con "Colocarla yo": `drawPreview` normal de dnd5e con el ratón; se toma la posición
+  en `preCreateMeasuredTemplate` (devolviendo `false`) y se manda al teléfono (`templateGmPlaced`), que sigue igual
+  que si hubiera confirmado. Si el jugador se desconecta, la sesión se cierra.
+- **Teléfono:** `.bhd-place` (cruceta 3 × 3; mantener pulsado = repetir cada 70 ms tras 380 ms, una petición a la
+  vez; girar solo cono / línea; con "Self" sin cruceta), lista de quién queda dentro, vibración y temblor al chocar.
+
 ## Pestaña Combate (decisiones de la etapa 4)
 
 - **Qué combate** (`getActiveCombat` en `scripts/apps/combat-data.js`): el `active` de la escena
@@ -595,3 +621,5 @@ lang/es.json, en.json        traducciones
 12. **Hechizos y Combate** (0.14.0, sin probar; JS y plantillas comprobados con Chrome sin pantalla) — resultado
     de Midi solo con lo que tiene el flujo, consumos y avisos del DM en el teléfono, pestaña Combate solo con
     encuentro (aunque no haya empezado) y con aviso, pestaña Hechizos completa, barra de pestañas para 7.
+13. **Colocar áreas** (0.15.0, sin probar) — con Midi, el jugador coloca el área en el teléfono antes del uso
+    (vista previa en la TV, alcance, quién queda dentro, girar, cancelar sin gastar, ayuda del DM al minuto).
