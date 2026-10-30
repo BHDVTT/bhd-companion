@@ -85,7 +85,18 @@
       "EndCast": "Terminar este lanzamiento: el próximo botón lo vuelve a lanzar",
       "AlreadyCast": "{name} ya está lanzado. Para lanzarlo otra vez, toca «Lanzado ✕» en su fila.",
       "NormalDamage": "Daño normal",
-      "CriticalDamage": "Daño crítico (dados dobles)"
+      "CriticalDamage": "Daño crítico (dados dobles)",
+      "Section": {
+        "action": "Acción",
+        "bonus": "Acción adicional",
+        "reaction": "Reacción",
+        "other": "Otras"
+      },
+      "Passive": "Rasgos pasivos",
+      "PassiveHint": "Pasivo: no tiene nada que usar. Lo que aporta ya está incluido en tus tiradas si dnd5e lo tiene automatizado.",
+      "Activities": "Qué hace",
+      "UsesOf": "{value}/{max} usos",
+      "SummonPlaced": "Criatura colocada junto a tu ficha en el mapa. El DM puede moverla."
     },
     "Combat": {
       "None": "No hay combate",
@@ -443,6 +454,14 @@
       "coverThreeQuarters": "Tres cuartos de cobertura: +5 a tu CA y a tus salvaciones de Destreza.",
       "coverTotal": "Cobertura total: no pueden atacarte directamente ni apuntarte con hechizos.",
       "bloodied": "Te queda la mitad de tus PG o menos."
+    },
+    "Enchant": {
+      "Open": "Elegir objeto",
+      "Applied": "Encantado ahora",
+      "Choose": "Elige el objeto",
+      "NoItems": "Ningún objeto de tu inventario cumple los requisitos de este encantamiento.",
+      "Full": "Ya encantaste todos los objetos que permite. Quita uno para elegir otro.",
+      "Done": "{name} encantado."
     }
   }
 }

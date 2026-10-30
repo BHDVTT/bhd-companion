@@ -19,8 +19,10 @@ Versión actual: **0.11.0**
   aparece unos segundos en el teléfono y completo en el chat (en la TV). Descanso corto y largo.
   **Concentración** (en qué hechizo, con botón para terminarla) y **condiciones** activas con su
   icono: al tocar una (Derribado, Envenenado…) se explica qué hace.
-- **Acciones** — armas equipadas, hechizos por nivel con sus espacios, rasgos con usos y
-  consumibles. Filtros (acción / adicional / reacción) y buscador de hechizos.
+- **Acciones** — agrupadas por el tiempo de activación de cada actividad (Acción, Acción adicional,
+  Reacción, Otras), hechizos por nivel con sus espacios y rasgos pasivos (sin botones). Todo sale de
+  dnd5e: tocar una fila muestra su ficha nativa. Filtros (acción / adicional / reacción) y buscador de
+  hechizos. Encantar desde el teléfono (p. ej. el arma de Pact of the Blade) eligiendo el objeto de una lista.
   Estilo D&D Beyond: cada fila tiene sus botones de tirada, sin ventanas: **Ataque** (+5),
   **Daño** (1d4 + 3 Perforante), **CD 13 DES** si pide salvación, **Curar** o **Usar**. Cada botón
   usa la actividad como la hoja normal (tarjeta en el chat, gasto) y saca su tirada ligada a esa tarjeta (el DM aplica el daño desde el chat).

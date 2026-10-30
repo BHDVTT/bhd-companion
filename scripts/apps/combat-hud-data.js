@@ -4,7 +4,8 @@
  * Solo lee datos de Foundry y dnd5e (actividades, objetivos, velocidad, distancias de la cuadrícula).
  */
 
-import { isSpellShown, prepareRow } from "./actions-data.js";
+import { isActionItem, isSpellShown, prepareRow } from "./actions-data.js";
+import { getUsableActivities } from "../quick-actions.js";
 import { describeHealth, isActorCombatant } from "./combat-data.js";
 import { getMoveToken, getSpeed } from "./move-data.js";
 import { getMovementUsed } from "../movement.js";
@@ -46,7 +47,7 @@ const UNTARGETED_TYPES = new Set(["self", "space"]);
  * @returns {Activity[]}
  */
 export function getBlockActivities(item, block) {
-  const activities = item.system.activities?.filter(a => a.canUse) ?? [];
+  const activities = getUsableActivities(item);
   if ( block === "opportunity" ) return activities.filter(a => a.type === "attack");
   return activities.filter(a => a.activation?.type === block);
 }
@@ -147,24 +148,19 @@ function preparePanel(actor, block, state) {
   const opportunity = [];
   for ( const item of actor.items ) {
     const type = item.type;
-    const equipped = item.system.equipped ?? true;
-    if ( (type === "weapon") && equipped && (block.id === "reaction") && getBlockActivities(item, "opportunity").length ) {
-      opportunity.push(item);
-    }
+    if ( (type === "weapon") && item.system.equipped && (block.id === "reaction")
+      && getBlockActivities(item, "opportunity").length ) opportunity.push(item);
     if ( !getBlockActivities(item, block.id).length ) continue;
-    if ( type === "weapon" ) {
-      if ( equipped ) groups.attacks.push(item);
-    }
-    else if ( type === "spell" ) {
+    if ( type === "spell" ) {
       if ( isSpellShown(item, actor) && (!item.getFlag("dnd5e", "cachedFor") || item.system.linkedActivity?.displayInSpellbook) ) {
         groups.spells.push(item);
       }
+      continue;
     }
+    if ( !isActionItem(item) ) continue;
+    if ( type === "weapon" ) groups.attacks.push(item);
     else if ( type === "feat" ) groups.features.push(item);
-    else if ( type === "consumable" ) {
-      if ( (item.system.type?.value !== "ammo") && (item.system.quantity > 0) ) groups.items.push(item);
-    }
-    else if ( equipped ) groups.items.push(item);
+    else groups.items.push(item);
   }
 
   const byName = (a, b) => a.name.localeCompare(b.name, game.i18n.lang);
@@ -182,7 +178,10 @@ function preparePanel(actor, block, state) {
     { id: "items", label: "BHD.Hud.Items", rows: toRows(groups.items, block.id) }
   ].filter(section => section.rows.length);
 
-  const basics = (block.id === "action") ? BASIC_ACTIONS.map(basic => ({
+  // Las acciones básicas usan habilidades y estados de dnd5e: si el sistema no los tiene, no se ofrecen.
+  const available = basic => (!basic.skill || (basic.skill in CONFIG.DND5E.skills))
+    && (!basic.status || CONFIG.statusEffects.some(e => e.id === basic.status));
+  const basics = (block.id === "action") ? BASIC_ACTIONS.filter(available).map(basic => ({
     ...basic,
     label: game.i18n.localize(`BHD.Hud.Basic.${basic.id}.Name`),
     hint: game.i18n.localize(`BHD.Hud.Basic.${basic.id}.Hint`)

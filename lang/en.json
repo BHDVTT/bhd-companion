@@ -85,7 +85,18 @@
       "EndCast": "End this casting: the next button casts it again",
       "AlreadyCast": "{name} is already cast. To cast it again, tap “Cast ✕” on its row.",
       "NormalDamage": "Normal damage",
-      "CriticalDamage": "Critical damage (double dice)"
+      "CriticalDamage": "Critical damage (double dice)",
+      "Section": {
+        "action": "Action",
+        "bonus": "Bonus Action",
+        "reaction": "Reaction",
+        "other": "Other"
+      },
+      "Passive": "Passive features",
+      "PassiveHint": "Passive: nothing to use. Whatever it adds is already included in your rolls if dnd5e automates it.",
+      "Activities": "What it does",
+      "UsesOf": "{value}/{max} uses",
+      "SummonPlaced": "Creature placed next to your token on the map. The GM can move it."
     },
     "Combat": {
       "None": "No combat",
@@ -443,6 +454,14 @@
       "coverThreeQuarters": "Three-quarters cover: +5 to your AC and Dexterity saves.",
       "coverTotal": "Total cover: you can't be targeted directly by attacks or spells.",
       "bloodied": "You have half your hit points or fewer."
+    },
+    "Enchant": {
+      "Open": "Choose item",
+      "Applied": "Currently enchanted",
+      "Choose": "Choose the item",
+      "NoItems": "No item in your inventory meets this enchantment's requirements.",
+      "Full": "You already enchanted as many items as allowed. Remove one to choose another.",
+      "Done": "{name} enchanted."
     }
   }
 }

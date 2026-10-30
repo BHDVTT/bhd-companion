@@ -14,9 +14,11 @@ import { canKeepAwake, updateWakeLock } from "../wake-lock.js";
 import { getInstallMode, promptInstall } from "../home-screen.js";
 import { reloadWithoutUrlMode } from "../device.js";
 import { useError, useLog } from "../use-log.js";
-import { getScaledActivity, getScaling, getTurnKey, needsCast, needsUsageDialog, QuickActionState } from "../quick-actions.js";
+import { getScaledActivity, getScaling, getTurnKey, needsCast, needsUsageDialog, QuickActionState, ROLL_KINDS } from "../quick-actions.js";
+import { applyEnchantment, prepareEnchantPicker, removeEnchantment } from "../enchantments.js";
 import { getConditionInfo, prepareStatus } from "./status-data.js";
 import { findSavePrompts, getSavePromptLabel, rollSavePrompt } from "../save-prompts.js";
+import { renderItemDetails } from "../item-details.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -63,6 +65,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       actionFilter: BHDMobileApp.#onActionFilter,
       closeTray: BHDMobileApp.#onCloseTray,
       chooseUse: BHDMobileApp.#onChooseUse,
+      bhdEnchantOpen: BHDMobileApp.#onEnchantOpen,
+      bhdEnchantPick: BHDMobileApp.#onEnchantPick,
+      bhdEnchantRemove: BHDMobileApp.#onEnchantRemove,
       closeChooser: BHDMobileApp.#onCloseChooser,
       endTurn: BHDMobileApp.#onEndTurn,
       dismissTurnAlert: BHDMobileApp.#onDismissTurnAlert,
@@ -695,6 +700,44 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     chooser.hidden = false;
   }
 
+  /**
+   * Lista para encantar desde una tarjeta (arma de pacto...): lo ya encantado (con Quitar) y los objetos del
+   * personaje que dnd5e deja encantar. Usa la misma hoja inferior que el menú del toque largo.
+   * @param {ChatMessage} message  Tarjeta de la actividad de encantar.
+   */
+  #openEnchantPicker(message) {
+    const chooser = this.element?.querySelector(".bhd-chooser");
+    const data = prepareEnchantPicker(message);
+    if ( !chooser || !data ) return;
+    const escape = foundry.utils.escapeHTML;
+    const localize = key => escape(game.i18n.localize(key));
+    const entry = (entry, action, icon, cssClass) => `
+      <button type="button" class="bhd-mode bhd-enchant-entry ${cssClass}" data-action="${action}"
+              data-message-id="${message.id}" ${action === "bhdEnchantPick" ? `data-item-id="${entry.id}"` : `data-uuid="${escape(entry.uuid)}"`}>
+        <img src="${escape(entry.img ?? "")}" alt=""><span>${escape(entry.name)}</span>
+        <i class="${icon}" aria-hidden="true"></i>
+      </button>`;
+    const applied = data.applied.map(a => a.removable ? entry(a, "bhdEnchantRemove", "fa-solid fa-rotate-left", "bhd-enchant-applied")
+      : `<p class="bhd-enchant-applied"><img src="${escape(a.img ?? "")}" alt=""> ${escape(a.name)}</p>`).join("");
+    let choose = "";
+    if ( data.concentrationEnded ) choose = `<p class="bhd-enchant-note">${localize("DND5E.ENCHANT.Warning.ConcentrationEnded")}</p>`;
+    else if ( data.full ) choose = `<p class="bhd-enchant-note">${localize("BHD.Enchant.Full")}</p>`;
+    else if ( data.candidates.length ) choose = data.candidates.map(c => entry(c, "bhdEnchantPick", "fa-solid fa-wand-sparkles", "")).join("");
+    else choose = `<p class="bhd-enchant-note">${localize("BHD.Enchant.NoItems")}</p>`;
+    const count = data.max ? ` <span class="bhd-count">${data.applied.length}/${data.max}</span>` : "";
+    chooser.innerHTML = `
+      <div class="bhd-chooser-backdrop" data-action="closeChooser"></div>
+      <section class="bhd-chooser-sheet bhd-enchant-picker" role="dialog" aria-modal="true">
+        <header class="bhd-chooser-header"><img src="${escape(data.img)}" alt=""><span class="bhd-chooser-name">${escape(data.title)}</span></header>
+        ${data.applied.length ? `<h4 class="bhd-enchant-heading">${localize("BHD.Enchant.Applied")}${count}</h4>
+        <div class="bhd-enchant-list">${applied}</div>` : ""}
+        <h4 class="bhd-enchant-heading">${localize("BHD.Enchant.Choose")}${data.applied.length ? "" : count}</h4>
+        <div class="bhd-enchant-list">${choose}</div>
+        <button type="button" class="bhd-chooser-cancel" data-action="closeChooser">${localize("BHD.Actions.Close")}</button>
+      </section>`;
+    chooser.hidden = false;
+  }
+
   /** Cierra el menú del toque largo. */
   #closeChooser() {
     const chooser = this.element.querySelector(".bhd-chooser");
@@ -741,13 +784,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       useLog(`${tag} | Toque`, { mode, targets: Array.from(game.user.targets).map(t => t.name) });
 
-      // Objeto sin actividades (p. ej. un consumible sencillo): el uso normal de dnd5e.
-      if ( !activity ) {
-        const message = await item.use({ event }, { configure: false });
-        if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
-        this.#markUsed(block);
-        return;
-      }
+      // Los objetos sin actividades son pasivos: no tienen botones (la fila solo muestra su descripción).
+      if ( !activity ) return;
 
       // Como desde la hoja normal: primero `activity.use` (tarjeta del chat, gasto, eventos que escuchan
       // Automated Animations y otros módulos) y después la tirada ligada a esa tarjeta. Un hechizo que gasta
@@ -762,7 +800,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return;
       }
       if ( !cast || (!cast.sticky && (kind !== "damage")) ) {
-        cast = await this.#cast(item, activity, event, tag);
+        cast = await this.#cast(item, activity, kind, event, tag);
         if ( !cast ) return;
       }
 
@@ -819,13 +857,16 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * (terminando la anterior si hace falta), coloca el área y crea la tarjeta del chat.
    * @param {Item} item
    * @param {Activity} activity
+   * @param {string} kind  Botón tocado ("attack", "damage", "heal", "save", "use").
    * @param {Event} [event]
    * @param {string} tag  Prefijo del registro.
    * @returns {Promise<object|null>}  El lanzamiento, o null si no se pudo (dnd5e ya avisó por qué).
    */
-  async #cast(item, activity, event, tag) {
+  async #cast(item, activity, kind, event, tag) {
     const actor = item.actor;
-    const usage = { event, subsequentActions: false };
+    // Si el botón hace la tirada (Ataque, Daño, Curar), dnd5e no tira nada más; con Usar o Salvación hace lo
+    // que la actividad haga después de usarse (p. ej. encantar el propio objeto).
+    const usage = { event, subsequentActions: !ROLL_KINDS.has(kind) };
     const slot = this.#quick.getSlot(activity);
     if ( slot ) usage.spell = { slot };
     const concentrating = Array.from(actor.concentration?.effects ?? []).map(effect => ({
@@ -844,7 +885,13 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
     const message = results.message;
-    if ( message instanceof foundry.documents.ChatMessage ) this.#openTray(message);
+    if ( message instanceof foundry.documents.ChatMessage ) {
+      this.#openTray(message);
+      // La tarjeta pide elegir un objeto (encantar: arma de pacto...): en el chat se arrastra; aquí, una lista.
+      if ( message.getFlag("dnd5e", "use.enchantmentProfile") && !activity.enchant?.self ) {
+        this.#openEnchantPicker(message);
+      }
+    }
     const cast = {
       activityId: activity.id,
       slot,
@@ -963,6 +1010,18 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( renderId !== this.#trayRender ) return;
     const log = tray.querySelector(".bhd-tray-log");
     log.replaceChildren(...elements);
+    // Zonas de "arrastra aquí el objeto" de las tarjetas de encantar: en el teléfono, un botón que abre la lista.
+    for ( const zone of log.querySelectorAll("enchantment-application") ) {
+      const messageId = zone.closest("[data-message-id]")?.dataset.messageId;
+      if ( !messageId || zone.querySelector(".bhd-enchant-open") ) continue;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "bhd-enchant-open";
+      button.dataset.action = "bhdEnchantOpen";
+      button.dataset.messageId = messageId;
+      button.innerHTML = `<i class="fa-solid fa-hand-pointer" aria-hidden="true"></i> ${foundry.utils.escapeHTML(game.i18n.localize("BHD.Enchant.Open"))}`;
+      zone.append(button);
+    }
     const wasHidden = tray.hidden;
     tray.hidden = false;
     // Muestra lo más reciente (la última tirada).
@@ -1593,6 +1652,55 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Botón "Elegir objeto" de una tarjeta de encantar del panel de resultados.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onEnchantOpen(event, target) {
+    const message = game.messages.get(target.dataset.messageId);
+    if ( message ) this.#openEnchantPicker(message);
+  }
+
+  /**
+   * Encanta el objeto elegido en la lista (como soltarlo en la tarjeta del chat).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onEnchantPick(event, target) {
+    const message = game.messages.get(target.dataset.messageId);
+    if ( !message ) return;
+    try {
+      const effect = await applyEnchantment(message, target.dataset.itemId);
+      if ( !effect ) return;
+      ui.notifications.info(game.i18n.format("BHD.Enchant.Done", { name: effect.parent?.name ?? "" }));
+      const data = prepareEnchantPicker(message);
+      if ( data?.max && !data.full ) this.#openEnchantPicker(message);
+      else this.#closeChooser();
+    } catch(err) {
+      useError("Encantar | Error", err);
+      ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: message.getAssociatedItem()?.name ?? "", error: err?.message ?? String(err) }));
+    }
+  }
+
+  /**
+   * Quita un encantamiento de la lista y la vuelve a mostrar (para elegir otro objeto).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onEnchantRemove(event, target) {
+    const message = game.messages.get(target.dataset.messageId);
+    try {
+      await removeEnchantment(message, target.dataset.uuid);
+    } catch(err) {
+      useError("Quitar encantamiento | Error", err);
+    }
+    if ( message ) this.#openEnchantPicker(message);
+  }
+
+  /**
    * Termina el lanzamiento en curso de un hechizo: el próximo botón lo vuelve a lanzar (y gasta otro espacio).
    * @this {BHDMobileApp}
    * @param {PointerEvent} event
@@ -1620,24 +1728,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onItemInfo(event, target) {
     const item = this.actor?.items.get(target.dataset.itemId);
     if ( !item ) return;
-    // Los objetos sin identificar muestran a los jugadores solo su descripción "sin identificar".
-    const unidentified = (item.system.identified === false) && !game.user.isGM;
-    const html = unidentified ? item.system.unidentified?.description : item.system.description?.value;
-    const description = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
-      html ?? "",
-      { rollData: item.getRollData(), relativeTo: item, secrets: item.isOwner }
-    );
-    const row = target.closest(".bhd-action, .bhd-inv-item");
-    const subtitle = row?.querySelector(".bhd-action-sub")?.textContent.trim() ?? "";
     const content = document.createElement("div");
-    content.className = "bhd-item-info";
-    if ( subtitle ) {
-      const sub = document.createElement("p");
-      sub.className = "bhd-item-info-sub";
-      sub.textContent = subtitle;
-      content.append(sub);
-    }
-    content.insertAdjacentHTML("beforeend", description);
+    content.className = "bhd-item-info bhd-item-details";
+    content.innerHTML = await renderItemDetails(item);
     await DialogV2.prompt({
       window: { title: item.name, icon: "fa-solid fa-circle-info" },
       classes: ["bhd-dialog"],

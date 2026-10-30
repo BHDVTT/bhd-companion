@@ -3472,3 +3472,254 @@ body.bhd-mobile .bhd-offline-reload {
   border-radius: 50%;
   background: #27232c;
 }
+
+/* ------------------------------------------ */
+/*  Rasgos pasivos (pestaña Acciones)          */
+/* ------------------------------------------ */
+
+#bhd-mobile-app details.bhd-passive > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--bhd-touch);
+  margin: 8px 0 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+#bhd-mobile-app details.bhd-passive > summary::-webkit-details-marker {
+  display: none;
+}
+
+#bhd-mobile-app details.bhd-passive > summary::after {
+  content: "\f078";
+  margin-left: auto;
+  font-family: "Font Awesome 6 Pro", "Font Awesome 6 Free";
+  font-weight: 900;
+  transition: transform 0.15s;
+}
+
+#bhd-mobile-app details.bhd-passive[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+#bhd-mobile-app .bhd-count {
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text-muted);
+  font-size: calc(12px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-action.bhd-passive-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ------------------------------------------ */
+/*  Encantar un objeto (arma de pacto...)      */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-enchant-heading {
+  margin: 10px 0 6px;
+  border: none;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+  color: var(--bhd-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#bhd-mobile-app .bhd-enchant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 45dvh;
+  overflow-y: auto;
+}
+
+#bhd-mobile-app .bhd-mode.bhd-enchant-entry {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 56px;
+  padding: 6px 12px;
+  text-align: left;
+}
+
+#bhd-mobile-app .bhd-enchant-entry img,
+#bhd-mobile-app p.bhd-enchant-applied img {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+#bhd-mobile-app .bhd-enchant-entry span {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-enchant-entry i {
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-enchant-applied {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold-soft);
+}
+
+#bhd-mobile-app p.bhd-enchant-applied {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 6px 12px;
+  border: 2px solid var(--bhd-gold);
+  border-radius: 10px;
+}
+
+#bhd-mobile-app .bhd-enchant-note {
+  margin: 0;
+  color: var(--bhd-text-muted);
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+}
+
+/* Botón "Elegir objeto" dentro de la tarjeta de encantar del panel de resultados */
+#bhd-mobile-app .bhd-tray .bhd-enchant-open {
+  width: 100%;
+  height: auto;
+  min-height: var(--bhd-touch);
+  margin-top: 6px;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+/* ------------------------------------------ */
+/*  Detalle de un objeto (ficha de dnd5e)      */
+/* ------------------------------------------ */
+
+body.bhd-mobile .bhd-item-details .header .top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+body.bhd-mobile .bhd-item-details .header img {
+  width: 56px;
+  height: 56px;
+  border: 2px solid var(--dnd5e-color-gold, #9f9275);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+body.bhd-mobile .bhd-item-details .header .name {
+  display: flex;
+  flex-direction: column;
+}
+
+body.bhd-mobile .bhd-item-details .header .title {
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+body.bhd-mobile .bhd-item-details .header .subtitle {
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+  opacity: 0.8;
+}
+
+body.bhd-mobile .bhd-item-details .header .bottom {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+  opacity: 0.85;
+}
+
+body.bhd-mobile .bhd-item-details .header .school,
+body.bhd-mobile .bhd-item-details .control-hint {
+  display: none;
+}
+
+body.bhd-mobile .bhd-item-details .spell-block {
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.bhd-mobile .bhd-item-details .spell-block li {
+  margin: 2px 0;
+}
+
+body.bhd-mobile .bhd-item-details .pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.bhd-mobile .bhd-item-details .pill {
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  font-size: calc(12px * var(--bhd-text-scale, 1));
+  opacity: 0.85;
+}
+
+body.bhd-mobile .bhd-item-details .bhd-detail-heading {
+  margin: 12px 0 4px;
+  border: none;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+  text-transform: uppercase;
+}
+
+body.bhd-mobile .bhd-item-details .bhd-detail-activities {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.bhd-mobile .bhd-item-details .bhd-detail-activity {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+body.bhd-mobile .bhd-item-details .bhd-detail-activity img {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: none;
+}
+
+body.bhd-mobile .bhd-item-details .bhd-detail-activity-text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+body.bhd-mobile .bhd-item-details .bhd-detail-activity-text strong {
+  flex-basis: 100%;
+}
+
+body.bhd-mobile .bhd-item-details .bhd-detail-fact {
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+  opacity: 0.85;
+}
+
+body.bhd-mobile .bhd-item-details .bhd-detail-fact + .bhd-detail-fact::before {
+  content: "· ";
+}
+
+body.bhd-mobile .bhd-item-details .bhd-detail-uses,
+body.bhd-mobile .bhd-item-details .bhd-detail-passive {
+  margin: 8px 0;
+  font-weight: bold;
+}
