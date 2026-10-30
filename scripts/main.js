@@ -15,6 +15,10 @@ import { updateWakeLock } from "./wake-lock.js";
 import { registerMovementSocket } from "./movement.js";
 import { broadcastTargets, pruneTargets } from "./targets.js";
 import { registerUseLogSocket } from "./use-log.js";
+import { registerRemoteUse } from "./remote-use.js";
+
+// Respaldo de los aparatos lentos: el PC del DM hace los ataques (socketlib avisa durante "init").
+registerRemoteUse();
 
 /** Pasos del flujo de Midi QOL que se anotan en el registro de los usos del teléfono. */
 const MIDI_HOOKS = [

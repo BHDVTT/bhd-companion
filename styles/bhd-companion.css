@@ -9,7 +9,8 @@ body.bhd-mobile #interface,
 body.bhd-mobile #board,
 body.bhd-mobile #hud,
 body.bhd-mobile #camera-views,
-body.bhd-mobile #pause {
+body.bhd-mobile #pause,
+body.bhd-mobile #dice-box-canvas {
   display: none !important;
 }
 

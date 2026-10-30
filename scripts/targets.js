@@ -1,6 +1,11 @@
 /**
  * Objetivos desde el teléfono (HUD de la pestaña Combate).
  *
+ * Con el mapa cargado (oculto detrás de la vista) y mostrando la escena activa, se marcan las fichas
+ * reales con `canvas.tokens.setTargets`, igual que al hacer clic en el mapa: Foundry llena
+ * `game.user.targets` con objetos `Token` (los que esperan Midi QOL y otros módulos) y avisa a las
+ * demás pantallas. Lo de abajo (`PhoneTarget`) queda para el modo ligero, sin mapa.
+ *
  * Foundry guarda los objetivos del jugador en `game.user.targets`, un conjunto de fichas del mapa.
  * El teléfono no tiene mapa (ni fichas dibujadas), así que se llena con objetos `PhoneTarget` que
  * imitan lo que dnd5e (y otros módulos, como Midi QOL) leen de una ficha: id, nombre, actor,
@@ -47,6 +52,15 @@ export function getTargetIds() {
  */
 export function setTargets(ids) {
   const scene = game.scenes.active;
+  if ( canvas?.ready && scene && (canvas.scene === scene) ) {
+    // Quita los PhoneTarget que quedaran (p. ej. de antes de que el mapa terminara de cargar).
+    for ( const target of Array.from(game.user.targets) ) {
+      if ( target instanceof PhoneTarget ) game.user.targets.delete(target);
+    }
+    canvas.tokens.setTargets(ids.filter(id => canvas.tokens.get(id)), { mode: "replace" });
+    broadcastTargets();   // con la escena, para que la TV los dibuje
+    return;
+  }
   const tokens = scene ? ids.map(id => scene.tokens.get(id)).filter(t => t) : [];
   const targets = game.user.targets;
   for ( const target of Array.from(targets) ) {

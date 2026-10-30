@@ -4,7 +4,7 @@ import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.
 import { getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
 import { BASIC_ACTIONS, getBlockActivities, getTargetNeed, prepareHud, prepareTargetCards, prepareTargetChips } from "./combat-hud-data.js";
 import { ECONOMY_BLOCKS, getEconomy, getOwnCombatant, setEconomy } from "../economy.js";
-import { setTargets, toggleTarget } from "../targets.js";
+import { getTargetIds, setTargets, toggleTarget } from "../targets.js";
 import { prepareInventory } from "./inventory-data.js";
 import { getMoveToken, prepareMovement } from "./move-data.js";
 import { requestMovement } from "../movement.js";
@@ -15,6 +15,7 @@ import { getInstallMode, promptInstall } from "../home-screen.js";
 import { reloadWithoutUrlMode } from "../device.js";
 import { beginUse, endUse, getBlockedWindows } from "../mobile-windows.js";
 import { useError, useLog, useWarn } from "../use-log.js";
+import { requestRemoteUse, shouldUseRemotely } from "../remote-use.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -779,6 +780,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       targets: Array.from(game.user.targets).map(t => t.name), midiQOL: midi
     });
     try {
+      if ( shouldUseRemotely() ) {
+        await this.#useRemotely(item, activity, mode, tag);
+        return;
+      }
       // Con Midi QOL: los objetivos ya se eligieron en el teléfono. Su ventana de confirmar objetivos
       // se maneja tocando fichas en el mapa (que el teléfono no tiene) y falla, así que no se pide.
       const usage = { event };
@@ -803,6 +808,40 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       clearTimeout(guard);
       release();
     }
+  }
+
+  /**
+   * Respaldo sin mapa (modo ligero): el PC del DM usa la actividad con los objetivos del jugador.
+   * La actividad se elige aquí (si hay varias); el espacio de conjuro es el que dnd5e propone.
+   * @param {Item} item
+   * @param {Activity} [activity]
+   * @param {string} mode
+   * @param {string} tag  Prefijo del registro.
+   */
+  async #useRemotely(item, activity, mode, tag) {
+    if ( !activity ) {
+      const usable = item.system.activities?.filter(a => a.canUse) ?? [];
+      if ( usable.length > 1 ) activity = await dnd5e.applications.activity.ActivityChoiceDialog.create(item);
+      else activity = usable[0];
+    }
+    if ( !activity ) {
+      useLog(`${tag} | No se eligió actividad`);
+      return;
+    }
+    const targetIds = getTargetIds();
+    useLog(`${tag} | 2. Sin mapa: se pide al PC del DM (socketlib)`, {
+      activity: `${activity.name || activity.type} (${activity.type})`, mode, targets: targetIds
+    });
+    const response = await requestRemoteUse(activity, { mode, targetIds, sceneId: game.scenes.active?.id ?? null });
+    if ( !response?.ok ) {
+      useWarn(`${tag} | 6. El PC del DM no lo usó`, response);
+      const reason = response?.reason ?? "Error";
+      ui.notifications.warn(game.i18n.format(`BHD.Remote.${reason}`, { name: item.name, error: response?.error ?? "" }));
+      return;
+    }
+    useLog(`${tag} | 6. Usado en el PC del DM`, { message: response.messageId });
+    // En el teléfono no salta dnd5e.postUseActivity: se marca aquí (acción usada, resultado, tarjeta).
+    this.onPostUseActivity(activity, { message: game.messages.get(response.messageId) });
   }
 
   /**
@@ -1854,7 +1893,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       toggles: [
         { key: "largeText", icon: "fa-solid fa-text-height", on: get("largeText") },
         { key: "keepAwake", icon: "fa-solid fa-sun", on: get("keepAwake"), unsupported: !canKeepAwake() },
-        { key: "phoneMusic", icon: "fa-solid fa-music", on: get("phoneMusic") }
+        { key: "phoneMusic", icon: "fa-solid fa-music", on: get("phoneMusic") },
+        { key: "lightMode", icon: "fa-solid fa-feather", on: get("lightMode") }
       ],
       install: getInstallMode()
     });
@@ -1887,8 +1927,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static async #onToggleSetting(event, target) {
     const key = target.dataset.setting;
-    if ( !["largeText", "keepAwake", "phoneMusic"].includes(key) ) return;
+    if ( !["largeText", "keepAwake", "phoneMusic", "lightMode"].includes(key) ) return;
     await game.settings.set(MODULE_ID, key, !game.settings.get(MODULE_ID, key));
+    // El mapa se carga (o no) al abrir la página.
+    if ( key === "lightMode" ) return window.location.reload();
     if ( key === "largeText" ) applyLargeText();
     else if ( key === "keepAwake" ) updateWakeLock();
     else if ( key === "phoneMusic" ) syncPlaylistSounds();

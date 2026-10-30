@@ -61,10 +61,11 @@ scripts/apps/move-data.js       datos de la pestaña Mover (ficha, pies usados /
 scripts/apps/combat-hud-data.js datos del HUD de combate (bloques, opciones por bloque, tarjetas de objetivos)
 scripts/movement.js          mover fichas desde el teléfono: reglas, canal del módulo, lado del DM, seguir en la TV
 scripts/economy.js           acción / adicional / reacción / Correr usados en el turno (flag del combatiente)
-scripts/targets.js           objetivos sin mapa: game.user.targets con PhoneTarget y aviso a la TV
+scripts/targets.js           objetivos: fichas reales del mapa oculto; sin mapa, PhoneTarget; aviso a la TV
 scripts/mobile-templates.js  áreas de hechizo (plantillas) sin mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
 scripts/mobile-windows.js    qué ventanas se permiten en vista móvil (cierra las de otros módulos), una a la vez
+scripts/remote-use.js        modo ligero: el PC del DM usa la actividad por el jugador (socketlib)
 scripts/use-log.js           registro paso a paso de los usos del teléfono (consola del teléfono y del DM)
 scripts/connection.js        reconexión sin límite y aviso "Sin conexión" en vista móvil
 scripts/wake-lock.js         pantalla siempre encendida (Screen Wake Lock API)
@@ -93,7 +94,23 @@ lang/es.json, en.json        traducciones
   El GM nunca. `?bhd=mobile` manda sobre `preferNormal`; "Volver a la interfaz normal" y el botón
   "Vista móvil" recargan sin el `?bhd=` (`reloadWithoutUrlMode`). La decisión y los datos del
   dispositivo salen en consola.
-- **Sin mapa:** en `mobile-mode.js` `Canvas.prototype.initialize` se vuelve vacío (lo mismo que hace
+- **Mapa oculto (desde 0.9.0):** el teléfono **sí carga el mapa** (Midi QOL necesita fichas `Token`: sin ellas
+  fallaba con "You must provide an embedded Document instance as the input for a PlaceableObject"), oculto y
+  barato (`prepareHiddenCanvas`): hook `canvasConfig` (resolución 0.5, `low-power`), `_configurePerformanceMode`
+  envuelto (modo LOW, sin msaa/smaa/mipmaps, `lightSoftEdges: false`, 10 FPS), `EffectsCanvasGroup#activateAnimation`
+  sin animar luces, `canvas.stage.renderable = false` (no se pinta nada, también FXMaster / Sequencer) y
+  `SoundsLayer#_syncPositions` sin oyentes salvo `phoneMusic`. Dice So Nice (`diceSoNiceMessagePreProcess`,
+  `messageHookDisabled`, `showForRoll`, `#dice-box-canvas` oculto) y `Sequencer.EffectManager._playEffect`
+  se anulan en el teléfono. Nunca con `game.settings.set` ni sustituyendo `get` (The Forge sincroniza).
+  `followToken` no se ejecuta en vista móvil. Objetivos: `canvas.tokens.setTargets` con las fichas reales.
+- **Modo ligero** (ajuste del teléfono `lightMode`, recarga): sin mapa, como antes de 0.9.0 (lo de abajo). Con
+  Midi QOL y sin mapa (o el mapa en otra escena que la activa), `shouldUseRemotely` → `#useRemotely`: el
+  teléfono elige actividad y pide por socketlib (`executeAsGM("useActivity")`) al DM, que comprueba dueño,
+  pone los objetivos del jugador como suyos (debe ver la escena activa), hace `activity.use` con
+  `configure: false` y `workflowOptions` (sin confirmar objetivos, ataque / daño automáticos, ventaja) y
+  restaura sus objetivos; en cola. El teléfono llama a `onPostUseActivity` con la tarjeta devuelta.
+  Limitación: sin ventana de espacio de conjuro (el que dnd5e propone), sin aviso de total en el teléfono.
+- **Sin mapa (solo modo ligero):** en `mobile-mode.js` `Canvas.prototype.initialize` se vuelve vacío (lo mismo que hace
   Foundry con `core.noCanvas`): no se crea WebGL, `canvas.initialized/ready` quedan en false. **No se toca
   ni se finge `core.noCanvas`** (0.8.2): antes se sustituía `game.settings.get` y The Forge, que sincroniza
   los ajustes de cliente, guardó `true` y mostraba "Difference in client settings detected". Lo que Foundry
@@ -333,7 +350,7 @@ lang/es.json, en.json        traducciones
   largo y "Más opciones" también pasan por el HUD con `data-hud-block`). Si solo hay una actividad
   de ese tipo se usa `activity.use()` (sin preguntar cuál). Acciones básicas en `BASIC_ACTIONS`:
   mensaje al chat + tirada (Esconderse = Sigilo, Buscar = Percepción) + marcar acción.
-- **Objetivos sin mapa** (`targets.js`): `game.user.targets` se llena con `PhoneTarget` (id, name,
+- **Objetivos sin mapa** (`targets.js`, desde 0.9.0 solo en modo ligero; con mapa, fichas reales): `game.user.targets` se llena con `PhoneTarget` (id, name,
   actor, document, x/y/w/h, center, `hasDynamicRing: false` porque dnd5e lo lee en `targetToken`).
   dnd5e solo usa `name` y `actor` (`getTargetDescriptors`). Se avisa a las demás pantallas con
   `broadcastActivity({ sceneId, targets })` (sin `sceneId` la TV los ignora, ver

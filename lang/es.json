@@ -111,6 +111,15 @@
         "Dead": "Tu personaje ha muerto."
       }
     },
+    "Remote": {
+      "NoSocketlib": "No se pudo usar {name}: en modo ligero hace falta el módulo socketlib activo.",
+      "NoGM": "No se pudo usar {name}: el DM no está conectado.",
+      "GMNotViewing": "No se pudo usar {name}: el DM no está viendo la escena de la TV.",
+      "NotOwner": "No se pudo usar {name}: el DM no ve que este personaje sea tuyo.",
+      "NotFound": "No se pudo usar {name}: el DM no encontró el objeto.",
+      "Cancelled": "{name} no se usó (se canceló o faltó algo: objetivo, espacio de conjuro o usos).",
+      "Error": "No se pudo usar {name} en el PC del DM: {error}"
+    },
     "Use": {
       "Busy": "Espera: todavía se está usando {name}.",
       "NotUsed": "{name} no se usó (se canceló o faltó algo: objetivo, espacio de conjuro o usos). Si sigue pasando, avisa al DM.",
@@ -324,6 +333,10 @@
         "Name": "Pantalla siempre encendida",
         "Hint": "La pantalla no se apaga sola mientras la vista está abierta. Gasta algo más de batería.",
         "Unsupported": "Este navegador no lo permite (hace falta HTTPS, como en The Forge, y un navegador reciente)."
+      },
+      "LightMode": {
+        "Name": "Modo ligero (aparatos lentos)",
+        "Hint": "Este aparato no carga el mapa. Con Midi QOL, los ataques y hechizos los hace el PC del DM (necesita socketlib). La página se recarga."
       },
       "PhoneMusic": {
         "Name": "Música en el teléfono",

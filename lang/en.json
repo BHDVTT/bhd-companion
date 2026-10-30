@@ -111,6 +111,15 @@
         "Dead": "Your character has died."
       }
     },
+    "Remote": {
+      "NoSocketlib": "{name} could not be used: light mode needs the socketlib module active.",
+      "NoGM": "{name} could not be used: the DM is not connected.",
+      "GMNotViewing": "{name} could not be used: the DM is not viewing the TV scene.",
+      "NotOwner": "{name} could not be used: the DM does not see this character as yours.",
+      "NotFound": "{name} could not be used: the DM could not find the item.",
+      "Cancelled": "{name} was not used (it was cancelled or something was missing: a target, a spell slot or uses).",
+      "Error": "{name} could not be used on the DM's PC: {error}"
+    },
     "Use": {
       "Busy": "Wait: {name} is still being used.",
       "NotUsed": "{name} was not used (it was cancelled or something was missing: a target, a spell slot or uses). If this keeps happening, tell the DM.",
@@ -324,6 +333,10 @@
         "Name": "Keep screen on",
         "Hint": "The screen won't turn off by itself while the view is open. Uses a bit more battery.",
         "Unsupported": "This browser doesn't allow it (it needs HTTPS, like The Forge, and a recent browser)."
+      },
+      "LightMode": {
+        "Name": "Light mode (slow devices)",
+        "Hint": "This device does not load the map. With Midi QOL, attacks and spells run on the DM's PC (needs socketlib). The page reloads."
       },
       "PhoneMusic": {
         "Name": "Music on the phone",

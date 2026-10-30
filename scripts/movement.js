@@ -1,7 +1,8 @@
 /**
  * Mover la ficha desde el teléfono (pestaña Mover).
  *
- * El teléfono no tiene mapa, así que no puede comprobar paredes ni puertas. Por eso cada paso se
+ * El mapa del teléfono está oculto (o no existe, en modo ligero), así que los pasos no se deciden ahí:
+ * se siguen comprobando en el DM, que es quien ve la escena en la TV. Cada paso se
  * pide por el canal del módulo al cliente del DM activo, que sí tiene el mapa: comprueba si el
  * jugador puede moverse, si hay una pared, y mueve la ficha con el movimiento normal de Foundry
  * (`TokenDocument#move`). Después avisa a las pantallas con mapa (la TV) para que sigan la ficha.
@@ -9,6 +10,7 @@
 
 import { MODULE_ID } from "./constants.js";
 import { getActiveCombat } from "./apps/combat-data.js";
+import { isMobileView } from "./mobile-mode.js";
 
 const SOCKET = `module.${MODULE_ID}`;
 
@@ -307,6 +309,7 @@ function announceFollow(token) {
  * @param {string} tokenId
  */
 function followToken(sceneId, tokenId) {
+  if ( isMobileView() ) return;   // el mapa del teléfono está oculto
   if ( !canvas?.ready || (canvas.scene?.id !== sceneId) ) return;
   if ( !game.settings.get(MODULE_ID, "followMoves") ) return;
   const token = canvas.tokens.get(tokenId);

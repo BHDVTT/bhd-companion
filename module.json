@@ -2,7 +2,7 @@
   "id": "bhd-companion",
   "title": "BHD Companion",
   "description": "Vista móvil para jugadores de Battlehammer's Dungeon: hoja de personaje, tiradas y combate en tiempo real desde el teléfono.",
-  "version": "0.8.4",
+  "version": "0.9.0",
   "authors": [
     {
       "name": "Battlehammer's Dungeon"
@@ -20,6 +20,13 @@
         "compatibility": {
           "minimum": "5.0.0"
         }
+      }
+    ],
+    "recommends": [
+      {
+        "id": "socketlib",
+        "type": "module",
+        "reason": "Modo ligero: con Midi QOL, los ataques de los teléfonos sin mapa se hacen en el PC del DM."
       }
     ]
   },
@@ -44,7 +51,7 @@
   "socket": true,
   "url": "https://github.com/BHDVTT/bhd-companion",
   "manifest": "https://github.com/BHDVTT/bhd-companion/releases/latest/download/module.json",
-  "download": "https://github.com/BHDVTT/bhd-companion/releases/download/v0.8.4/module.zip",
+  "download": "https://github.com/BHDVTT/bhd-companion/releases/download/v0.9.0/module.zip",
   "bugs": "https://github.com/BHDVTT/bhd-companion/issues",
   "readme": "https://github.com/BHDVTT/bhd-companion#readme"
 }
