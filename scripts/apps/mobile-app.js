@@ -25,6 +25,7 @@ import {
 import { applyEnchantment, prepareEnchantPicker, removeEnchantment } from "../enchantments.js";
 import { getConditionInfo, prepareStatus } from "./status-data.js";
 import { findSavePrompts, getSavePromptLabel, rollSavePrompt } from "../save-prompts.js";
+import { rollMidiChatSave } from "../midi-chat-saves.js";
 import { renderItemDetails } from "../item-details.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -71,6 +72,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       bhdEffectInfo: BHDMobileApp.#onEffectInfo,
       bhdSaveRoll: BHDMobileApp.#onSaveRoll,
       bhdSaveDismiss: BHDMobileApp.#onSaveDismiss,
+      bhdSaveMode: BHDMobileApp.#onSaveMode,
       itemInfo: BHDMobileApp.#onItemInfo,
       actionFilter: BHDMobileApp.#onActionFilter,
       closeTray: BHDMobileApp.#onCloseTray,
@@ -192,6 +194,16 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Salvaciones ya avisadas (no se repiten si el mensaje se vuelve a crear o actualizar). */
   #seenPrompts = new Set();
+
+  /**
+   * Salvaciones por chat de Midi que ya salieron del aviso (tiradas aquí o por Midi), por id: para no volver a
+   * mostrarlas si el DM las reenvía, y para enseñar el resultado cuando llegue.
+   * @type {Map<string, {prompt: object, rolledHere: boolean, total: number|null}>}
+   */
+  #midiChatDone = new Map();
+
+  /** Reloj de la cuenta atrás del aviso de salvación (salvaciones por chat de Midi). */
+  #saveTick = null;
 
   /**
    * Mensajes del chat que se ven en el panel de resultados: la tarjeta del último objeto usado
@@ -487,7 +499,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Android abre un menú del navegador con el toque largo: lo evitamos en las filas.
     this.element.addEventListener("contextmenu", event => {
-      if ( event.target.closest(".bhd-roll-btn") ) event.preventDefault();
+      if ( event.target.closest(".bhd-roll-btn, .bhd-save-alert-roll") ) event.preventDefault();
     });
 
     const toast = document.createElement("div");
@@ -843,13 +855,22 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     clearTimeout(this.#longPress?.timer);
     this.#longPress = null;
     const target = event.target.closest(
-      '.bhd-roll-btn[data-kind="attack"], .bhd-roll-btn[data-kind="damage"], .bhd-roll-btn[data-kind="midi"]'
+      '.bhd-roll-btn[data-kind="attack"], .bhd-roll-btn[data-kind="damage"], .bhd-roll-btn[data-kind="midi"], '
+      + ".bhd-save-alert-roll[data-midi-chat]"
     );
     if ( !target || (event.button !== 0) ) return;
     const press = this.#longPress = { target, x: event.clientX, y: event.clientY, fired: false };
     press.timer = setTimeout(() => {
       press.fired = true;
       navigator.vibrate?.(20);
+      // Aviso de salvación por chat de Midi: las tres opciones salen dentro del mismo aviso.
+      if ( target.matches(".bhd-save-alert-roll") ) {
+        const modes = target.parentElement.querySelector(".bhd-save-alert-modes");
+        if ( modes ) modes.hidden = false;
+        target.hidden = true;
+        useLog("Salvación por chat: toque largo, elige ventaja / normal / desventaja");
+        return;
+      }
       this.#openChooser(target);
     }, LONG_PRESS_MS);
   }
@@ -1745,6 +1766,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( !alert ) return;
     if ( !prompt || !actor ) {
       alert.hidden = true;
+      this.#tickSaveAlert();
       return;
     }
     const localize = key => game.i18n.localize(key);
@@ -1753,25 +1775,49 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       : (["check", "skill", "tool"].includes(prompt.type) ? "BHD.Save.CheckTitle" : "BHD.Save.Title");
     const more = this.#savePrompts.length - 1;
     // Midi espera la tirada: no hay "Ahora no" (si Midi tiene tiempo límite, se tira sola al acabarse).
-    const later = prompt.midi
-      ? (prompt.timeout ? `<span class="bhd-save-alert-more">${game.i18n.format("BHD.Save.AutoRoll", { seconds: prompt.timeout })}</span>` : "")
-      : `<button type="button" class="bhd-save-alert-later" data-action="bhdSaveDismiss">${localize("BHD.Save.Later")}</button>`;
+    let later;
+    if ( prompt.midiChat ) later = `
+        ${prompt.endsAt ? `<div class="bhd-reaction-timer"><span class="bhd-reaction-bar bhd-save-alert-bar"></span></div>
+        <span class="bhd-save-alert-more bhd-save-alert-seconds"></span>` : ""}
+        <div class="bhd-save-alert-modes" hidden>
+          <span class="bhd-save-alert-more">${localize("BHD.Save.ChooseMode")}</span>
+          <button type="button" class="bhd-big-btn bhd-save-mode bhd-mode-adv" data-action="bhdSaveMode" data-mode="advantage">
+            <i class="fa-solid fa-angles-up" aria-hidden="true"></i> ${localize("BHD.Actions.Advantage")}</button>
+          <button type="button" class="bhd-big-btn bhd-save-mode" data-action="bhdSaveMode" data-mode="normal">
+            <i class="fa-solid fa-dice-d20" aria-hidden="true"></i> ${localize("BHD.Actions.Normal")}</button>
+          <button type="button" class="bhd-big-btn bhd-save-mode bhd-mode-dis" data-action="bhdSaveMode" data-mode="disadvantage">
+            <i class="fa-solid fa-angles-down" aria-hidden="true"></i> ${localize("BHD.Actions.Disadvantage")}</button>
+        </div>
+        <span class="bhd-save-alert-hint">${localize("BHD.Save.HoldForMode")}</span>`;
+    else if ( prompt.midi ) later = prompt.timeout
+      ? `<span class="bhd-save-alert-more">${game.i18n.format("BHD.Save.AutoRoll", { seconds: prompt.timeout })}</span>` : "";
+    else later = `<button type="button" class="bhd-save-alert-later" data-action="bhdSaveDismiss">${localize("BHD.Save.Later")}</button>`;
+    // Ventaja / desventaja que calculó Midi (condiciones, efectos, rasgos): se ve en el botón.
+    const modeKey = (prompt.advantage && !prompt.disadvantage) ? "BHD.Save.Advantage"
+      : ((prompt.disadvantage && !prompt.advantage) ? "BHD.Save.Disadvantage" : null);
+    const modeClass = modeKey ? (prompt.advantage ? "bhd-save-adv" : "bhd-save-dis") : "";
     alert.innerHTML = `
       <div class="bhd-save-alert-box ${concentration ? "bhd-save-concentration" : ""}">
         <i class="fa-solid ${concentration ? "fa-brain" : "fa-shield-heart"} bhd-save-alert-icon" aria-hidden="true"></i>
         <strong class="bhd-save-alert-title">${localize(title)}</strong>
         <span class="bhd-save-alert-source"></span>
-        <button type="button" class="bhd-big-btn bhd-save-alert-roll" data-action="bhdSaveRoll">
-          <i class="fa-solid fa-dice-d20" aria-hidden="true"></i> <span></span>
+        <button type="button" class="bhd-big-btn bhd-save-alert-roll ${modeClass}" data-action="bhdSaveRoll"
+                ${prompt.midiChat ? "data-midi-chat" : ""}>
+          <i class="fa-solid fa-dice-d20" aria-hidden="true"></i> <span class="bhd-save-alert-label"></span>
+          ${modeKey ? `<em class="bhd-save-alert-mode">${localize(modeKey)}</em>` : ""}
         </button>
         ${later}
         ${more > 0 ? `<span class="bhd-save-alert-more">${game.i18n.format("BHD.Save.More", { count: more })}</span>` : ""}
       </div>`;
-    const source = [(actor !== this.actor) ? actor.name : "", prompt.source].filter(_ => _).join(" · ");
-    alert.querySelector(".bhd-save-alert-source").textContent = source
-      ? game.i18n.format("BHD.Save.From", { source }) : "";
-    alert.querySelector(".bhd-save-alert-roll span").textContent = getSavePromptLabel(prompt, actor);
+    const what = [(actor !== this.actor) ? actor.name : "", prompt.source].filter(_ => _).join(" · ");
+    let source = what ? game.i18n.format("BHD.Save.From", { source: what }) : "";
+    if ( prompt.midiChat && prompt.caster ) {
+      source = game.i18n.format("BHD.Save.FromCaster", { source: what || "—", caster: prompt.caster });
+    }
+    alert.querySelector(".bhd-save-alert-source").textContent = source;
+    alert.querySelector(".bhd-save-alert-label").textContent = getSavePromptLabel(prompt, actor);
     alert.hidden = false;
+    this.#tickSaveAlert();
     if ( !vibrate ) return;
     try {
       if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([200, 100, 200]);
@@ -1821,6 +1867,125 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     useLog(`Tirada de Midi: ${label} = ${roll.total}`);
     this.#showRollResult(label, roll);
+  }
+
+  /* -------------------------------------------- */
+  /*  Salvaciones por chat de Midi                */
+  /*  (midi-chat-saves.js)                        */
+  /* -------------------------------------------- */
+
+  /**
+   * Midi pidió una salvación por chat (o el DM la reenvía al volver el teléfono): a la cola del aviso.
+   * @param {object} prompt  Ver `onRequest` en midi-chat-saves.js (`midiChat: true`, `endsAt`).
+   */
+  promptMidiChatSave(prompt) {
+    if ( this.#midiChatDone.has(prompt.id) ) return;
+    const queued = this.#savePrompts.find(p => p.id === prompt.id);
+    if ( queued ) {
+      queued.endsAt = prompt.endsAt;   // reenviada: solo se corrige el tiempo que queda
+      this.#tickSaveAlert();
+      return;
+    }
+    if ( prompt.endsAt && (prompt.endsAt <= Date.now()) ) return;
+    this.#savePrompts.push(prompt);
+    const first = this.#savePrompts[0] === prompt;
+    useLog(first ? "Salvación por chat: aviso en pantalla" : `Salvación por chat: en cola (${this.#savePrompts.length - 1} antes)`);
+    this.#showSaveAlert(first);
+  }
+
+  /**
+   * Cuenta atrás del aviso: barra y segundos de la primera salvación por chat. Las que se quedan sin tiempo salen
+   * de la cola (la tira Midi; su resultado llega con `onMidiChatSaveRolled`). Se para cuando no queda ninguna.
+   */
+  #tickSaveAlert() {
+    const now = Date.now();
+    for ( const prompt of this.#savePrompts.filter(p => p.midiChat && p.endsAt && (p.endsAt <= now)) ) {
+      useLog(`Salvación por chat: se acabó el tiempo; la tira Midi (${prompt.source})`);
+      this.#finishMidiChat(prompt, false);
+    }
+    const prompt = this.#savePrompts[0];
+    const running = this.#savePrompts.some(p => p.midiChat && p.endsAt);
+    if ( !running ) {
+      clearInterval(this.#saveTick);
+      this.#saveTick = null;
+    }
+    else this.#saveTick ??= setInterval(() => this.#tickSaveAlert(), 250);
+    if ( !prompt?.midiChat || !prompt.endsAt ) return;
+    const alert = this.element?.querySelector(".bhd-save-alert");
+    const left = Math.max(0, prompt.endsAt - now);
+    const bar = alert?.querySelector(".bhd-save-alert-bar");
+    if ( bar ) bar.style.transform = `scaleX(${Math.min(1, left / ((prompt.timeout || 1) * 1000))})`;
+    const seconds = alert?.querySelector(".bhd-save-alert-seconds");
+    if ( seconds ) seconds.textContent = game.i18n.format("BHD.Save.SecondsLeft", { seconds: Math.ceil(left / 1000) });
+  }
+
+  /**
+   * Saca del aviso una salvación por chat y pasa a la siguiente de la cola.
+   * @param {object} prompt
+   * @param {boolean} rolledHere  ¿La tiró el jugador desde el aviso?
+   */
+  #finishMidiChat(prompt, rolledHere) {
+    const index = this.#savePrompts.indexOf(prompt);
+    if ( index >= 0 ) this.#savePrompts.splice(index, 1);
+    if ( !this.#midiChatDone.has(prompt.id) ) this.#midiChatDone.set(prompt.id, { prompt, rolledHere, total: null });
+    if ( index === 0 ) this.#showSaveAlert(this.#savePrompts.length > 0);
+  }
+
+  /**
+   * Tira la primera salvación por chat del aviso.
+   * @param {"advantage"|"normal"|"disadvantage"|null} mode  Null: lo que calculó Midi.
+   * @param {Event} [event]
+   */
+  async #rollMidiChat(mode, event) {
+    const prompt = this.#savePrompts[0];
+    if ( !prompt?.midiChat ) return;
+    this.#finishMidiChat(prompt, true);
+    try {
+      const roll = await rollMidiChatSave(prompt, mode, event);
+      const entry = this.#midiChatDone.get(prompt.id);
+      if ( roll && entry && (entry.total === null) ) {
+        entry.total = roll.total;
+        this.#showRollResult(getSavePromptLabel(prompt, prompt.actor), roll);
+      }
+    } catch(err) {
+      ui.notifications.error(game.i18n.format("BHD.Use.Error", {
+        name: getSavePromptLabel(prompt, prompt.actor), error: err?.message ?? String(err)
+      }));
+    }
+  }
+
+  /**
+   * Midi ya tiene la tirada (la del jugador, o la suya al acabarse el tiempo): se cierra el aviso si seguía abierto.
+   * @param {string} id
+   * @param {number|null} total
+   */
+  onMidiChatSaveRolled(id, total) {
+    const queued = this.#savePrompts.find(p => p.id === id);
+    if ( queued ) {
+      useLog("Salvación por chat: Midi ya la tiene; cierro el aviso");
+      this.#finishMidiChat(queued, false);
+    }
+    const entry = this.#midiChatDone.get(id);
+    if ( !entry ) return;
+    useLog(`Salvación por chat: Midi recibió la tirada (${total ?? "?"})${entry.rolledHere ? "" : " — la tiró Midi"}`);
+    if ( Number.isFinite(total) ) entry.total = total;
+    if ( !entry.rolledHere && Number.isFinite(total) ) {
+      this.#showRollResult(game.i18n.localize("BHD.Save.MidiRolled"), { total });
+    }
+  }
+
+  /**
+   * Midi decidió si pasó o falló (con todo lo que suma Midi: cobertura, bonificadores, éxito automático...).
+   * @param {string} id
+   * @param {boolean} success
+   */
+  onMidiChatSaveResult(id, success) {
+    const entry = this.#midiChatDone.get(id);
+    if ( !entry ) return;
+    const label = `${getSavePromptLabel(entry.prompt, entry.prompt.actor)} · `
+      + game.i18n.localize(success ? "BHD.Save.Success" : "BHD.Save.Failure");
+    useLog(`Salvación por chat: resultado de Midi — ${label}`);
+    this.#showRollResult(label, { total: Number.isFinite(entry.total) ? entry.total : (success ? "✓" : "✗") });
   }
 
   /**
@@ -2498,8 +2663,16 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * Tira la salvación del aviso con dnd5e (sin ventana) y muestra el resultado.
    * @this {BHDMobileApp}
    * @param {PointerEvent} event
+   * @param {HTMLElement} target
    */
-  static async #onSaveRoll(event) {
+  static async #onSaveRoll(event, target) {
+    // Al soltar un toque largo también llega un clic: ese ya abrió las opciones, no se tira.
+    if ( this.#longPress?.fired && (this.#longPress.target === target) ) {
+      this.#longPress = null;
+      return;
+    }
+    // Petición por chat de Midi: tira el jugador, con la ventaja / desventaja que calculó Midi.
+    if ( this.#savePrompts[0]?.midiChat ) return this.#rollMidiChat(null, event);
     // Petición de Midi: la tirada la hace Midi (midi-prompts.js) en cuanto el jugador toca.
     if ( this.#savePrompts[0]?.midi ) {
       this.#savePrompts[0].resolve(true);
@@ -2522,6 +2695,16 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       useError("Salvación | Error", err);
       ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: getSavePromptLabel(prompt, actor), error: err?.message ?? String(err) }));
     }
+  }
+
+  /**
+   * Opción del toque largo en el aviso de salvación por chat de Midi: Ventaja, Normal o Desventaja.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onSaveMode(event, target) {
+    return this.#rollMidiChat(target.dataset.mode, event);
   }
 
   /**

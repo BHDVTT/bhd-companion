@@ -419,7 +419,15 @@
       "CheckButton": "Prueba de {ability}",
       "SkillButton": "Tirada de {skill}",
       "ToolButton": "Prueba con {tool}",
-      "AutoRoll": "Si no tiras en {seconds} s, se tira sola."
+      "AutoRoll": "Si no tiras en {seconds} s, se tira sola.",
+      "FromCaster": "{source} · lo lanzó {caster}",
+      "SecondsLeft": "Quedan {seconds} s: después la tira Midi por ti",
+      "Advantage": "con ventaja",
+      "Disadvantage": "con desventaja",
+      "HoldForMode": "Mantén presionado para elegir ventaja, normal o desventaja",
+      "ChooseMode": "¿Cómo tiras?",
+      "MidiRolled": "Se acabó el tiempo: Midi la tiró por ti",
+      "Rolled": "Midi recibió tu tirada"
     },
     "Midi": {
       "Attack": "Atacar",

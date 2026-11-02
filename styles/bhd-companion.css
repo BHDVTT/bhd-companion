@@ -2892,6 +2892,73 @@ body.bhd-mobile .bhd-item-info-sub {
   font-weight: bold;
 }
 
+/* Salvación por chat de Midi: ventaja / desventaja en el botón, cuenta atrás y opciones del toque largo */
+#bhd-mobile-app .bhd-save-alert-roll {
+  flex-wrap: wrap;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#bhd-mobile-app .bhd-save-alert-mode {
+  flex-basis: 100%;
+  font-size: calc(15px * var(--bhd-text-scale, 1));
+  font-style: normal;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+#bhd-mobile-app .bhd-save-alert-roll.bhd-save-adv {
+  border-color: #3f9b5a;
+  background: #1f5a33;
+}
+
+#bhd-mobile-app .bhd-save-alert-roll.bhd-save-dis {
+  border-color: #b5483f;
+  background: #6b231e;
+}
+
+#bhd-mobile-app .bhd-save-alert .bhd-reaction-timer {
+  margin-top: 4px;
+}
+
+#bhd-mobile-app .bhd-save-alert .bhd-reaction-bar {
+  background: #8db8ea;
+}
+
+#bhd-mobile-app .bhd-save-alert-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+#bhd-mobile-app .bhd-save-alert-modes[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-save-mode {
+  width: 100%;
+  height: auto;
+  min-height: 56px;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-save-mode.bhd-mode-adv {
+  border-color: #3f9b5a;
+  background: #1f5a33;
+}
+
+#bhd-mobile-app .bhd-save-mode.bhd-mode-dis {
+  border-color: #b5483f;
+  background: #6b231e;
+}
+
+#bhd-mobile-app .bhd-save-alert-hint {
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+  color: var(--bhd-text-muted);
+}
+
 @keyframes bhd-alert-in {
   from { opacity: 0; transform: scale(1.05); }
   to { opacity: 1; transform: scale(1); }

@@ -419,7 +419,15 @@
       "CheckButton": "{ability} check",
       "SkillButton": "{skill} check",
       "ToolButton": "{tool} check",
-      "AutoRoll": "If you don't roll within {seconds} s, it rolls by itself."
+      "AutoRoll": "If you don't roll within {seconds} s, it rolls by itself.",
+      "FromCaster": "{source} · cast by {caster}",
+      "SecondsLeft": "{seconds} s left: then Midi rolls it for you",
+      "Advantage": "with advantage",
+      "Disadvantage": "with disadvantage",
+      "HoldForMode": "Press and hold to choose advantage, normal or disadvantage",
+      "ChooseMode": "How do you roll?",
+      "MidiRolled": "Time's up: Midi rolled it for you",
+      "Rolled": "Midi got your roll"
     },
     "Midi": {
       "Attack": "Attack",

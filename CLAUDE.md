@@ -99,6 +99,7 @@ scripts/save-prompts.js      salvaciones pendientes que pide el chat (hechizo de
 scripts/remote-socket.js     canal de socketlib del módulo (funciones por nombre)
 scripts/midi-remote.js       con Midi: el teléfono pide y el DM ejecuta (usos y reacciones), resultado, áreas sin clic en el DM
 scripts/midi-prompts.js      con Midi: salvaciones y reacciones que Midi pide al teléfono, en los avisos de la vista
+scripts/midi-chat-saves.js   con Midi en modo "Chat Message": la petición de salvación va del flujo (DM) al teléfono; tirada ligada por speaker.token
 scripts/template-placement.js con Midi: colocar el área desde el teléfono (vista previa en el DM y la TV, alcance, quién queda dentro)
 scripts/dialog-relay.js      con Midi: ventanas que salen en el DM durante un uso del teléfono → al teléfono y vuelta
 scripts/apps/status-data.js  concentración, condiciones (con explicación) y efectos activos
@@ -621,7 +622,7 @@ lang/es.json, en.json        traducciones
      Foundry visibles en la TV, resultado impacta / falla y daño.
 7. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
-8. **Publicación** (0.16.0 publicada: compatibilidad v14 / dnd5e 6, cámara, iniciativa entera; falta probar en v14) — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
+8. **Publicación** (0.17.0 publicada: salvaciones por chat de Midi en el teléfono; 0.16.0: v14 / dnd5e 6, cámara, iniciativa entera; falta probar en v14) — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
    `download` en `module.json` para instalar en The Forge.
 9. **Tiradas estilo D&D Beyond** ✅ (0.10.0, probada en Foundry local) — botones Ataque / Daño / CD /
    Curar / Usar en cada fila, crítico, nivel del hechizo en la fila, salvaciones pendientes, concentración y
@@ -638,3 +639,18 @@ lang/es.json, en.json        traducciones
     encuentro (aunque no haya empezado) y con aviso, pestaña Hechizos completa, barra de pestañas para 7.
 13. **Colocar áreas** (0.15.0, sin probar) — con Midi, el jugador coloca el área en el teléfono antes del uso
     (vista previa en la TV, alcance, quién queda dentro, girar, cancelar sin gastar, ayuda del DM al minuto).
+
+## Salvaciones por chat de Midi (0.17.0)
+
+- Con "Prompt Players to Roll Saves = Chat Message" Midi solo escribe una línea de texto (sin datos ni botón) y espera
+  en `Workflow#processSaveRoll` (hook `renderChatMessageHTML` en el cliente del flujo) el primer mensaje de tirada
+  de dnd5e con `speaker.token` = la ficha pedida (`saveRequests[target.id]`); con `playerSaveTimeout` la tira él.
+  Igual en Midi 13.0, 14.0 y 14.6 (código: `git clone --depth 1 --branch v14.6.7 https://gitlab.com/tposney/midi-qol.git`).
+- `midi-chat-saves.js`: en todos los clientes con Midi se envuelve `MidiQOL.Workflow.prototype.createPlayerChatSaveRequest`
+  → `midiSaveRequest` al jugador (ficha, característica, CD si `MidiQOL.shouldDisplaySaveDC()`, ventaja / desventaja
+  de `saveDetails`, hechizo, quién lanzó, tiempo). Promesa cumplida → `midiSaveRolled`; hook `midi-qol.postCheckSaves`
+  → `midiSaveResult` (`workflow.saves`). El teléfono pregunta `midiSaveQuery` al volver / reconectar.
+- Teléfono: cola `#savePrompts` con `midiChat: true`, cuenta atrás `#tickSaveAlert`; toque = tirada de dnd5e con
+  `advantage/disadvantage` explícitos (Midi no los recalcula) y `midiOptions.isConcentrationCheck` para concentración;
+  un `preCreateChatMessage` fija `speaker.token/scene` (Midi en el teléfono pone el de su mapa). Toque largo →
+  Ventaja / Normal / Desventaja dentro del aviso. Herramientas: se dejan a Midi.

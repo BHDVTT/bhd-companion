@@ -18,6 +18,7 @@ import { registerUseLogSocket } from "./use-log.js";
 import { enableGmRemoteHelpers, registerMidiRemote } from "./midi-remote.js";
 import { registerDialogRelay } from "./dialog-relay.js";
 import { registerMidiPrompts } from "./midi-prompts.js";
+import { listenMidiChatSaves, registerMidiChatSaves } from "./midi-chat-saves.js";
 import { registerTemplatePlacement } from "./template-placement.js";
 
 /** ¿Este cliente está en vista móvil? Se decide una sola vez al cargar. */
@@ -46,6 +47,8 @@ Hooks.once("ready", () => {
   registerMovementSocket();
   // Registro de los ataques del teléfono: el DM lo ve en su consola (F12).
   registerUseLogSocket();
+  // Midi QOL con salvaciones por chat: la petición va al teléfono del jugador (en el cliente que corre el flujo).
+  if ( isMidiActive() ) registerMidiChatSaves();
   if ( mobileView ) openMobileView();
   else if ( canUseMobileView() ) addReturnToMobileButton();
 });
@@ -64,6 +67,7 @@ function openMobileView() {
   updateWakeLock();
   // Con Midi QOL: sus salvaciones y reacciones salen en los avisos de la vista.
   registerMidiPrompts(app);
+  if ( isMidiActive() ) listenMidiChatSaves(app);
 
   // Varios cambios seguidos (p. ej. el GM aplica daño y un estado) producen un solo redibujado.
   // Con la pantalla apagada o en otra app no se dibuja nada (ahorra batería): se hace una vez al volver.
