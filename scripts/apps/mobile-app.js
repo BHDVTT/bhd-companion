@@ -1,5 +1,5 @@
 import { isMidiActive, MODULE_ID, TEMPLATE_PATH } from "../constants.js";
-import { getActiveCharacter, getCharacterChoices, isLegacyRules, prepareCharacterSheet } from "./character-data.js";
+import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "./character-data.js";
 import { getCompanionActor, getCompanionTokens, prepareCompanionChoices } from "./companions-data.js";
 import { adjustResource, prepareResources } from "./resources-data.js";
 import { clearDiary, prepareDiary } from "../diary.js";
@@ -298,9 +298,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Compañero elegido en el selector de la cabecera (uuid de su ficha), o null: el personaje. */
   #companionUuid = null;
 
-  /** Inspiración gastada con las reglas de 2014: uuid del actor cuya próxima tirada d20 lleva ventaja. */
-  #inspirationAdvantage = null;
-
   /** Contador de recursos abierto en la pestaña Acciones (id del objeto o "resource.<clave>"). */
   #openResource = null;
 
@@ -425,7 +422,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     context.userName = game.user.name;
     context.character = actor ? { name: actor.name, img: actor.img } : null;
     context.sheet = (actor && (tab === "character")) ? prepareCharacterSheet(actor) : null;
-    if ( context.sheet ) context.sheet.inspirationPending = this.#inspirationAdvantage === actor.uuid;
     context.hpAmount = this.#hpAmount;
     context.actions = (actor && (tab === "actions")) ? prepareActions(actor, this.#quick) : null;
     if ( context.actions ) context.actions.resources = prepareResources(actor, this.#openResource, this.#quick);
@@ -1222,10 +1218,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
     const block = (hudBlock === "opportunity") ? "reaction" : (hudBlock ?? activity.activation?.type);
-    // Inspiración gastada (reglas de 2014): este ataque lleva ventaja.
-    if ( (activity.type === "attack") && (mode === "normal") && this.takeInspirationAdvantage(this.actor) ) {
-      mode = "advantage";
-    }
 
     this.#using = true;
     button?.classList.add("bhd-rolling");
@@ -2630,16 +2622,14 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Texto de la regla de Inspiración que trae dnd5e (`CONFIG.DND5E.rules.inspiration`: la página de las reglas
-   * de 2024 o, con "rulesVersion" de 2014, la de 2014).
+   * Texto de la regla de Inspiración heroica que trae dnd5e (`CONFIG.DND5E.rules.inspiration`).
    * @returns {Promise<string>}
    */
   async #getInspirationRuleHtml() {
     const uuid = CONFIG.DND5E.rules?.inspiration;
     const page = uuid ? await fromUuid(uuid).catch(() => null) : null;
     const text = page?.text?.content;
-    if ( !text ) return `<p>${foundry.utils.escapeHTML(game.i18n.localize(isLegacyRules()
-      ? "BHD.Inspiration.RuleLegacy" : "BHD.Inspiration.RuleModern"))}</p>`;
+    if ( !text ) return `<p>${foundry.utils.escapeHTML(game.i18n.localize("BHD.Inspiration.RuleSummary"))}</p>`;
     return foundry.applications.ux.TextEditor.implementation.enrichHTML(text, { relativeTo: page });
   }
 
@@ -2652,11 +2642,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Usar la Inspiración, según la versión de reglas del mundo (ajuste "rulesVersion" de dnd5e):
-   * - 2024 (Inspiración heroica): volver a tirar el último d20 del personaje (ataque, salvación, prueba) y quedarse
-   *   con la nueva tirada. Se toma la última tirada d20 suya del chat de los últimos minutos.
-   * - 2014: ventaja en su próxima tirada de ataque, salvación o prueba.
-   * En los dos casos se marca como gastada en el actor.
+   * Usar la Inspiración heroica: volver a tirar el último d20 del personaje (ataque, salvación, prueba) y quedarse
+   * con la nueva tirada. Se toma la última tirada d20 suya del chat de los últimos minutos. Se marca como gastada.
    * @this {BHDMobileApp}
    */
   static async #onUseInspiration() {
@@ -2665,22 +2652,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const escape = foundry.utils.escapeHTML;
     const rule = `<div class="bhd-item-info">${await this.#getInspirationRuleHtml()}</div>`;
 
-    if ( isLegacyRules() ) {
-      const ok = await DialogV2.confirm({
-        window: { title: "BHD.Inspiration.Use" },
-        classes: ["bhd-dialog"],
-        content: `<p><strong>${escape(game.i18n.localize("BHD.Inspiration.LegacyConfirm"))}</strong></p>${rule}`,
-        rejectClose: false
-      });
-      if ( !ok ) return;
-      await actor.update({ "system.attributes.inspiration": false });
-      this.#inspirationAdvantage = actor.uuid;
-      useLog(`Inspiración (2014): ${actor.name} la gasta; su próxima tirada d20 lleva ventaja`);
-      ui.notifications.info("BHD.Inspiration.Pending", { localize: true });
-      return;
-    }
-
-    // 2024: la última tirada d20 del personaje (como mucho de hace 10 minutos).
+    // La última tirada d20 del personaje (como mucho de hace 10 minutos).
     const since = Date.now() - (10 * 60 * 1000);
     const message = game.messages.contents.findLast(m => (m.timestamp >= since) && (m.speaker?.actor === actor.id)
       && m.isOwner && (m.rolls?.[0] instanceof CONFIG.Dice.D20Roll));
@@ -2707,25 +2679,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         speaker: message.speaker,
         flavor: `${flavor} — ${game.i18n.localize("BHD.Inspiration.RerollFlavor")}`
       });
-      useLog(`Inspiración (2024): ${actor.name} vuelve a tirar «${flavor}»: ${roll.total} → ${reroll.total}`);
+      useLog(`Inspiración: ${actor.name} vuelve a tirar «${flavor}»: ${roll.total} → ${reroll.total}`);
       this.#showRollResult(game.i18n.localize("BHD.Inspiration.RerollFlavor"), reroll);
     }
-    else useLog(`Inspiración (2024): ${actor.name} la gasta sin volver a tirar aquí`);
+    else useLog(`Inspiración: ${actor.name} la gasta sin volver a tirar aquí`);
     await actor.update({ "system.attributes.inspiration": false });
-  }
-
-  /**
-   * Hook `dnd5e.preRollD20TestV2` (y los usos con Midi): si la Inspiración de 2014 está gastada para este actor,
-   * la tirada lleva ventaja y se consume.
-   * @param {Actor|null} actor
-   * @returns {boolean}  true si la tirada debe llevar ventaja.
-   */
-  takeInspirationAdvantage(actor) {
-    if ( !actor || (this.#inspirationAdvantage !== actor.uuid) ) return false;
-    this.#inspirationAdvantage = null;
-    useLog(`Inspiración (2014): ventaja aplicada a la tirada de ${actor.name}`);
-    if ( this.activeTab === "character" ) this.render({ parts: ["main"] });
-    return true;
   }
 
   /**

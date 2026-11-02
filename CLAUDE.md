@@ -430,8 +430,8 @@ lang/es.json, en.json        traducciones
 - **Concentración y condiciones** (`status-data.js`, `status.hbs`, en Personaje y Combate): `actor.concentration`
   (botón Terminar → confirmación → `actor.endConcentration(effect)`), `actor.statuses` con
   `CONFIG.statusEffects` (sin `hud: false` ni la de concentrar) y efectos temporales sin estado. Tocar una
-  condición abre la explicación breve de `BHD.Conditions.<id>` (cansancio: `exhaustionLegacy` con las reglas
-  2014) o, si no hay, la página de reglas `reference` de dnd5e.
+  condición abre la explicación breve de `BHD.Conditions.<id>`
+  o, si no hay, la página de reglas `reference` de dnd5e.
 
 ## Inventario, notas y descansos (decisiones de la etapa 5)
 
@@ -675,10 +675,10 @@ lang/es.json, en.json        traducciones
   origen de `effect.origin`, cambios de `effect.changes` (v13) o `effect.system.changes` (v14). Quitar solo si
   `effect.isOwner` y el origen es suyo o desconocido. `checkEffectTimers` (con cada cambio del combate) avisa de la
   última ronda (`remaining <= 1`) y del fin; `deleteActiveEffect` → "Terminó".
-- **Inspiración**: tarjeta en Personaje si `system.attributes.inspiration`. "Usar" según `rulesVersion`: 2024 →
-  `reroll()` de la última tirada D20Roll del actor (≤ 10 min) y la marca gastada; 2014 → `#inspirationAdvantage`
-  y ventaja en el siguiente `dnd5e.preRollD20TestV2` (o modo "advantage" en el ataque con Midi). Texto de la regla:
+- **Inspiración** (solo reglas 2024, el mundo no usa las de 2014): tarjeta en Personaje si `system.attributes.inspiration`.
+  "Usar" = `reroll()` de la última tirada D20Roll del actor (≤ 10 min) y la marca gastada. Texto de la regla:
   `CONFIG.DND5E.rules.inspiration`. Aviso con vibración si otro usuario la da. DM: estrella en `renderPlayers`.
+  No añadir nada de las reglas 2014.
 - **Diario** (`diary.js`): `localStorage` `bhd-companion.diary.<actorUuid>`; sesión nueva tras 6 h sin entradas o
   al limpiar. Tiradas: `flags.dnd5e.roll.type` (dnd5e 5) o `message.type` / `system.type` (dnd5e 6); usos: tarjeta
   "usage". Al abrir, se recuperan del chat las de la sesión (`backfillDiary`). Filtros Todo / Tiradas / Combate.

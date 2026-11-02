@@ -108,12 +108,6 @@ function openMobileView() {
     const inspiration = foundry.utils.getProperty(changes, "system.attributes.inspiration");
     if ( (inspiration === true) && (userId !== game.user.id) && app.myActors.includes(actor) ) app.onInspirationGranted(actor);
   });
-  // Inspiración gastada con las reglas de 2014: ventaja en la próxima prueba, salvación o ataque (tiradas d20).
-  Hooks.on("dnd5e.preRollD20TestV2", config => {
-    const subject = config.subject;
-    const actor = (subject instanceof Actor) ? subject : subject?.actor;
-    if ( app.takeInspirationAdvantage(actor) ) config.advantage = true;
-  });
   Hooks.on("createActor", actor => {
     if ( actor.type === "character" ) refresh();
   });

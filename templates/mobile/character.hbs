@@ -32,7 +32,7 @@
     {{/if}}
   </section>
 
-  {{!-- Inspiración (heroica): se lee del actor; "Usar" sigue la regla de la versión de reglas del mundo --}}
+  {{!-- Inspiración heroica: se lee del actor; "Usar" vuelve a tirar el último d20 --}}
   {{#if sheet.inspiration}}
   <section class="bhd-card bhd-inspiration-card">
     <i class="fa-solid fa-star bhd-inspiration-icon" aria-hidden="true"></i>
@@ -49,8 +49,6 @@
       </button>
     </div>
   </section>
-  {{else if sheet.inspirationPending}}
-  <p class="bhd-card bhd-inspiration-pending"><i class="fa-solid fa-star" aria-hidden="true"></i> {{localize "BHD.Inspiration.Pending"}}</p>
   {{/if}}
 
   {{!-- Puntos de golpe --}}

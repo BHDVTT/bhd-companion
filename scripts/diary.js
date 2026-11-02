@@ -102,8 +102,8 @@ function speaksAs(message, actor) {
  * @returns {string|null}
  */
 function getRollType(message) {
-  const legacy = message.flags?.dnd5e?.roll?.type;
-  if ( legacy ) return legacy;
+  const flagType = message.flags?.dnd5e?.roll?.type;
+  if ( flagType ) return flagType;
   const system = message.system ?? {};
   switch ( message.type ) {
     case "save": return (system.type === "death") ? "death" : ((system.type === "concentration") ? "concentration" : "save");

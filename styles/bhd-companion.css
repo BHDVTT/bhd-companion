@@ -4780,13 +4780,6 @@ body.bhd-mobile .bhd-relay-dialog .bhd-relay-content img {
   font-size: calc(13px * var(--bhd-text-scale, 1));
 }
 
-#bhd-mobile-app .bhd-inspiration-pending {
-  margin: 0;
-  border-color: var(--bhd-gold);
-  color: var(--bhd-gold);
-  font-size: calc(14px * var(--bhd-text-scale, 1));
-}
-
 /* Estrella del DM en la lista de jugadores (interfaz normal de Foundry) */
 #players .bhd-gm-inspiration {
   flex: 0 0 22px;

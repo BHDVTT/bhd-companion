@@ -163,8 +163,7 @@ export async function getConditionInfo(statusId, actor) {
   if ( !status ) return null;
   const name = game.i18n.localize(status.name);
   const escape = foundry.utils.escapeHTML;
-  let key = `BHD.Conditions.${statusId}`;
-  if ( (statusId === "exhaustion") && (game.settings.get("dnd5e", "rulesVersion") === "legacy") ) key += "Legacy";
+  const key = `BHD.Conditions.${statusId}`;
   if ( game.i18n.has(key) ) {
     let html = `<p>${escape(game.i18n.localize(key))}</p>`;
     const level = actor?.system.attributes?.exhaustion;
