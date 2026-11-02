@@ -375,9 +375,12 @@
         "Name": "In combat, allow moving outside your own turn",
         "Hint": "Normally, in combat each player can only move their token from the phone during their turn. Check this to always allow it."
       },
-      "FollowMoves": {
-        "Name": "Follow tokens moved from a phone",
-        "Hint": "On this screen (for example, the TV), the map centers on the token a player moves from their phone."
+      "FollowCamera": {
+        "Name": "Camera: follow tokens moved from a phone",
+        "Hint": "Which screens with a map center the camera on the token a player moves from their phone. \"Player screens only\" includes the TV if it logs in as a player; the GM's PC does not move. If the camera still moves with \"Never\", another module or a Foundry setting is moving it.",
+        "Off": "Never",
+        "Players": "Player screens only (the TV)",
+        "All": "All (GM screens too)"
       },
       "ViewMode": {
         "Name": "BHD Companion view",

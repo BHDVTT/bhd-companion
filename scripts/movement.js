@@ -247,10 +247,12 @@ async function stepToken(token, direction) {
   if ( !last ) newPath.push({ ...here, action });
   else if ( !isSamePosition(last, here) ) newPath.push({ ...here, action: "displace" });
 
+  // pan: false — si no, Foundry mueve la cámara de toda pantalla que tenga la ficha seleccionada (p. ej. la PC
+  // del DM) cuando sale del borde. La cámara solo la mueve followToken, según el ajuste "followCamera".
   const moved = await token.move({
     x: target.x, y: target.y, elevation: source.elevation, action,
     snapped: !token.parent.grid.isGridless, explicit: false, checkpoint: true
-  }, { method: "keyboard" });
+  }, { method: "keyboard", pan: false });
   if ( !moved ) return { ok: false, reason: "Wall" };
 
   const now = token._source;
@@ -271,7 +273,7 @@ async function undoStep(token) {
   // "displace" es el movimiento de Foundry sin animación ni paredes: vuelve por donde vino.
   const moved = await token.move({
     x: previous.x, y: previous.y, elevation: previous.elevation, action: "displace"
-  }, { method: "api" });
+  }, { method: "api", pan: false });
   if ( !moved ) return { ok: false, reason: "Error" };
   await token.setFlag(MODULE_ID, MOVE_FLAG, { key, path: path.slice(0, -1) });
   announceFollow(token);
@@ -298,20 +300,33 @@ async function resetMovement(token) {
  * @param {TokenDocument} token
  */
 function announceFollow(token) {
+  if ( game.settings.get(MODULE_ID, "followCamera") === "off" ) return;
   const data = { type: "follow", sceneId: token.parent.id, tokenId: token.id };
   game.socket.emit(SOCKET, data);
   followToken(data.sceneId, data.tokenId);
 }
 
 /**
- * Centra el mapa en la ficha, si este cliente tiene el mapa de esa escena y el ajuste activado.
+ * ¿Esta pantalla debe seguir las fichas movidas desde un teléfono? Según el ajuste del GM "followCamera":
+ * nunca, solo pantallas de jugador (la TV) o todas (también las del GM).
+ * @returns {boolean}
+ */
+function shouldFollow() {
+  const mode = game.settings.get(MODULE_ID, "followCamera");
+  if ( mode === "all" ) return true;
+  return (mode === "players") && !game.user.isGM;
+}
+
+/**
+ * Centra el mapa en la ficha, si este cliente tiene el mapa de esa escena y el ajuste lo permite.
+ * Es el único lugar del módulo que mueve la cámara.
  * @param {string} sceneId
  * @param {string} tokenId
  */
 function followToken(sceneId, tokenId) {
   if ( isMobileView() ) return;   // el mapa del teléfono está oculto
   if ( !canvas?.ready || (canvas.scene?.id !== sceneId) ) return;
-  if ( !game.settings.get(MODULE_ID, "followMoves") ) return;
+  if ( !shouldFollow() ) return;
   const token = canvas.tokens.get(tokenId);
   if ( !token?.visible ) return;
   const { x, y } = token.document.getCenterPoint(token.document._source);

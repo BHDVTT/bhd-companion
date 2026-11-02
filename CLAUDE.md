@@ -1,6 +1,18 @@
 # BHD Companion — guía del proyecto
 
-Módulo de Foundry VTT **v13** (id `bhd-companion`) para el sistema **dnd5e** (5.x).
+Módulo de Foundry VTT **v14** (sigue funcionando en v13) (id `bhd-companion`) para el sistema **dnd5e**
+(5.3 o 6.x en v14; 5.x en v13). La partida real está en v14; el Foundry local sigue en v13.
+
+**v14 / dnd5e 6 (0.16.0):** plantillas → Regiones: dnd5e 6 crea las áreas con
+`dnd5e.canvas.TemplatePlacement.fromActivity` (`patchRegionPlacement` en mobile-templates.js; `AbilityTemplate`
+sigue para la vista previa de Midi, obsoleto hasta dnd5e 6.2); permiso `REGION_CREATE` en v14. Tarjetas del chat
+de dnd5e 6 sin HTML guardado: datos en `message.system` (`system.origin`, `system.item`, `system.buttons`,
+`system.targets[].actor`) — ver `getOriginMessageId` / `getMessageItemId` / `getOriginMessageData` en
+mobile-app.js y `findDataPrompts` en save-prompts.js. `getTargetDescriptors` obsoleto → `getTargetArmorClasses`.
+Código de dnd5e 6 para consultar: `git clone --depth 1 --branch release-6.0.6 https://github.com/foundryvtt/dnd5e.git`
+(el de Foundry v14 no está en local: https://foundryvtt.com/api/v14/). Iniciativa en la app sin el decimal de
+desempate (`formatInitiative`, `Math.floor`). **Antes de trabajar: `git pull`** (hay sesiones en la nube que
+publican versiones; en 0.16.0 el PC estaba en 0.8.1 y GitHub en 0.15.0).
 Se usa en la tienda **Battlehammer's Dungeon (BHD)**: una TV en la mesa muestra el mapa de
 Foundry y 5 jugadores participan solo con su teléfono. Cuando un jugador entra desde un
 teléfono, el módulo reemplaza la interfaz normal de Foundry por una vista móvil propia
@@ -492,8 +504,11 @@ lang/es.json, en.json        traducciones
   o `walk`. Pasar de la velocidad se permite (Correr), en rojo.
 - **Deshacer:** vuelve al punto anterior con `action: "displace"` (sin animación ni paredes) y quita el
   paso; solo si el último punto es un paso y la ficha sigue ahí. Fuera de combate, "Poner a cero".
-- **TV:** tras cada paso el DM emite `follow`; los clientes con mapa de esa escena y ajuste de cliente
-  `followMoves` (true) hacen `canvas.animatePan` a la ficha.
+- **TV:** tras cada paso el DM emite `follow` (salvo con `followCamera` = `off`); los clientes con mapa de esa
+  escena hacen `canvas.animatePan` a la ficha según el ajuste de mundo `followCamera` (0.16.0, sustituye al de
+  cliente `followMoves`): `off` / `players` (no GM: la TV) / `all`. `followToken` es el único sitio del módulo
+  que mueve la cámara. Los `token.move` llevan `pan: false`: sin eso Foundry mueve la cámara de cualquier
+  cliente con la ficha seleccionada cuando sale de la pantalla (`Token#_onUpdate` → `#panCanvas`).
 - **Teléfono:** pestaña `move` (cruceta 3 × 3, `bhdMove` / `bhdMoveUndo` / `bhdMoveReset`), hasta 3 pasos en
   cola; si uno falla se descartan los demás. Pared → aviso, `navigator.vibrate` y `.bhd-shake`.
   Redibuja con `*Token` de fichas propias de la escena activa, `updateScene` (active/grid) y `pauseGame`,
@@ -606,7 +621,7 @@ lang/es.json, en.json        traducciones
      Foundry visibles en la TV, resultado impacta / falla y daño.
 7. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
-8. **Publicación** (0.8.1 publicada en GitHub; falta instalar en The Forge y probar con 5 jugadores) — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
+8. **Publicación** (0.16.0 publicada: compatibilidad v14 / dnd5e 6, cámara, iniciativa entera; falta probar en v14) — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
    `download` en `module.json` para instalar en The Forge.
 9. **Tiradas estilo D&D Beyond** ✅ (0.10.0, probada en Foundry local) — botones Ataque / Daño / CD /
    Curar / Usar en cada fila, crítico, nivel del hechizo en la fila, salvaciones pendientes, concentración y

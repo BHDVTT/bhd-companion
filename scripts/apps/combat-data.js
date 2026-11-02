@@ -142,14 +142,14 @@ function findNext(combat, current, visible) {
 }
 
 /**
- * Iniciativa con los decimales que usa el combate, o null si aún no la tiró.
+ * Iniciativa como número entero, o null si aún no la tiró. dnd5e suma la Destreza / 100 para desempatar
+ * (15.14): el orden de `combat.turns` ya usa el valor completo; aquí solo se muestra 15.
  * @param {number|null} initiative
  * @returns {string|null}
  */
-function formatInitiative(initiative) {
+export function formatInitiative(initiative) {
   if ( !Number.isFinite(initiative) ) return null;
-  if ( Number.isInteger(initiative) ) return String(initiative);
-  return initiative.toFixed(CONFIG.Combat.initiative.decimals);
+  return String(Math.floor(initiative));
 }
 
 /**

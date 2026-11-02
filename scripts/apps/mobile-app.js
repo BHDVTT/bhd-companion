@@ -2,7 +2,7 @@ import { isMidiActive, MODULE_ID, TEMPLATE_PATH } from "../constants.js";
 import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "./character-data.js";
 import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.js";
 import { canTogglePrepared, getPreparationLimit, hasSpells, prepareSpellsTab, SPELL_ACTIVATIONS } from "./spells-data.js";
-import { getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
+import { formatInitiative, getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
 import { BASIC_ACTIONS, getTargetNeed, prepareHud, prepareTargetCards, prepareTargetChips } from "./combat-hud-data.js";
 import { ECONOMY_BLOCKS, getEconomy, getOwnCombatant, setEconomy } from "../economy.js";
 import { getTargetIds, setTargets, toggleTarget } from "../targets.js";
@@ -1032,7 +1032,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Las tiradas de un lanzamiento cuelgan de su tarjeta y usan el nivel del espacio gastado.
       const rollActivity = getScaledActivity(activity, cast?.scaling ?? 0);
-      const message = cast?.messageId ? { data: { "flags.dnd5e.originatingMessage": cast.messageId } } : {};
+      const message = cast?.messageId ? { data: getOriginMessageData(cast.messageId) } : {};
       const dialog = { configure: false };
       switch ( kind ) {
         case "attack": {
@@ -1576,7 +1576,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {ChatMessage} message
    */
   #openTray(message) {
-    const itemId = message.getFlag("dnd5e", "item.id");
+    const itemId = getMessageItemId(message);
     if ( itemId && (itemId !== this.#trayItemId) ) {
       this.#trayItemId = itemId;
       this.#trayMessages = [];
@@ -1649,8 +1649,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     if ( !this.#trayItemId ) return;
     if ( action === "create" ) {
-      const origin = message.getFlag("dnd5e", "originatingMessage");
-      const ownRoll = message.isAuthor && (message.getFlag("dnd5e", "item.id") === this.#trayItemId)
+      const origin = getOriginMessageId(message);
+      const ownRoll = message.isAuthor && (getMessageItemId(message) === this.#trayItemId)
         && (message.speaker?.actor === this.actor?.id);
       if ( !ownRoll && !this.#trayMessages.includes(origin) ) return;
       if ( this.#trayMessages.includes(message.id) ) return;
@@ -1953,7 +1953,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   #getAttackVerdicts(roll) {
     if ( !game.settings.get(MODULE_ID, "showAttackResult") ) return [];
-    return dnd5e.utils.getTargetDescriptors().map(({ name, ac }) => {
+    return getTargetArmorClasses().map(({ name, ac }) => {
       let hit;
       if ( roll.isCritical ) hit = true;
       else if ( roll.isFumble ) hit = false;
@@ -2246,8 +2246,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const combatant = combat?.getCombatantsByActor(actor).find(c => c.isOwner && (c.initiative === null));
     if ( combatant ) {
       await combat.rollInitiative([combatant.id]);
-      const initiative = combat.combatants.get(combatant.id)?.initiative;
-      return Number.isFinite(initiative) ? { total: initiative } : null;
+      const initiative = formatInitiative(combat.combatants.get(combatant.id)?.initiative);
+      return initiative ? { total: initiative } : null;
     }
     const roll = actor.getInitiativeRoll();
     if ( !roll ) return null;
@@ -2256,7 +2256,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       speaker: ChatMessage.implementation.getSpeaker({ actor }),
       flavor: game.i18n.localize("BHD.Sheet.InitiativeRoll")
     });
-    return roll;
+    // En el teléfono, sin el decimal de desempate.
+    return { total: formatInitiative(roll.total) };
   }
 
   /* -------------------------------------------- */
@@ -3162,4 +3163,62 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     await game.settings.set(MODULE_ID, "preferNormal", true);
     reloadWithoutUrlMode();
   }
+}
+
+/* -------------------------------------------- */
+/*  Datos de las tarjetas de dnd5e 5 y 6        */
+/* -------------------------------------------- */
+
+/**
+ * ¿Las tarjetas del chat guardan sus datos en `message.system` (dnd5e 6) en lugar de flags (dnd5e 5)?
+ * @returns {boolean}
+ */
+function usesMessageSystemData() {
+  return !foundry.utils.isNewerVersion("6.0.0", game.system.version);
+}
+
+/**
+ * Datos del mensaje de una tirada para que cuelgue de su tarjeta (`system.origin` en dnd5e 6).
+ * @param {string} messageId
+ * @returns {object}
+ */
+function getOriginMessageData(messageId) {
+  return usesMessageSystemData() ? { "system.origin": messageId } : { "flags.dnd5e.originatingMessage": messageId };
+}
+
+/**
+ * Id de la tarjeta de la que sale este mensaje (p. ej. la tirada de daño de un ataque).
+ * @param {ChatMessage} message
+ * @returns {string|undefined}
+ */
+function getOriginMessageId(message) {
+  // En los datos guardados es el id (ya preparado sería el documento).
+  const origin = message._source.system?.origin;
+  return (typeof origin === "string") ? origin : message.getFlag("dnd5e", "originatingMessage");
+}
+
+/**
+ * Id del objeto que usó la tarjeta (`system.item.id` en dnd5e 6).
+ * @param {ChatMessage} message
+ * @returns {string|undefined}
+ */
+function getMessageItemId(message) {
+  return message._source.system?.item?.id ?? message.getFlag("dnd5e", "item.id");
+}
+
+/**
+ * Nombre y CA de los objetivos marcados, igual que los guarda dnd5e en la tarjeta de ataque (con cobertura
+ * total la CA es null). Se calcula aquí porque dnd5e 6 retiró `dnd5e.utils.getTargetDescriptors`.
+ * @returns {{name: string, ac: number|null}[]}
+ */
+function getTargetArmorClasses() {
+  const targets = [];
+  for ( const target of game.user.targets ) {
+    const token = target.document ?? target;
+    const actor = token.actor;
+    if ( !actor ) continue;
+    const ac = actor.statuses.has("coverTotal") ? null : actor.system.attributes?.ac?.value;
+    targets.push({ name: token.name, ac: ac ?? null });
+  }
+  return targets;
 }

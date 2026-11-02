@@ -27,7 +27,9 @@
  * @returns {SavePrompt[]}
  */
 export function findSavePrompts(message, actor, { midi=false }={}) {
-  if ( !actor || !message.visible || !message.content?.includes("data-action") ) return [];
+  if ( !actor || !message.visible ) return [];
+  if ( ["prompt", "usage"].includes(message.type) && message.system?.buttons ) return findDataPrompts(message, actor, midi);
+  if ( !message.content?.includes("data-action") ) return [];
   const template = document.createElement("template");
   template.innerHTML = message.content;
   const root = template.content;
@@ -72,6 +74,56 @@ export function findSavePrompts(message, actor, { midi=false }={}) {
       if ( actor.concentration?.effects.size ) add("concentration", button, `rc${i}`, message.author.name);
     });
   }
+  return prompts;
+}
+
+/**
+ * dnd5e 6: las tarjetas ya no guardan su HTML; los botones están en los datos del mensaje.
+ * - Tipo "prompt": concentración al recibir daño (`challengeConcentration`) y petición de tirada del DM.
+ * - Tipo "usage": tarjeta de una actividad de salvación, con los objetivos en `system.targets`.
+ * @param {ChatMessage} message
+ * @param {Actor} actor
+ * @param {boolean} midi
+ * @returns {SavePrompt[]}
+ */
+function findDataPrompts(message, actor, midi) {
+  const showDC = message.shouldDisplayChallenge ?? true;
+  const prompts = [];
+  const add = (type, { ability, dc }, index, source) => prompts.push({
+    id: `${message.id}.${index}`,
+    messageId: message.id,
+    type,
+    ability: (ability in CONFIG.DND5E.abilities) ? ability : null,
+    dc: Number.isFinite(parseInt(dc)) ? parseInt(dc) : null,
+    showDC,
+    source
+  });
+  const system = message.system;
+  const ownMessage = message.speaker?.actor === actor.id;
+
+  if ( message.type === "prompt" ) {
+    system.buttons.forEach((button, i) => {
+      if ( button.type === "concentration" ) {
+        if ( !midi && ownMessage ) add("concentration", button, `c${i}`, game.i18n.localize("BHD.Save.ConcentrationSource"));
+        else if ( message.author?.isGM && actor.concentration?.effects.size ) {
+          add("concentration", button, `rc${i}`, message.author.name);
+        }
+      }
+      else if ( (button.type === "save") && message.author?.isGM && system.broadcast ) {
+        add("save", button, `r${i}`, message.author.name);
+      }
+    });
+    return prompts;
+  }
+
+  // Tarjeta de salvación con el personaje entre sus objetivos.
+  if ( midi || ownMessage ) return prompts;
+  const targeted = Array.from(system.targets ?? []).some(t => (t.actor === actor.uuid) || (t.uuid === actor.uuid));
+  if ( !targeted ) return prompts;
+  const source = message.speaker?.alias || message.author?.name || "";
+  system.buttons.forEach((button, i) => {
+    if ( button.action === "rollSave" ) add("save", button.dataset ?? {}, `s${i}`, source);
+  });
   return prompts;
 }
 

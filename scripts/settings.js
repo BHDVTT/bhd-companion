@@ -63,13 +63,22 @@ export function registerSettings() {
     onChange: () => game.modules.get(MODULE_ID).api?.app?.render()
   });
 
-  // En las pantallas con mapa (la TV): centrar la vista en la ficha que se mueve desde un teléfono.
-  game.settings.register(MODULE_ID, "followMoves", {
-    name: "BHD.Settings.FollowMoves.Name",
-    hint: "BHD.Settings.FollowMoves.Hint",
-    scope: "client",
+  // Pantallas con mapa: centrar la cámara en la ficha que se mueve desde un teléfono.
+  // Es de mundo (el GM lo decide una vez para la TV y su PC). Sustituye al antiguo "followMoves",
+  // que era de cada pantalla: apagarlo en la PC del DM no lo apagaba en la TV.
+  game.settings.register(MODULE_ID, "followCamera", {
+    name: "BHD.Settings.FollowCamera.Name",
+    hint: "BHD.Settings.FollowCamera.Hint",
+    scope: "world",
     config: true,
-    type: new foundry.data.fields.BooleanField({ initial: true })
+    type: new foundry.data.fields.StringField({
+      initial: "players",
+      choices: {
+        off: "BHD.Settings.FollowCamera.Off",
+        players: "BHD.Settings.FollowCamera.Players",
+        all: "BHD.Settings.FollowCamera.All"
+      }
+    })
   });
 
   // Vista de cada dispositivo: automática (teléfonos y tabletas), siempre móvil o nunca.

@@ -375,9 +375,12 @@
         "Name": "En combate, moverse fuera del propio turno",
         "Hint": "Normalmente, en combate cada jugador solo puede mover su ficha desde el teléfono durante su turno. Márcalo para permitirlo siempre."
       },
-      "FollowMoves": {
-        "Name": "Seguir las fichas movidas desde un teléfono",
-        "Hint": "En esta pantalla (por ejemplo, la TV), el mapa se centra en la ficha que un jugador mueve desde su teléfono."
+      "FollowCamera": {
+        "Name": "Cámara: seguir las fichas movidas desde un teléfono",
+        "Hint": "Qué pantallas con mapa centran la cámara en la ficha que un jugador mueve desde su teléfono. «Solo pantallas de jugador» incluye la TV si entra con un usuario jugador; la PC del DM no se mueve. Si con «Nunca» la cámara sigue moviéndose, la mueve otro módulo o un ajuste de Foundry.",
+        "Off": "Nunca",
+        "Players": "Solo pantallas de jugador (la TV)",
+        "All": "Todas (también las del DM)"
       },
       "ViewMode": {
         "Name": "Vista de BHD Companion",
