@@ -102,7 +102,11 @@ scripts/midi-prompts.js      con Midi: salvaciones y reacciones que Midi pide al
 scripts/midi-chat-saves.js   con Midi en modo "Chat Message": la petición de salvación va del flujo (DM) al teléfono; tirada ligada por speaker.token
 scripts/template-placement.js con Midi: colocar el área desde el teléfono (vista previa en el DM y la TV, alcance, quién queda dentro)
 scripts/dialog-relay.js      con Midi: ventanas que salen en el DM durante un uso del teléfono → al teléfono y vuelta
-scripts/apps/status-data.js  concentración, condiciones (con explicación) y efectos activos
+scripts/apps/status-data.js  concentración, condiciones y efectos activos (duración, quién lo aplicó, cambios, quitar)
+scripts/apps/companions-data.js compañeros e invocaciones: fichas de la escena activa de las que el jugador es dueño
+scripts/apps/resources-data.js  recursos limitados (system.uses de rasgos/objetos, system.resources) para Acciones
+scripts/diary.js             diario de la sesión (Notas): chat, dnd5e.damageActor/healActor, efectos; localStorage
+scripts/gm-inspiration.js    DM: estrella junto a cada jugador (lista de jugadores) para dar Inspiración
 scripts/mobile-templates.js  áreas de hechizo (plantillas) e invocaciones sin clic en el mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
 scripts/mobile-windows.js    qué ventanas se permiten en vista móvil (cierra las de otros módulos), una a la vez
@@ -654,3 +658,32 @@ lang/es.json, en.json        traducciones
   `advantage/disadvantage` explícitos (Midi no los recalcula) y `midiOptions.isConcentrationCheck` para concentración;
   un `preCreateChatMessage` fija `speaker.token/scene` (Midi en el teléfono pone el de su mapa). Toque largo →
   Ventaja / Normal / Desventaja dentro del aviso. Herramientas: se dejan a Midi.
+
+## Recursos, efectos, compañeros, inspiración y diario (0.18.0)
+
+- **Compañeros** (`companions-data.js`): fichas de `game.scenes.active` con `token.isOwner` que no son uno de sus
+  personajes (ni copia no vinculada de uno). `#companionUuid` en la app; `get actor()` devuelve el actor del compañero
+  (sintético si la ficha no está vinculada) o el personaje. `isActorCombatant` con `actor.isToken` compara `tokenId`
+  (varias invocaciones iguales). Aviso de turno para el personaje y cada compañero (`myActors`); el botón cambia la
+  vista a quien le toca. Si la ficha desaparece, `checkCompanion()` vuelve al personaje. La cabecera es una sola raíz
+  (`.bhd-top`: cabecera + selector `.bhd-companions`).
+- **Recursos** (`resources-data.js`, arriba de Acciones): objetos no hechizo ni consumible con `system.uses.max`
+  (equipables solo equipados) y `system.resources.*` con máximo y nombre. Recuperación con
+  `CONFIG.DND5E.limitedUsePeriods`. Detalle = `prepareRow` + `action-row.hbs` (mismos botones). − / + cambia
+  `system.uses.spent` (o `system.resources.<k>.value`). `#applyActionFilters` no oculta la fila del detalle.
+- **Efectos** (`status-data.js`): duración de `ActiveEffect#duration` (v13: `type`; v14: `units`, `expired`),
+  origen de `effect.origin`, cambios de `effect.changes` (v13) o `effect.system.changes` (v14). Quitar solo si
+  `effect.isOwner` y el origen es suyo o desconocido. `checkEffectTimers` (con cada cambio del combate) avisa de la
+  última ronda (`remaining <= 1`) y del fin; `deleteActiveEffect` → "Terminó".
+- **Inspiración**: tarjeta en Personaje si `system.attributes.inspiration`. "Usar" según `rulesVersion`: 2024 →
+  `reroll()` de la última tirada D20Roll del actor (≤ 10 min) y la marca gastada; 2014 → `#inspirationAdvantage`
+  y ventaja en el siguiente `dnd5e.preRollD20TestV2` (o modo "advantage" en el ataque con Midi). Texto de la regla:
+  `CONFIG.DND5E.rules.inspiration`. Aviso con vibración si otro usuario la da. DM: estrella en `renderPlayers`.
+- **Diario** (`diary.js`): `localStorage` `bhd-companion.diary.<actorUuid>`; sesión nueva tras 6 h sin entradas o
+  al limpiar. Tiradas: `flags.dnd5e.roll.type` (dnd5e 5) o `message.type` / `system.type` (dnd5e 6); usos: tarjeta
+  "usage". Al abrir, se recuperan del chat las de la sesión (`backfillDiary`). Filtros Todo / Tiradas / Combate.
+- **Epic Rolls 5e**: todas sus versiones son paquete protegido (`"protected": true`, sin `download`): no se puede
+  descargar sin la licencia. Lo único público es cómo lo llama Midi (`ui.EpicRolls5e.requestRoll({ actors,
+  contestants, type: "save.dex", options: { DC, showDC, blindRoll, rollSettings } })` → `{ canceled, results:
+  [{ actor, roll }] }`). Pendiente: estudiar su código desde `Data/modules/epic-rolls-5e` cuando el usuario lo
+  instale en local, antes de integrarlo.

@@ -14,12 +14,14 @@ import { watchConnection } from "./connection.js";
 import { updateWakeLock } from "./wake-lock.js";
 import { registerMovementSocket } from "./movement.js";
 import { broadcastTargets, pruneTargets } from "./targets.js";
-import { registerUseLogSocket } from "./use-log.js";
+import { registerUseLogSocket, useLog } from "./use-log.js";
 import { enableGmRemoteHelpers, registerMidiRemote } from "./midi-remote.js";
 import { registerDialogRelay } from "./dialog-relay.js";
 import { registerMidiPrompts } from "./midi-prompts.js";
 import { listenMidiChatSaves, registerMidiChatSaves } from "./midi-chat-saves.js";
 import { registerTemplatePlacement } from "./template-placement.js";
+import { registerGmInspiration } from "./gm-inspiration.js";
+import { recordEffect, recordHitPoints, recordMessage } from "./diary.js";
 
 /** ¿Este cliente está en vista móvil? Se decide una sola vez al cargar. */
 let mobileView = false;
@@ -49,6 +51,8 @@ Hooks.once("ready", () => {
   registerUseLogSocket();
   // Midi QOL con salvaciones por chat: la petición va al teléfono del jugador (en el cliente que corre el flujo).
   if ( isMidiActive() ) registerMidiChatSaves();
+  // DM: estrella junto a cada jugador para dar Inspiración (al teléfono le llega un aviso).
+  if ( game.user.isGM ) registerGmInspiration();
   if ( mobileView ) openMobileView();
   else if ( canUseMobileView() ) addReturnToMobileButton();
 });
@@ -82,9 +86,9 @@ function openMobileView() {
     app.render();
   });
 
-  /** ¿Este personaje aparece en la vista (el que se muestra o uno del selector)? */
-  const isShown = actor => (actor?.type === "character")
-    && ((actor === app.actor) || getCharacterChoices().includes(actor));
+  /** ¿Este actor aparece en la vista (el que se muestra, uno del selector de personajes o un compañero)? */
+  const isShown = actor => !!actor && ((actor === app.actor) || app.myActors.includes(actor)
+    || ((actor.type === "character") && getCharacterChoices().includes(actor)));
 
   /** ¿Este actor está en el combate activo? (su vida aproximada se ve en la pestaña Combate) */
   const inCombat = actor => !!actor && !!getActiveCombat()?.combatants.some(c => c.actor === actor);
@@ -100,6 +104,15 @@ function openMobileView() {
     // Al guardar las notas mientras se escribe, no hace falta redibujar (el texto ya está en pantalla).
     if ( (userId === game.user.id) && isOnlyModuleFlags(changes) ) return;
     if ( isShown(actor) || inCombat(actor) || ("ownership" in changes) ) refresh();
+    // El DM (u otro jugador) le dio Inspiración: aviso con vibración.
+    const inspiration = foundry.utils.getProperty(changes, "system.attributes.inspiration");
+    if ( (inspiration === true) && (userId !== game.user.id) && app.myActors.includes(actor) ) app.onInspirationGranted(actor);
+  });
+  // Inspiración gastada con las reglas de 2014: ventaja en la próxima prueba, salvación o ataque (tiradas d20).
+  Hooks.on("dnd5e.preRollD20TestV2", config => {
+    const subject = config.subject;
+    const actor = (subject instanceof Actor) ? subject : subject?.actor;
+    if ( app.takeInspirationAdvantage(actor) ) config.advantage = true;
   });
   Hooks.on("createActor", actor => {
     if ( actor.type === "character" ) refresh();
@@ -130,6 +143,24 @@ function openMobileView() {
     Hooks.on(`${action}ChatMessage`, message => app.onChatMessage(message, action));
   }
 
+  // Diario de la sesión: tiradas y usos del chat, daño y curación (hooks de dnd5e), condiciones y efectos.
+  // Efectos con duración: aviso cuando terminan.
+  Hooks.on("createChatMessage", message => {
+    if ( recordMessage(message, app.myActors) ) app.onDiaryChanged();
+  });
+  for ( const hook of ["dnd5e.damageActor", "dnd5e.healActor"] ) {
+    Hooks.on(hook, (actor, changes) => {
+      if ( app.myActors.includes(actor) && recordHitPoints(actor, changes) ) app.onDiaryChanged();
+    });
+  }
+  Hooks.on("createActiveEffect", effect => {
+    if ( app.myActors.includes(effect.parent) && recordEffect(effect, true) ) app.onDiaryChanged();
+  });
+  Hooks.on("deleteActiveEffect", effect => {
+    app.onEffectDeleted(effect);
+    if ( app.myActors.includes(effect.parent) && recordEffect(effect, false) ) app.onDiaryChanged();
+  });
+
   // Pestañas Mover y Combate (bloque Movimiento): fichas del jugador en la escena de la TV
   // (posición, pies recorridos), cambio de escena activa y pausa. Solo si la pestaña está abierta.
   const onMoveChange = () => {
@@ -139,6 +170,18 @@ function openMobileView() {
     if ( (token.parent === game.scenes.active) && token.isOwner ) onMoveChange();
   };
   for ( const action of ["create", "update", "delete"] ) Hooks.on(`${action}Token`, onToken);
+  // Compañeros e invocaciones: aparecen y desaparecen del selector de la cabecera con su ficha.
+  // Los cambios de un compañero de ficha no vinculada (vida, estados) llegan como cambios de la ficha.
+  const onCompanionToken = (token, action) => {
+    if ( (token.parent !== game.scenes.active) || !token.isOwner || (token.actor?.type === "character") ) return;
+    if ( action !== "update" ) {
+      useLog(`Compañero: ${token.name} ${action === "create" ? "aparece en" : "sale de"} la escena`);
+      app.checkCompanion();
+      refresh();
+    }
+    else if ( token.actor === app.actor ) refresh();
+  };
+  for ( const action of ["create", "update", "delete"] ) Hooks.on(`${action}Token`, token => onCompanionToken(token, action));
   // Objetivos: si su ficha desaparece o el DM cambia de escena, dejan de ser objetivos.
   Hooks.on("deleteToken", () => pruneTargets());
   Hooks.on("updateScene", (scene, changes) => {

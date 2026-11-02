@@ -42,6 +42,8 @@ export function getActiveCombat(actor) {
  */
 export function isActorCombatant(combatant, actor) {
   if ( !combatant || !actor ) return false;
+  // Actor de una ficha no vinculada (p. ej. una de varias invocaciones iguales): solo su propia ficha.
+  if ( actor.isToken ) return combatant.tokenId === actor.token?.id;
   return (combatant.actor === actor) || (combatant.actorId === actor.id);
 }
 

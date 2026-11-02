@@ -567,6 +567,81 @@
       "NoItems": "No item in your inventory meets this enchantment's requirements.",
       "Full": "You already enchanted as many items as allowed. Remove one to choose another.",
       "Done": "{name} enchanted."
+    },
+    "Companion": {
+      "Choose": "Character and companions",
+      "Label": "Companion",
+      "CR": "CR {cr}",
+      "Gone": "Your companion is no longer in the scene: back to your character.",
+      "TurnAlert": "{name}'s turn!",
+      "Control": "Control {name}"
+    },
+    "Resources": {
+      "Title": "Resources",
+      "Recharge": "Recharge {value}+",
+      "Spend": "Spend one use",
+      "Recover": "Recover one use",
+      "AdjustHint": "− / + adjust uses by hand. Using the feature spends them by itself."
+    },
+    "Effects": {
+      "Ended": "Ended",
+      "From": "From:",
+      "Remaining": "Remaining:",
+      "Changes": "What it changes",
+      "Remove": "Remove effect",
+      "LastRound": "Last round of {name} ({actor}).",
+      "EndedNotice": "{name} ended ({actor})."
+    },
+    "Inspiration": {
+      "Have": "You have Inspiration!",
+      "Use": "Use Inspiration",
+      "Rule": "Rule",
+      "RuleModern": "2024 rules: spend it to reroll a die immediately after rolling it.",
+      "RuleLegacy": "2014 rules: spend it for advantage on one attack roll, saving throw or ability check.",
+      "LegacyConfirm": "Spend Inspiration: your next attack roll, saving throw or ability check has advantage.",
+      "Pending": "Inspiration spent: your next attack roll, saving throw or ability check has advantage.",
+      "LastRoll": "Last roll",
+      "RerollConfirm": "Reroll \"{roll}\" (you rolled {total}) and keep the new roll.",
+      "NoRoll": "There is no recent d20 roll of yours. You can spend it and ask the GM to apply it.",
+      "Reroll": "Reroll",
+      "SpendOnly": "Just spend it",
+      "RerollFlavor": "Heroic Inspiration: new roll",
+      "Granted": "{name} gets Inspiration!",
+      "GMGive": "Give Inspiration to {name}",
+      "GMRemove": "Remove Inspiration from {name}"
+    },
+    "Diary": {
+      "Title": "Session log",
+      "Clear": "Clear the log",
+      "ClearConfirm": "Delete {name}'s log on this phone? A new session starts.",
+      "Empty": "Nothing in this session yet.",
+      "Used": "Used {name}",
+      "Damage": "Took {amount} damage",
+      "Healed": "Regained {amount} HP",
+      "ConditionGained": "Now: {name}",
+      "ConditionLost": "No longer: {name}",
+      "EffectGained": "Starts: {name}",
+      "EffectLost": "Ends: {name}",
+      "Filter": {
+        "all": "All",
+        "rolls": "Rolls",
+        "combat": "Combat"
+      },
+      "Roll": {
+        "attack": "Attack",
+        "damage": "Damage",
+        "healing": "Healing",
+        "save": "Saving throw",
+        "concentration": "Concentration",
+        "death": "Death saving throw",
+        "initiative": "Initiative",
+        "ability": "Ability check",
+        "check": "Check",
+        "skill": "Skill",
+        "tool": "Tool",
+        "hitDie": "Hit die",
+        "roll": "Roll"
+      }
     }
   }
 }

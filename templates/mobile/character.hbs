@@ -17,14 +17,41 @@
     <div class="bhd-hero-info">
       <h2 class="bhd-hero-name">{{sheet.name}}</h2>
       {{#if sheet.classLabel}}<span class="bhd-hero-class">{{sheet.classLabel}}</span>{{/if}}
+      {{#if sheet.isCharacter}}
       <span class="bhd-hero-level">{{localize "BHD.Sheet.Level" level=sheet.level}}</span>
+      {{else if sheet.cr}}
+      <span class="bhd-hero-level">{{localize "BHD.Companion.CR" cr=sheet.cr}}</span>
+      {{/if}}
     </div>
+    {{#if sheet.isCharacter}}
     <button type="button" class="bhd-inspiration {{#if sheet.inspiration}}bhd-on{{/if}}" data-action="toggleInspiration"
             aria-pressed="{{sheet.inspiration}}">
       <i class="fa-solid fa-star" aria-hidden="true"></i>
       <span>{{localize "BHD.Sheet.Inspiration"}}</span>
     </button>
+    {{/if}}
   </section>
+
+  {{!-- Inspiración (heroica): se lee del actor; "Usar" sigue la regla de la versión de reglas del mundo --}}
+  {{#if sheet.inspiration}}
+  <section class="bhd-card bhd-inspiration-card">
+    <i class="fa-solid fa-star bhd-inspiration-icon" aria-hidden="true"></i>
+    <div class="bhd-inspiration-text">
+      <strong>{{localize "BHD.Inspiration.Have"}}</strong>
+      <span>{{sheet.inspirationRule}}</span>
+    </div>
+    <div class="bhd-inspiration-buttons">
+      <button type="button" class="bhd-big-btn bhd-inspiration-use" data-action="bhdUseInspiration">
+        {{localize "BHD.Inspiration.Use"}}
+      </button>
+      <button type="button" class="bhd-inspiration-rule" data-action="bhdInspirationRule">
+        <i class="fa-solid fa-book-open" aria-hidden="true"></i> {{localize "BHD.Inspiration.Rule"}}
+      </button>
+    </div>
+  </section>
+  {{else if sheet.inspirationPending}}
+  <p class="bhd-card bhd-inspiration-pending"><i class="fa-solid fa-star" aria-hidden="true"></i> {{localize "BHD.Inspiration.Pending"}}</p>
+  {{/if}}
 
   {{!-- Puntos de golpe --}}
   <section class="bhd-card bhd-hp">
@@ -88,7 +115,8 @@
   {{!-- Concentración, condiciones y efectos (tocar una condición la explica) --}}
   {{#if status}}{{> "modules/bhd-companion/templates/mobile/status.hbs" status=status}}{{/if}}
 
-  {{!-- Descansos --}}
+  {{!-- Descansos (solo personajes: un compañero descansa con el personaje) --}}
+  {{#if sheet.isCharacter}}
   <section class="bhd-card bhd-rest">
     <div class="bhd-rest-header">
       <span class="bhd-rest-title"><i class="fa-solid fa-campground" aria-hidden="true"></i> {{localize "BHD.Rest.Title"}}</span>
@@ -112,6 +140,7 @@
     <p class="bhd-tap-hint">{{localize "BHD.Rest.OnlyGM"}}</p>
     {{/if}}
   </section>
+  {{/if}}
 
   {{!-- Características --}}
   <h3 class="bhd-section-title">{{localize "BHD.Sheet.Abilities"}}</h3>

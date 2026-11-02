@@ -1,5 +1,8 @@
 import { isMidiActive, MODULE_ID, TEMPLATE_PATH } from "../constants.js";
-import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "./character-data.js";
+import { getActiveCharacter, getCharacterChoices, isLegacyRules, prepareCharacterSheet } from "./character-data.js";
+import { getCompanionActor, getCompanionTokens, prepareCompanionChoices } from "./companions-data.js";
+import { adjustResource, prepareResources } from "./resources-data.js";
+import { clearDiary, prepareDiary } from "../diary.js";
 import { ACTION_FILTERS, normalizeSearch, prepareActions } from "./actions-data.js";
 import { canTogglePrepared, getPreparationLimit, hasSpells, prepareSpellsTab, SPELL_ACTIVATIONS } from "./spells-data.js";
 import { formatInitiative, getActiveCombat, isActorTurn, prepareCombat, prepareDeathSaves } from "./combat-data.js";
@@ -23,7 +26,9 @@ import {
   getScaledActivity, getScaling, getSlotOptions, getTurnKey, needsCast, needsUsageDialog, QuickActionState, ROLL_KINDS
 } from "../quick-actions.js";
 import { applyEnchantment, prepareEnchantPicker, removeEnchantment } from "../enchantments.js";
-import { getConditionInfo, prepareStatus } from "./status-data.js";
+import {
+  canRemoveEffect, describeEffect, getConditionInfo, getDuration, getEffectChanges, prepareStatus
+} from "./status-data.js";
 import { findSavePrompts, getSavePromptLabel, rollSavePrompt } from "../save-prompts.js";
 import { rollMidiChatSave } from "../midi-chat-saves.js";
 import { renderItemDetails } from "../item-details.js";
@@ -65,6 +70,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       hpStep: BHDMobileApp.#onHpStep,
       hpApply: BHDMobileApp.#onHpApply,
       toggleInspiration: BHDMobileApp.#onToggleInspiration,
+      bhdUseInspiration: BHDMobileApp.#onUseInspiration,
+      bhdInspirationRule: BHDMobileApp.#onInspirationRule,
       bhdQuick: BHDMobileApp.#onQuick,
       bhdEndCast: BHDMobileApp.#onEndCast,
       bhdEndConcentration: BHDMobileApp.#onEndConcentration,
@@ -94,6 +101,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       closeChooser: BHDMobileApp.#onCloseChooser,
       endTurn: BHDMobileApp.#onEndTurn,
       dismissTurnAlert: BHDMobileApp.#onDismissTurnAlert,
+      bhdCompanion: BHDMobileApp.#onCompanion,
+      bhdResource: BHDMobileApp.#onResource,
+      bhdResourceStep: BHDMobileApp.#onResourceStep,
+      bhdDiaryFilter: BHDMobileApp.#onDiaryFilter,
+      bhdDiaryClear: BHDMobileApp.#onDiaryClear,
       bhdEquip: BHDMobileApp.#onEquip,
       bhdAttune: BHDMobileApp.#onAttune,
       bhdQuantity: BHDMobileApp.#onQuantity,
@@ -127,6 +139,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         `${TEMPLATE_PATH}/mobile/character.hbs`,
         `${TEMPLATE_PATH}/mobile/actions.hbs`,
         `${TEMPLATE_PATH}/mobile/action-row.hbs`,
+        `${TEMPLATE_PATH}/mobile/resources.hbs`,
         `${TEMPLATE_PATH}/mobile/spells.hbs`,
         `${TEMPLATE_PATH}/mobile/combat.hbs`,
         `${TEMPLATE_PATH}/mobile/death-saves.hbs`,
@@ -282,6 +295,25 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Ficha elegida en el selector de la pestaña Mover (si el jugador controla varias). */
   #moveTokenId = null;
 
+  /** Compañero elegido en el selector de la cabecera (uuid de su ficha), o null: el personaje. */
+  #companionUuid = null;
+
+  /** Inspiración gastada con las reglas de 2014: uuid del actor cuya próxima tirada d20 lleva ventaja. */
+  #inspirationAdvantage = null;
+
+  /** Contador de recursos abierto en la pestaña Acciones (id del objeto o "resource.<clave>"). */
+  #openResource = null;
+
+  /**
+   * Avisos ya dados de efectos con duración, por uuid del efecto: "last" (última ronda) o "ended" (terminó).
+   * @type {Map<string, string>}
+   */
+  #effectNotices = new Map();
+
+  /** Diario de la sesión (pestaña Notas): filtro elegido y si la sección está abierta. */
+  #diaryFilter = "all";
+  #diaryOpen = true;
+
   /** Pasos tocados que esperan su turno: se mandan al DM de uno en uno. */
   #moveQueue = Promise.resolve();
 
@@ -337,7 +369,42 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @type {Actor|null}
    */
   get actor() {
-    return getActiveCharacter();
+    return getCompanionActor(this.#companionUuid) ?? getActiveCharacter();
+  }
+
+  /**
+   * El personaje del jugador y sus compañeros en la escena (avisos de turno, efectos, inspiración).
+   * @returns {Actor[]}
+   */
+  get myActors() {
+    const character = getActiveCharacter();
+    return [character, ...getCompanionTokens().map(t => t.actor)].filter(a => a);
+  }
+
+  /**
+   * Si el compañero elegido desapareció (fin de la invocación, ficha borrada), vuelve al personaje.
+   * Llamar cuando cambian las fichas de la escena.
+   */
+  checkCompanion() {
+    if ( !this.#companionUuid || getCompanionActor(this.#companionUuid) ) return;
+    useLog("Compañero: su ficha ya no está en la escena; vuelvo al personaje");
+    ui.notifications.info("BHD.Companion.Gone", { localize: true });
+    this.#selectCompanion(null);
+  }
+
+  /**
+   * Cambia el actor que muestra la vista: el personaje (null) o un compañero.
+   * @param {string|null} tokenUuid
+   */
+  #selectCompanion(tokenUuid) {
+    this.#companionUuid = tokenUuid || null;
+    this.#openResource = null;
+    this.#moveTokenId = null;
+    this.#hudBlock = null;
+    this.#hudResult = null;
+    useLog(`Compañero: la vista muestra a ${this.actor?.name ?? "?"}`);
+    this.render();
+    this.onCombatUpdate();
   }
 
   /* -------------------------------------------- */
@@ -358,8 +425,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     context.userName = game.user.name;
     context.character = actor ? { name: actor.name, img: actor.img } : null;
     context.sheet = (actor && (tab === "character")) ? prepareCharacterSheet(actor) : null;
+    if ( context.sheet ) context.sheet.inspirationPending = this.#inspirationAdvantage === actor.uuid;
     context.hpAmount = this.#hpAmount;
     context.actions = (actor && (tab === "actions")) ? prepareActions(actor, this.#quick) : null;
+    if ( context.actions ) context.actions.resources = prepareResources(actor, this.#openResource, this.#quick);
     context.spells = (actor && (tab === "spells")) ? prepareSpellsTab(actor, this.#quick, this.#spellFilters) : null;
     context.spellSearch = this.#spellSearch;
     context.actionFilters = ["all", ...ACTION_FILTERS].map(id => ({
@@ -377,11 +446,18 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     context.inventory = (actor && (tab === "inventory")) ? prepareInventory(actor, this.#openContainers) : null;
     const draft = (this.#notesDraft?.actorId === actor?.id) ? this.#notesDraft.text : null;
     context.notes = (actor && (tab === "notes")) ? await prepareNotes(actor, draft) : null;
+    if ( context.notes ) {
+      context.notes.diary = prepareDiary(actor, this.#diaryFilter);
+      context.notes.diaryOpen = this.#diaryOpen;
+    }
 
     const choices = getCharacterChoices();
+    const character = getActiveCharacter();
     context.choices = (choices.length > 1) ? choices.map(a => ({
-      id: a.id, name: a.name, selected: a === actor
+      id: a.id, name: a.name, selected: a === character
     })) : null;
+    context.companions = prepareCompanionChoices(character, (actor !== character) ? this.#companionUuid : null);
+    context.isCompanion = !!actor && (actor !== character);
     return context;
   }
 
@@ -618,6 +694,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         else this.#openContainers.delete(details.dataset.containerId);
       });
     }
+    // Diario: abierto o cerrado se recuerda al redibujar.
+    this.element.querySelector("[data-bhd-diary]")?.addEventListener("toggle", event => {
+      this.#diaryOpen = event.currentTarget.open;
+    });
 
     // Notas personales: se guardan solas un momento después de dejar de escribir.
     const notes = this.element.querySelector("[data-bhd-notes]");
@@ -782,6 +862,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const filtering = filter !== "all";
 
     for ( const row of root.querySelectorAll(".bhd-action") ) {
+      if ( row.closest(".bhd-resources") ) continue;   // detalle de un recurso: siempre a la vista
       const matchesFilter = !filtering || row.dataset.activation.split(" ").includes(filter);
       const isSpell = !!row.closest("[data-spell-section]");
       const matchesSearch = !isSpell || !query || row.dataset.search.includes(query);
@@ -1141,6 +1222,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
     const block = (hudBlock === "opportunity") ? "reaction" : (hudBlock ?? activity.activation?.type);
+    // Inspiración gastada (reglas de 2014): este ataque lleva ventaja.
+    if ( (activity.type === "attack") && (mode === "normal") && this.takeInspirationAdvantage(this.actor) ) {
+      mode = "advantage";
+    }
 
     this.#using = true;
     button?.classList.add("bhd-rolling");
@@ -2312,18 +2397,28 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * del jugador, muestra el aviso a pantalla completa y hace vibrar el teléfono.
    */
   onCombatUpdate() {
-    const actor = this.actor;
-    const combat = getActiveCombat(actor ?? null);
     const firstCheck = !this.#combatChecked;
     this.#combatChecked = true;
-    this.#syncCombatTab(!!combat);
-    if ( !isActorTurn(combat, actor) ) {
+    this.#syncCombatTab(!!getActiveCombat(this.actor ?? null));
+    this.checkEffectTimers();
+    // Turno del personaje o de un compañero con turno propio (si no lo tiene, se usa en el turno del personaje).
+    let actor = null;
+    let combat = null;
+    for ( const candidate of this.myActors ) {
+      const candidateCombat = getActiveCombat(candidate);
+      if ( !isActorTurn(candidateCombat, candidate) ) continue;
+      actor = candidate;
+      combat = candidateCombat;
+      break;
+    }
+    if ( !actor ) {
       this.#hideTurnAlert();
       return;
     }
     const key = `${combat.id}-${combat.round}-${combat.turn}`;
     if ( key === this.#alertedTurn ) return;
     this.#alertedTurn = key;
+    if ( actor !== getActiveCharacter() ) useLog(`Combate: turno del compañero ${actor.name}`);
     this.#showTurnAlert(combat, actor);
     // Esquivar dura hasta el principio del siguiente turno. Al abrir la vista no se quita:
     // puede que el jugador haya recargado la página en el mismo turno en que esquivó.
@@ -2344,13 +2439,24 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( !alert ) return;
     const atZero = !!prepareDeathSaves(actor)?.canRoll;
     const localize = key => game.i18n.localize(key);
+    const escape = foundry.utils.escapeHTML;
+    // Turno de un compañero: el aviso lo dice y el botón cambia la vista a ese compañero.
+    const companion = actor !== getActiveCharacter();
+    const token = companion ? getCompanionTokens().find(t => t.actor === actor) : null;
+    const title = companion ? escape(game.i18n.format("BHD.Companion.TurnAlert", { name: actor.name }))
+      : localize("BHD.Combat.YourTurnAlert");
+    // La vista muestra a otro (p. ej. el compañero en el turno del personaje): el botón cambia a quien le toca.
+    const button = (this.actor !== actor)
+      ? `<button type="button" class="bhd-big-btn" data-action="bhdCompanion" data-uuid="${token?.uuid ?? ""}">
+          ${escape(game.i18n.format("BHD.Companion.Control", { name: actor.name }))}</button>`
+      : `<button type="button" class="bhd-big-btn" data-action="dismissTurnAlert">${localize("BHD.Combat.LetsGo")}</button>`;
     alert.innerHTML = `
       <div class="bhd-turn-alert-box">
         <img class="bhd-turn-alert-img" src="" alt="">
         <span class="bhd-turn-alert-round">${game.i18n.format("BHD.Combat.Round", { round: combat.round })}</span>
-        <strong class="bhd-turn-alert-title">${localize("BHD.Combat.YourTurnAlert")}</strong>
+        <strong class="bhd-turn-alert-title">${title}</strong>
         <span class="bhd-turn-alert-hint">${localize(atZero ? "BHD.Combat.YourTurnDying" : "BHD.Combat.YourTurnHint")}</span>
-        <button type="button" class="bhd-big-btn" data-action="dismissTurnAlert">${localize("BHD.Combat.LetsGo")}</button>
+        ${button}
       </div>`;
     alert.querySelector(".bhd-turn-alert-img").src = combat.combatant?.img || actor.img;
     alert.hidden = false;
@@ -2521,6 +2627,118 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( mode === "damage" ) await actor.applyDamage(amount);
     else if ( mode === "heal" ) await actor.applyDamage(-amount);
     else if ( mode === "temp" ) await actor.applyTempHP(amount);
+  }
+
+  /**
+   * Texto de la regla de Inspiración que trae dnd5e (`CONFIG.DND5E.rules.inspiration`: la página de las reglas
+   * de 2024 o, con "rulesVersion" de 2014, la de 2014).
+   * @returns {Promise<string>}
+   */
+  async #getInspirationRuleHtml() {
+    const uuid = CONFIG.DND5E.rules?.inspiration;
+    const page = uuid ? await fromUuid(uuid).catch(() => null) : null;
+    const text = page?.text?.content;
+    if ( !text ) return `<p>${foundry.utils.escapeHTML(game.i18n.localize(isLegacyRules()
+      ? "BHD.Inspiration.RuleLegacy" : "BHD.Inspiration.RuleModern"))}</p>`;
+    return foundry.applications.ux.TextEditor.implementation.enrichHTML(text, { relativeTo: page });
+  }
+
+  /**
+   * Botón "Regla" de la tarjeta de Inspiración.
+   * @this {BHDMobileApp}
+   */
+  static async #onInspirationRule() {
+    await this.#showInfo(game.i18n.localize("BHD.Sheet.Inspiration"), null, await this.#getInspirationRuleHtml());
+  }
+
+  /**
+   * Usar la Inspiración, según la versión de reglas del mundo (ajuste "rulesVersion" de dnd5e):
+   * - 2024 (Inspiración heroica): volver a tirar el último d20 del personaje (ataque, salvación, prueba) y quedarse
+   *   con la nueva tirada. Se toma la última tirada d20 suya del chat de los últimos minutos.
+   * - 2014: ventaja en su próxima tirada de ataque, salvación o prueba.
+   * En los dos casos se marca como gastada en el actor.
+   * @this {BHDMobileApp}
+   */
+  static async #onUseInspiration() {
+    const actor = this.actor;
+    if ( !actor?.system.attributes?.inspiration ) return;
+    const escape = foundry.utils.escapeHTML;
+    const rule = `<div class="bhd-item-info">${await this.#getInspirationRuleHtml()}</div>`;
+
+    if ( isLegacyRules() ) {
+      const ok = await DialogV2.confirm({
+        window: { title: "BHD.Inspiration.Use" },
+        classes: ["bhd-dialog"],
+        content: `<p><strong>${escape(game.i18n.localize("BHD.Inspiration.LegacyConfirm"))}</strong></p>${rule}`,
+        rejectClose: false
+      });
+      if ( !ok ) return;
+      await actor.update({ "system.attributes.inspiration": false });
+      this.#inspirationAdvantage = actor.uuid;
+      useLog(`Inspiración (2014): ${actor.name} la gasta; su próxima tirada d20 lleva ventaja`);
+      ui.notifications.info("BHD.Inspiration.Pending", { localize: true });
+      return;
+    }
+
+    // 2024: la última tirada d20 del personaje (como mucho de hace 10 minutos).
+    const since = Date.now() - (10 * 60 * 1000);
+    const message = game.messages.contents.findLast(m => (m.timestamp >= since) && (m.speaker?.actor === actor.id)
+      && m.isOwner && (m.rolls?.[0] instanceof CONFIG.Dice.D20Roll));
+    const roll = message?.rolls[0];
+    const flavor = message ? (textOf(message.flavor) || game.i18n.localize("BHD.Inspiration.LastRoll")) : "";
+    const content = roll
+      ? `<p><strong>${escape(game.i18n.format("BHD.Inspiration.RerollConfirm", { roll: flavor, total: roll.total }))}</strong></p>${rule}`
+      : `<p><strong>${escape(game.i18n.localize("BHD.Inspiration.NoRoll"))}</strong></p>${rule}`;
+    const choice = await DialogV2.wait({
+      window: { title: "BHD.Inspiration.Use" },
+      classes: ["bhd-dialog"],
+      content,
+      buttons: [
+        ...(roll ? [{ action: "reroll", label: "BHD.Inspiration.Reroll", icon: "fa-solid fa-dice-d20", default: true }] : []),
+        { action: "spend", label: "BHD.Inspiration.SpendOnly", icon: "fa-solid fa-star" },
+        { action: "cancel", label: "BHD.Actions.Cancel" }
+      ],
+      rejectClose: false
+    });
+    if ( !choice || (choice === "cancel") ) return;
+    if ( choice === "reroll" ) {
+      const reroll = await roll.reroll();
+      await reroll.toMessage({
+        speaker: message.speaker,
+        flavor: `${flavor} — ${game.i18n.localize("BHD.Inspiration.RerollFlavor")}`
+      });
+      useLog(`Inspiración (2024): ${actor.name} vuelve a tirar «${flavor}»: ${roll.total} → ${reroll.total}`);
+      this.#showRollResult(game.i18n.localize("BHD.Inspiration.RerollFlavor"), reroll);
+    }
+    else useLog(`Inspiración (2024): ${actor.name} la gasta sin volver a tirar aquí`);
+    await actor.update({ "system.attributes.inspiration": false });
+  }
+
+  /**
+   * Hook `dnd5e.preRollD20TestV2` (y los usos con Midi): si la Inspiración de 2014 está gastada para este actor,
+   * la tirada lleva ventaja y se consume.
+   * @param {Actor|null} actor
+   * @returns {boolean}  true si la tirada debe llevar ventaja.
+   */
+  takeInspirationAdvantage(actor) {
+    if ( !actor || (this.#inspirationAdvantage !== actor.uuid) ) return false;
+    this.#inspirationAdvantage = null;
+    useLog(`Inspiración (2014): ventaja aplicada a la tirada de ${actor.name}`);
+    if ( this.activeTab === "character" ) this.render({ parts: ["main"] });
+    return true;
+  }
+
+  /**
+   * El DM (u otro) dio Inspiración a uno de los actores del jugador: aviso con vibración.
+   * @param {Actor} actor
+   */
+  onInspirationGranted(actor) {
+    useLog(`Inspiración: ${actor.name} la recibe`);
+    this.#showRollResult(game.i18n.format("BHD.Inspiration.Granted", { name: actor.name }), { total: "★" });
+    ui.notifications.info(game.i18n.format("BHD.Inspiration.Granted", { name: actor.name }));
+    try {
+      if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([150, 80, 150, 80, 300]);
+    } catch(err) {}
   }
 
   /**
@@ -2921,11 +3139,91 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onEffectInfo(event, target) {
     const effect = await fromUuid(target.dataset.uuid);
     if ( !effect ) return;
-    const html = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
-      effect.description || `<p>${foundry.utils.escapeHTML(game.i18n.localize("BHD.Status.NoDescription"))}</p>`,
+    const escape = foundry.utils.escapeHTML;
+    const actor = (effect.parent instanceof Actor) ? effect.parent : effect.parent?.actor;
+    const { duration, source } = describeEffect(effect, actor);
+    let html = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      effect.description || `<p>${escape(game.i18n.localize("BHD.Status.NoDescription"))}</p>`,
       { relativeTo: effect }
     );
-    await this.#showInfo(effect.name, effect.img, html);
+    const facts = [
+      source ? `<li><strong>${escape(game.i18n.localize("BHD.Effects.From"))}</strong> ${escape(source)}</li>` : "",
+      duration ? `<li><strong>${escape(game.i18n.localize("BHD.Effects.Remaining"))}</strong> ${escape(duration)}</li>` : ""
+    ].join("");
+    if ( facts ) html = `<ul class="bhd-effect-facts">${facts}</ul>${html}`;
+    // Lo que modifica el efecto (sus cambios de Foundry / dnd5e).
+    const changes = getEffectChanges(effect);
+    if ( changes.length ) {
+      html += `<h4>${escape(game.i18n.localize("BHD.Effects.Changes"))}</h4><ul class="bhd-effect-changes">${changes.map(c =>
+        `<li><code>${escape(c.key)}</code> <span>${escape(c.mode)}</span> <strong>${escape(c.value)}</strong></li>`).join("")}</ul>`;
+    }
+    useLog(`Efecto: detalle de ${effect.name}`, { duration, source });
+    if ( !canRemoveEffect(effect) ) {
+      await this.#showInfo(effect.name, effect.img, html);
+      return;
+    }
+    // El jugador es dueño del efecto y lo aplicó él (o algo suyo): puede quitarlo.
+    const content = `<div class="bhd-item-info bhd-status-info"><img class="bhd-status-info-img" src="${escape(effect.img ?? "")}" alt="">${html}</div>`;
+    const choice = await DialogV2.wait({
+      window: { title: effect.name },
+      classes: ["bhd-dialog"],
+      content,
+      buttons: [
+        { action: "close", label: "BHD.Actions.Close", icon: "fa-solid fa-check", default: true },
+        { action: "remove", label: "BHD.Effects.Remove", icon: "fa-solid fa-trash" }
+      ],
+      rejectClose: false
+    });
+    if ( choice !== "remove" ) return;
+    useLog(`Efecto: el jugador quita ${effect.name}`);
+    await effect.delete();
+  }
+
+  /**
+   * Avisos de los efectos con duración en combate: su última ronda y cuando se acaban (si Foundry los deja puestos
+   * ya vencidos). Se llama con cada cambio del combate.
+   */
+  checkEffectTimers() {
+    for ( const actor of this.myActors ) {
+      for ( const effect of actor.temporaryEffects ?? [] ) {
+        const { combat, remaining, expired } = getDuration(effect);
+        if ( !combat || (remaining === null) ) continue;
+        const key = `${effect.uuid}`;
+        if ( expired ) {
+          if ( this.#effectNotices.get(key) === "ended" ) continue;
+          this.#effectNotices.set(key, "ended");
+          this.#notifyEffectEnded(effect.name, actor);
+        }
+        else if ( remaining <= 1 ) {
+          if ( this.#effectNotices.has(key) ) continue;
+          this.#effectNotices.set(key, "last");
+          useLog(`Efecto: última ronda de ${effect.name} (${actor.name})`);
+          ui.notifications.warn(game.i18n.format("BHD.Effects.LastRound", { name: effect.name, actor: actor.name }));
+        }
+        else this.#effectNotices.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Hook `deleteActiveEffect`: un efecto temporal de uno de sus actores terminó (o lo quitaron).
+   * @param {ActiveEffect} effect
+   */
+  onEffectDeleted(effect) {
+    const actor = (effect.parent instanceof Actor) ? effect.parent : null;
+    if ( !actor || !this.myActors.includes(actor) || !effect.isTemporary ) return;
+    if ( this.#effectNotices.get(effect.uuid) === "ended" ) return;
+    this.#effectNotices.delete(effect.uuid);
+    this.#notifyEffectEnded(effect.name, actor);
+  }
+
+  /**
+   * @param {string} name
+   * @param {Actor} actor
+   */
+  #notifyEffectEnded(name, actor) {
+    useLog(`Efecto: terminó ${name} (${actor.name})`);
+    ui.notifications.info(game.i18n.format("BHD.Effects.EndedNotice", { name, actor: actor.name }));
   }
 
   /**
@@ -3031,6 +3329,90 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static #onDismissTurnAlert() {
     this.#hideTurnAlert();
+  }
+
+  /**
+   * Filtro del diario: Todo, Tiradas o Combate.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onDiaryFilter(event, target) {
+    this.#diaryFilter = target.dataset.filter;
+    this.render({ parts: ["main"] });
+  }
+
+  /**
+   * Limpia el diario del actor que se ve (la sesión empieza de nuevo).
+   * @this {BHDMobileApp}
+   */
+  static async #onDiaryClear() {
+    const actor = this.actor;
+    if ( !actor ) return;
+    const ok = await DialogV2.confirm({
+      window: { title: "BHD.Diary.Clear" },
+      classes: ["bhd-dialog"],
+      content: `<p>${foundry.utils.escapeHTML(game.i18n.format("BHD.Diary.ClearConfirm", { name: actor.name }))}</p>`,
+      rejectClose: false
+    });
+    if ( !ok ) return;
+    clearDiary(actor);
+    useLog(`Diario: limpiado para ${actor.name}`);
+    this.render({ parts: ["main"] });
+  }
+
+  /**
+   * Algo nuevo en el diario: se redibuja si se está viendo (sin molestar si el jugador escribe en sus notas).
+   */
+  onDiaryChanged() {
+    if ( this.activeTab !== "notes" ) return;
+    if ( document.activeElement?.matches?.("[data-bhd-notes]") ) return;
+    this.render({ parts: ["main"] });
+  }
+
+  /**
+   * Toca un contador de recursos: abre su detalle (o lo cierra si ya estaba abierto).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static #onResource(event, target) {
+    const id = target.dataset.id;
+    this.#openResource = (this.#openResource === id) ? null : id;
+    useLog(this.#openResource ? `Recursos: detalle de ${id}` : "Recursos: detalle cerrado");
+    this.render({ parts: ["main"] });
+  }
+
+  /**
+   * Botones − / + del detalle de un recurso: gasta o recupera un uso a mano.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onResourceStep(event, target) {
+    const actor = this.actor;
+    if ( !actor ) return;
+    const step = Number(target.dataset.step);
+    useLog(`Recursos: ${step > 0 ? "recupera" : "gasta"} un uso de ${target.dataset.id} a mano`);
+    try {
+      await adjustResource(actor, target.dataset.id, step);
+    } catch(err) {
+      useError("Recursos | Error", err?.message ?? String(err));
+      ui.notifications.error(err?.message ?? String(err));
+    }
+  }
+
+  /**
+   * Selector de la cabecera (o botón del aviso de turno): muestra el personaje o un compañero.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target  Con data-uuid (vacío: el personaje).
+   */
+  static #onCompanion(event, target) {
+    this.#hideTurnAlert();
+    const uuid = target.dataset.uuid || null;
+    if ( (uuid ?? null) === this.#companionUuid ) return;
+    this.#selectCompanion(uuid);
   }
 
   /**
@@ -3404,4 +3786,15 @@ function getTargetArmorClasses() {
     targets.push({ name: token.name, ac: ac ?? null });
   }
   return targets;
+}
+
+/**
+ * Texto plano de un trozo de HTML (sabor de una tirada, descripción corta).
+ * @param {string} html
+ * @returns {string}
+ */
+function textOf(html) {
+  const template = document.createElement("template");
+  template.innerHTML = String(html ?? "");
+  return template.content.textContent.replace(/\s+/g, " ").trim();
 }

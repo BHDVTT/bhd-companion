@@ -38,7 +38,8 @@ export function getMovableTokens() {
 export function getMoveToken(actor, selectedId) {
   const tokens = getMovableTokens();
   return tokens.find(t => t.id === selectedId)
-    ?? tokens.find(t => actor && ((t.actor === actor) || (t.actorId === actor.id)))
+    ?? tokens.find(t => actor && (t.actor === actor))
+    ?? tokens.find(t => actor && !actor.isToken && (t.actorId === actor.id))
     ?? tokens[0] ?? null;
 }
 

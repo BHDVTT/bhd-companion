@@ -32,12 +32,18 @@ export function getActiveCharacter() {
 export function prepareCharacterSheet(actor) {
   const system = actor.system;
   const attributes = system.attributes;
+  const isCharacter = actor.type === "character";
+  const cr = system.details?.cr;
   return {
     name: actor.name,
     img: actor.img,
+    isCharacter,
     classLabel: getClassLabel(actor),
     level: system.details?.level ?? 0,
-    inspiration: !!attributes.inspiration,
+    // Compañeros (PNJ): su valor de desafío en lugar del nivel.
+    cr: (!isCharacter && Number.isFinite(cr)) ? dnd5e.utils.formatCR(cr) : null,
+    inspiration: isCharacter && !!attributes.inspiration,
+    inspirationRule: game.i18n.localize(isLegacyRules() ? "BHD.Inspiration.RuleLegacy" : "BHD.Inspiration.RuleModern"),
     hp: prepareHitPoints(attributes.hp),
     ac: attributes.ac?.value ?? 10,
     initiative: signed(attributes.init?.total ?? 0),
@@ -47,6 +53,16 @@ export function prepareCharacterSheet(actor) {
     skills: prepareSkills(system.skills),
     rest: prepareRest(actor)
   };
+}
+
+/* -------------------------------------------- */
+
+/**
+ * ¿El mundo usa las reglas de 2014 (ajuste "rulesVersion" de dnd5e)? Decide cómo se usa la Inspiración.
+ * @returns {boolean}
+ */
+export function isLegacyRules() {
+  return game.settings.get("dnd5e", "rulesVersion") === "legacy";
 }
 
 /* -------------------------------------------- */

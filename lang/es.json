@@ -567,6 +567,81 @@
       "NoItems": "Ningún objeto de tu inventario cumple los requisitos de este encantamiento.",
       "Full": "Ya encantaste todos los objetos que permite. Quita uno para elegir otro.",
       "Done": "{name} encantado."
+    },
+    "Companion": {
+      "Choose": "Personaje y compañeros",
+      "Label": "Compañero",
+      "CR": "VD {cr}",
+      "Gone": "Tu compañero ya no está en la escena: vuelves a tu personaje.",
+      "TurnAlert": "¡Turno de {name}!",
+      "Control": "Controlar a {name}"
+    },
+    "Resources": {
+      "Title": "Recursos",
+      "Recharge": "Recarga {value}+",
+      "Spend": "Gastar un uso",
+      "Recover": "Recuperar un uso",
+      "AdjustHint": "− / + ajusta los usos a mano. Usar el rasgo los gasta solo."
+    },
+    "Effects": {
+      "Ended": "Terminado",
+      "From": "De:",
+      "Remaining": "Queda:",
+      "Changes": "Lo que modifica",
+      "Remove": "Quitar efecto",
+      "LastRound": "Última ronda de {name} ({actor}).",
+      "EndedNotice": "Terminó {name} ({actor})."
+    },
+    "Inspiration": {
+      "Have": "¡Tienes Inspiración!",
+      "Use": "Usar Inspiración",
+      "Rule": "Regla",
+      "RuleModern": "Reglas 2024: gástala para volver a tirar un dado justo después de tirarlo.",
+      "RuleLegacy": "Reglas 2014: gástala para tener ventaja en una tirada de ataque, salvación o prueba.",
+      "LegacyConfirm": "Gastar la Inspiración: tu próxima tirada de ataque, salvación o prueba tendrá ventaja.",
+      "Pending": "Inspiración gastada: tu próxima tirada de ataque, salvación o prueba tendrá ventaja.",
+      "LastRoll": "Última tirada",
+      "RerollConfirm": "Volver a tirar «{roll}» (sacaste {total}) y quedarte con la nueva tirada.",
+      "NoRoll": "No hay una tirada d20 tuya reciente. Puedes gastarla y pedir al DM que la aplique.",
+      "Reroll": "Volver a tirar",
+      "SpendOnly": "Solo gastarla",
+      "RerollFlavor": "Inspiración heroica: nueva tirada",
+      "Granted": "¡{name} recibe Inspiración!",
+      "GMGive": "Dar Inspiración a {name}",
+      "GMRemove": "Quitar la Inspiración a {name}"
+    },
+    "Diary": {
+      "Title": "Diario de la sesión",
+      "Clear": "Limpiar el diario",
+      "ClearConfirm": "¿Borrar el diario de {name} en este teléfono? Empieza una sesión nueva.",
+      "Empty": "Aún no hay nada en esta sesión.",
+      "Used": "Usó {name}",
+      "Damage": "Recibió {amount} de daño",
+      "Healed": "Recuperó {amount} PG",
+      "ConditionGained": "Ahora está: {name}",
+      "ConditionLost": "Ya no está: {name}",
+      "EffectGained": "Empieza: {name}",
+      "EffectLost": "Termina: {name}",
+      "Filter": {
+        "all": "Todo",
+        "rolls": "Tiradas",
+        "combat": "Combate"
+      },
+      "Roll": {
+        "attack": "Ataque",
+        "damage": "Daño",
+        "healing": "Curación",
+        "save": "Salvación",
+        "concentration": "Concentración",
+        "death": "Salvación de muerte",
+        "initiative": "Iniciativa",
+        "ability": "Prueba de característica",
+        "check": "Prueba",
+        "skill": "Habilidad",
+        "tool": "Herramienta",
+        "hitDie": "Dado de golpe",
+        "roll": "Tirada"
+      }
     }
   }
 }

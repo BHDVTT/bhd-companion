@@ -16,13 +16,22 @@
   {{#if (or status.conditions.length status.effects.length)}}
   <div class="bhd-conditions">
     {{#each status.conditions}}
-    <button type="button" class="bhd-condition" data-action="bhdConditionInfo" data-status="{{id}}">
-      <img src="{{img}}" alt=""><span>{{name}}{{#if level}} {{level}}{{/if}}</span>
+    <button type="button" class="bhd-condition {{#if lastRound}}bhd-last-round{{/if}}" data-action="bhdConditionInfo" data-status="{{id}}">
+      <img src="{{img}}" alt="">
+      <span class="bhd-condition-text">
+        <span>{{name}}{{#if level}} {{level}}{{/if}}</span>
+        {{#if duration}}<small class="bhd-effect-time"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> {{duration}}</small>{{/if}}
+      </span>
     </button>
     {{/each}}
     {{#each status.effects}}
-    <button type="button" class="bhd-condition bhd-effect" data-action="bhdEffectInfo" data-uuid="{{uuid}}">
-      <img src="{{img}}" alt=""><span>{{name}}</span>
+    <button type="button" class="bhd-condition bhd-effect {{#if lastRound}}bhd-last-round{{/if}}" data-action="bhdEffectInfo" data-uuid="{{uuid}}">
+      <img src="{{img}}" alt="">
+      <span class="bhd-condition-text">
+        <span>{{name}}</span>
+        {{#if source}}<small class="bhd-effect-source">{{source}}</small>{{/if}}
+        {{#if duration}}<small class="bhd-effect-time"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> {{duration}}</small>{{/if}}
+      </span>
     </button>
     {{/each}}
   </div>

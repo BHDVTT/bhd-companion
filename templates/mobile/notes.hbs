@@ -11,6 +11,39 @@
     <p class="bhd-notes-status" data-bhd-notes-status>{{localize "BHD.Notes.AutoSave"}}</p>
   </section>
 
+  {{!-- Diario de la sesión: tiradas, daño y curación, condiciones y efectos (sale del chat y del actor) --}}
+  {{#if notes.diary}}
+  <details class="bhd-card bhd-diary" data-bhd-diary {{#if notes.diaryOpen}}open{{/if}}>
+    <summary class="bhd-diary-summary">
+      <i class="fa-solid fa-scroll" aria-hidden="true"></i> {{localize "BHD.Diary.Title"}}
+      <span class="bhd-count">{{notes.diary.count}}</span>
+    </summary>
+    <div class="bhd-filters" role="group">
+      {{#each notes.diary.filters}}
+      <button type="button" class="bhd-chip {{#if active}}bhd-on{{/if}}" data-action="bhdDiaryFilter" data-filter="{{id}}"
+              aria-pressed="{{active}}">{{label}}</button>
+      {{/each}}
+    </div>
+    {{#if notes.diary.entries.length}}
+    <ol class="bhd-diary-list">
+      {{#each notes.diary.entries}}
+      <li class="bhd-diary-entry {{#if kind}}bhd-diary-{{kind}}{{/if}}">
+        <time class="bhd-diary-time">{{timeLabel}}</time>
+        <i class="{{icon}} bhd-diary-icon" aria-hidden="true"></i>
+        <span class="bhd-diary-text">{{text}}</span>
+        {{#if total}}<strong class="bhd-diary-total">{{total}}</strong>{{/if}}
+      </li>
+      {{/each}}
+    </ol>
+    {{else}}
+    <p class="bhd-no-results">{{localize "BHD.Diary.Empty"}}</p>
+    {{/if}}
+    <button type="button" class="bhd-diary-clear" data-action="bhdDiaryClear">
+      <i class="fa-solid fa-broom" aria-hidden="true"></i> {{localize "BHD.Diary.Clear"}}
+    </button>
+  </details>
+  {{/if}}
+
   {{!-- Personalidad --}}
   {{#if notes.personality.length}}
   <h3 class="bhd-section-title">{{localize "BHD.Notes.Personality"}}</h3>

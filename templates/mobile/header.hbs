@@ -1,9 +1,11 @@
+{{!-- Una sola raíz: cabecera y, si hay, selector de compañeros --}}
+<div class="bhd-top">
 <header class="bhd-header">
   {{#if character}}
   <img class="bhd-portrait" src="{{character.img}}" alt="">
   <div class="bhd-identity">
     <span class="bhd-name">{{character.name}}</span>
-    <span class="bhd-player">{{userName}}</span>
+    <span class="bhd-player">{{#if isCompanion}}{{localize "BHD.Companion.Label"}}{{else}}{{userName}}{{/if}}</span>
   </div>
   {{else}}
   <div class="bhd-portrait bhd-portrait-empty"><i class="fa-solid fa-user" aria-hidden="true"></i></div>
@@ -16,3 +18,17 @@
     <i class="fa-solid fa-gear" aria-hidden="true"></i>
   </button>
 </header>
+{{!-- Personaje y compañeros (familiar, montura, invocaciones): solo si el jugador tiene alguno en la escena --}}
+{{#if companions}}
+<nav class="bhd-companions" aria-label="{{localize 'BHD.Companion.Choose'}}">
+  {{#each companions}}
+  <button type="button" class="bhd-companion {{#if active}}bhd-on{{/if}}" data-action="bhdCompanion" data-uuid="{{uuid}}"
+          aria-pressed="{{active}}">
+    <img src="{{img}}" alt="">
+    <span class="bhd-companion-name">{{name}}</span>
+    {{#if hp}}<span class="bhd-companion-hp"><i class="fa-solid fa-heart" aria-hidden="true"></i> {{hp}}</span>{{/if}}
+  </button>
+  {{/each}}
+</nav>
+{{/if}}
+</div>

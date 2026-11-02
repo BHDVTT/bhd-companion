@@ -1,5 +1,7 @@
 <div class="bhd-sheet bhd-actions">
   {{#if actions}}
+  {{!-- Recursos limitados del personaje: contadores grandes arriba --}}
+  {{#if actions.resources}}{{> "modules/bhd-companion/templates/mobile/resources.hbs" resources=actions.resources}}{{/if}}
   {{!-- Filtros por tipo de activación --}}
   <div class="bhd-filters" role="group" aria-label="{{localize 'BHD.Actions.Filter'}}">
     {{#each filters}}

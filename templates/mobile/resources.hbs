@@ -1,0 +1,47 @@
+{{!-- Recursos limitados (Ki, Furia, Puntos de hechicería...). Recibe resources (ver resources-data.js). --}}
+<section class="bhd-resources" aria-label="{{localize 'BHD.Resources.Title'}}">
+  <h3 class="bhd-section-title">{{localize "BHD.Resources.Title"}}</h3>
+  <div class="bhd-resource-strip">
+    {{#each resources.counters}}
+    <button type="button" class="bhd-resource {{#if empty}}bhd-empty{{/if}} {{#if active}}bhd-on{{/if}}"
+            data-action="bhdResource" data-id="{{id}}" aria-pressed="{{active}}">
+      <span class="bhd-resource-name">{{name}}</span>
+      <span class="bhd-resource-value"><strong>{{value}}</strong>/{{max}}</span>
+      {{#if recoveryText}}<span class="bhd-resource-recovery">{{recoveryText}}</span>{{/if}}
+    </button>
+    {{/each}}
+  </div>
+
+  {{#with resources.open as |open|}}
+  <div class="bhd-card bhd-resource-detail">
+    <header class="bhd-resource-detail-header">
+      {{#if open.img}}<img src="{{open.img}}" alt="">{{/if}}
+      <div>
+        <strong>{{open.name}}</strong>
+        {{#if open.recoveryText}}
+        <span class="bhd-resource-recovery"><i class="fa-solid fa-rotate" aria-hidden="true"></i> {{open.recoveryText}}</span>
+        {{/if}}
+      </div>
+      <button type="button" class="bhd-resource-close" data-action="bhdResource" data-id="{{open.id}}"
+              aria-label="{{localize 'BHD.Actions.Close'}}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    </header>
+    <div class="bhd-resource-adjust">
+      <button type="button" class="bhd-step" data-action="bhdResourceStep" data-id="{{open.id}}" data-step="-1"
+              aria-label="{{localize 'BHD.Resources.Spend'}}" {{#unless open.canDecrease}}disabled{{/unless}}>
+        <i class="fa-solid fa-minus" aria-hidden="true"></i>
+      </button>
+      <span class="bhd-resource-big"><strong>{{open.value}}</strong> / {{open.max}}</span>
+      <button type="button" class="bhd-step" data-action="bhdResourceStep" data-id="{{open.id}}" data-step="1"
+              aria-label="{{localize 'BHD.Resources.Recover'}}" {{#unless open.canIncrease}}disabled{{/unless}}>
+        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+      </button>
+    </div>
+    <p class="bhd-tap-hint">{{localize "BHD.Resources.AdjustHint"}}</p>
+    {{#if open.row}}
+    {{#unless open.row.passive}}
+    <div class="bhd-action-list">{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=open.row}}</div>
+    {{/unless}}
+    {{/if}}
+  </div>
+  {{/with}}
+</section>
