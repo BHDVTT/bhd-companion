@@ -16,7 +16,7 @@
  */
 
 import { MODULE_ID } from "./constants.js";
-import { getSocket, registerSocketHandler } from "./remote-socket.js";
+import { callGM, getSocket, registerSocketHandler } from "./remote-socket.js";
 import { getScaledActivity, getScaling } from "./quick-actions.js";
 
 const SOCKET = `module.${MODULE_ID}`;
@@ -95,21 +95,18 @@ export function needsAreaPlacement(activity) {
  * @param {string|null} slot
  * @returns {Promise<object>}  `{ ok, sessionId, ...estado }` o `{ ok: false, reason }`.
  */
-export async function requestPlacementStart(activity, slot) {
-  if ( !getSocket() ) return { ok: false, reason: "NoSocketlib" };
-  if ( !game.users.activeGM ) return { ok: false, reason: "NoGM" };
-  try {
-    return await getSocket().executeAsGM("templateStart", {
-      actorUuid: activity.actor.uuid,
-      itemId: activity.item.id,
-      activityId: activity.id,
-      slot,
-      sceneId: game.scenes.active?.id ?? null
-    });
-  } catch(err) {
-    return { ok: false, reason: "Error", error: err?.message ?? String(err) };
-  }
+export function requestPlacementStart(activity, slot) {
+  return callGM("templateStart", {
+    actorUuid: activity.actor.uuid,
+    itemId: activity.item.id,
+    activityId: activity.id,
+    slot,
+    sceneId: game.scenes.active?.id ?? null
+  }, PLACEMENT_TIMEOUT_MS);
 }
+
+/** Cuánto espera el teléfono cada respuesta del DM al colocar un área (ms). */
+const PLACEMENT_TIMEOUT_MS = 10 * 1000;
 
 /**
  * Mueve (una casilla) o gira la vista previa.
@@ -117,12 +114,8 @@ export async function requestPlacementStart(activity, slot) {
  * @param {{dx?: number, dy?: number, rotate?: number}} change
  * @returns {Promise<object>}  Nuevo estado (con `blocked` si chocó con el alcance o el borde).
  */
-export async function requestPlacementMove(sessionId, change) {
-  try {
-    return await getSocket().executeAsGM("templateMove", { sessionId, ...change });
-  } catch(err) {
-    return { ok: false, reason: "Error", error: err?.message ?? String(err) };
-  }
+export function requestPlacementMove(sessionId, change) {
+  return callGM("templateMove", { sessionId, ...change }, PLACEMENT_TIMEOUT_MS);
 }
 
 /**
@@ -131,12 +124,8 @@ export async function requestPlacementMove(sessionId, change) {
  * @param {boolean} confirm
  * @returns {Promise<{ok: boolean, x?: number, y?: number, direction?: number}>}
  */
-export async function requestPlacementEnd(sessionId, confirm) {
-  try {
-    return await getSocket().executeAsGM("templateEnd", { sessionId, confirm });
-  } catch(err) {
-    return { ok: false, reason: "Error", error: err?.message ?? String(err) };
-  }
+export function requestPlacementEnd(sessionId, confirm) {
+  return callGM("templateEnd", { sessionId, confirm }, PLACEMENT_TIMEOUT_MS);
 }
 
 /**

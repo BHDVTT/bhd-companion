@@ -8,6 +8,15 @@
     </button>
   </header>
 
+  {{!-- Botones que no responden o algo trabado: reinicia la conexión y vuelve a dibujar, sin recargar. --}}
+  <button type="button" class="bhd-settings-reconnect" data-action="bhdReconnect">
+    <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+    <span class="bhd-setting-text">
+      <span class="bhd-setting-name">{{localize "BHD.Reconnect.Button"}}</span>
+      <span class="bhd-setting-hint">{{localize "BHD.Reconnect.Hint"}}</span>
+    </span>
+  </button>
+
   {{#each toggles}}
   <button type="button" class="bhd-setting-toggle {{#if on}}bhd-on{{/if}}" data-action="bhdToggleSetting"
           data-setting="{{key}}" aria-pressed="{{on}}" {{#if unsupported}}disabled{{/if}}>

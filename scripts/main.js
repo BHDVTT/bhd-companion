@@ -75,15 +75,17 @@ function openMobileView() {
 
   // Varios cambios seguidos (p. ej. el GM aplica daño y un estado) producen un solo redibujado.
   // Con la pantalla apagada o en otra app no se dibuja nada (ahorra batería): se hace una vez al volver.
+  // Un dibujo que falla (p. ej. un dato raro de un objeto) se apunta en la consola y no tumba los siguientes.
   let pendingRender = false;
+  const draw = () => Promise.resolve(app.render()).catch(err => console.error("BHD Companion | Error al dibujar la vista", err));
   const refresh = foundry.utils.debounce(() => {
     if ( document.hidden ) pendingRender = true;
-    else app.render();
+    else draw();
   }, 50);
   document.addEventListener("visibilitychange", () => {
     if ( document.hidden || !pendingRender ) return;
     pendingRender = false;
-    app.render();
+    draw();
   });
 
   /** ¿Este actor aparece en la vista (el que se muestra, uno del selector de personajes o un compañero)? */
@@ -189,9 +191,11 @@ function openMobileView() {
     if ( user.isSelf && (app.activeTab === "combat") ) refresh();
   });
   // Si se cortó la conexión, la TV olvidó los objetivos de este jugador: se le vuelven a mandar.
-  game.socket.io?.on("reconnect", () => {
+  const resendTargets = () => {
     if ( game.user.targets.size ) broadcastTargets();
-  });
+  };
+  game.socket.io?.on("reconnect", resendTargets);
+  Hooks.on("bhd-companion.reconnected", resendTargets);
 
   // HUD de combate: marcar como usada la acción, adicional o reacción de lo que se use fuera de los
   // botones de la vista. (Es un Hooks.call de dnd5e: devolver false cortaría el uso.)

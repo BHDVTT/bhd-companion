@@ -3224,6 +3224,54 @@ body.bhd-large-text #bhd-mobile-app {
   font-size: calc(17px * var(--bhd-text-scale, 1));
 }
 
+/* Reconectar: pequeño, arriba del panel de ajustes. */
+#bhd-mobile-app .bhd-settings-reconnect {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: auto;
+  min-height: 48px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--bhd-gold);
+  border-radius: 12px;
+  background: var(--bhd-gold-soft);
+  box-shadow: none;
+  color: var(--bhd-text);
+  text-align: left;
+}
+
+#bhd-mobile-app .bhd-settings-reconnect > i {
+  margin: 0;
+  color: var(--bhd-gold);
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-settings-reconnect.bhd-rolling > i {
+  animation: bhd-spin 0.9s linear infinite;
+}
+
+@keyframes bhd-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Toque largo (ventaja / desventaja): sin lupa, menú del navegador ni selección de texto en iPhone y Android. */
+#bhd-mobile-app .bhd-rollable,
+#bhd-mobile-app .bhd-roll-btn,
+#bhd-mobile-app .bhd-save-alert-roll {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#bhd-mobile-app .bhd-rollable *,
+#bhd-mobile-app .bhd-roll-btn * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 #bhd-mobile-app .bhd-settings-exit {
   display: flex;
   align-items: center;

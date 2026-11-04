@@ -110,6 +110,7 @@ scripts/gm-inspiration.js    DM: estrella junto a cada jugador (lista de jugador
 scripts/mobile-templates.js  áreas de hechizo (plantillas) e invocaciones sin clic en el mapa en vista móvil
 scripts/mobile-dialogs.js    ventanas de dnd5e compactas (secciones plegadas) en vista móvil
 scripts/mobile-windows.js    qué ventanas se permiten en vista móvil (cierra las de otros módulos), una a la vez
+scripts/busy.js              botones ocupados con tiempo máximo (10 s) y withTimeout
 scripts/use-log.js           registro de los usos del teléfono (consola del teléfono y del DM)
 scripts/connection.js        reconexión sin límite y aviso "Sin conexión" en vista móvil
 scripts/wake-lock.js         pantalla siempre encendida (Screen Wake Lock API)
@@ -658,6 +659,33 @@ lang/es.json, en.json        traducciones
   `advantage/disadvantage` explícitos (Midi no los recalcula) y `midiOptions.isConcentrationCheck` para concentración;
   un `preCreateChatMessage` fija `speaker.token/scene` (Midi en el teléfono pone el de su mapa). Toque largo →
   Ventaja / Normal / Desventaja dentro del aviso. Herramientas: se dejan a Midi.
+
+## Botones que nunca se traban, toque largo y Reconectar (0.19.0, sin probar en teléfono)
+
+- **Botones ocupados** (`busy.js`): `BusyLocks` con nombre (`"roll"` características / salvaciones / habilidades /
+  iniciativa / muerte; `"use"` objetos, hechizos, acciones básicas, "Más opciones"). `acquire` devuelve un lock con
+  temporizador de 10 s (`BUSY_TIMEOUT_MS`); si el jugador está contestando algo (`#isWaitingForPlayer`: ventana
+  `.bhd-window`, `.bhd-relay-dialog`, selector, colocar área, menú) espera de 2 en 2 s hasta 2 min. Al agotarse:
+  libera, aviso `BHD.Busy.Timeout` (o `StillWaiting` con Midi) y en consola. `release` en `finally`, por token
+  (liberar tarde no pisa otro). Con Midi el uso sigue en el DM: `#midiPending` impide pedir el mismo objeto otra vez.
+  Síntoma real que lo motivó (v14, iPhone y Android): la prueba de habilidad salía en el chat pero la promesa de
+  `rollSkill` no terminaba y `#rolling` quedaba en true; causa exacta sin confirmar.
+- **Peticiones al DM** (`callGM` en remote-socket.js): `executeAsGM` con tiempo límite; al `disconnect` del socket
+  todas las pendientes devuelven `ConnectionLost` (socketlib nunca entrega la respuesta de una conexión vieja).
+  Midi 150 s, colocar área 10 s. En el DM, `relay` (dialog-relay.js) deja de esperar al teléfono a los 90 s o con
+  `userConnected` false y enseña la ventana al DM.
+- **Toque largo** (400 ms, `LONG_PRESS_SELECTOR`): también en características, salvaciones, habilidades y muerte
+  (`#openCheckChooser` → `bhdCheckMode` → `#rollCheck` con `advantage/disadvantage` en la config de dnd5e). Con el
+  dedo, `pointercancel` se ignora (iOS / Android lo mandan al empezar a desplazar o seleccionar) y el movimiento se
+  mide con `touchmove`; `touchend` con `preventDefault` tras disparar, y el clic de después se descarta en
+  `document` (captura, `#suppressClickUntil`, 700 ms). `contextmenu` y `selectstart` anulados en esos botones;
+  CSS `-webkit-touch-callout: none` + `user-select: none`. Si el botón se redibujó, `#findSameButton`.
+- **Escuchadores de `_onRender`** una sola vez por elemento (`#boundListeners`, WeakMap): al dibujar solo "main"
+  la cabecera se quedaba con escuchadores repetidos.
+- **Reconectar** (panel del engranaje, `bhdReconnect`): `resetPending()` (locks, peticiones, selector, área, menú),
+  `restartConnection()` (connection.js: `disconnect` + `connect`, sin el aviso "Sin conexión"; < 5 s, así Foundry no
+  recarga), `render({ force: true })` con 10 s máximo y hook propio `bhd-companion.reconnected` (reenvía objetivos y
+  pregunta por salvaciones de Midi pendientes).
 
 ## Recursos, efectos, compañeros, inspiración y diario (0.18.0)
 

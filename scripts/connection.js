@@ -29,7 +29,7 @@ export function watchConnection() {
   manager.reconnectionDelay(RECONNECT_DELAY);
   manager.reconnectionDelayMax(RECONNECT_DELAY_MAX);
 
-  const overlay = createOverlay();
+  const overlay = overlayElement = createOverlay();
   let unloading = false;
   window.addEventListener("beforeunload", () => unloading = true);
 
@@ -38,7 +38,7 @@ export function watchConnection() {
   };
 
   socket.on("disconnect", reason => {
-    if ( unloading ) return;
+    if ( unloading || restarting ) return;
     showOverlay(overlay, "BHD.Connection.Lost");
     if ( reason === "io server disconnect" ) setTimeout(reconnect, SERVER_CLOSE_RETRY);
   });
@@ -57,6 +57,51 @@ export function watchConnection() {
     if ( document.visibilityState === "visible" ) reconnect();
   });
   window.addEventListener("online", reconnect);
+  // Conectado otra vez (también tras "Reconectar"): fuera el aviso.
+  socket.on("connect", () => {
+    if ( !overlay.hidden && !overlay.classList.contains("bhd-online") ) {
+      showOverlay(overlay, "BHD.Connection.Back");
+      setTimeout(() => {
+        if ( socket.connected ) overlay.hidden = true;
+      }, 1500);
+    }
+  });
+}
+
+/** Aviso "Sin conexión" (creado en watchConnection). */
+let overlayElement = null;
+
+/** ¿Se está reiniciando la conexión a mano (botón Reconectar)? Entonces no se tapa la vista. */
+let restarting = false;
+
+/** Cuánto se espera (ms) a que vuelva la conexión tras "Reconectar". */
+const RESTART_TIMEOUT = 8000;
+
+/**
+ * Botón "Reconectar": cierra la conexión con el servidor y la abre otra vez, sin recargar la página.
+ * Las respuestas que se esperaban por la conexión vieja se dan por perdidas (ver remote-socket.js).
+ * Es tan rápido que Foundry no recarga la página (solo lo hace tras 5 s o más sin conexión).
+ * @returns {Promise<boolean>}  true si vuelve a estar conectado.
+ */
+export function restartConnection() {
+  const socket = game.socket;
+  if ( !socket ) return Promise.resolve(false);
+  return new Promise(resolve => {
+    let timer;
+    const finish = ok => {
+      clearTimeout(timer);
+      socket.off("connect", onConnect);
+      restarting = false;
+      if ( !ok && overlayElement ) showOverlay(overlayElement, "BHD.Connection.Lost");
+      resolve(ok);
+    };
+    const onConnect = () => finish(true);
+    timer = setTimeout(() => finish(socket.connected), RESTART_TIMEOUT);
+    restarting = true;
+    socket.on("connect", onConnect);
+    if ( socket.connected ) socket.disconnect();
+    setTimeout(() => socket.connect(), 300);
+  });
 }
 
 /**

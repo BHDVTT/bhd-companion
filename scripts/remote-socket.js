@@ -41,3 +41,54 @@ export function registerSocketHandler(name, handler) {
 export function getSocket() {
   return socket;
 }
+
+/* -------------------------------------------- */
+
+/** Peticiones al DM sin respuesta todavía: al cortarse la conexión se contestan con un error. */
+const pendingCalls = new Set();
+
+// Si se corta la conexión, socketlib nunca entrega la respuesta: quien espera recibe "ConnectionLost".
+Hooks.once("ready", () => {
+  game.socket?.on("disconnect", () => cancelPendingCalls("ConnectionLost"));
+});
+
+/**
+ * Llama a una función en el cliente del DM, con tiempo límite. Nunca se queda esperando para siempre ni lanza:
+ * devuelve lo del DM o `{ ok: false, reason }` ("NoSocketlib", "NoGM", "Timeout", "ConnectionLost",
+ * "GMOutdated", "Error").
+ * @param {string} name
+ * @param {object} data
+ * @param {number} timeout  ms
+ * @returns {Promise<object>}
+ */
+export function callGM(name, data, timeout) {
+  if ( !socket ) return Promise.resolve({ ok: false, reason: "NoSocketlib" });
+  if ( !game.users.activeGM ) return Promise.resolve({ ok: false, reason: "NoGM" });
+  return new Promise(resolve => {
+    const call = { finish: null, timer: null };
+    call.finish = result => {
+      if ( !pendingCalls.has(call) ) return;
+      pendingCalls.delete(call);
+      clearTimeout(call.timer);
+      resolve(result);
+    };
+    pendingCalls.add(call);
+    call.timer = setTimeout(() => {
+      console.warn(`BHD Companion | El DM no contestó "${name}" en ${Math.round(timeout / 1000)} s`);
+      call.finish({ ok: false, reason: "Timeout" });
+    }, timeout);
+    socket.executeAsGM(name, data).then(call.finish, err => {
+      // El DM tiene una versión vieja del módulo (no conoce la función): que recargue.
+      const unregistered = err instanceof (globalThis.socketlib?.errors?.SocketlibUnregisteredHandlerError ?? class {});
+      call.finish({ ok: false, reason: unregistered ? "GMOutdated" : "Error", error: err?.message ?? String(err) });
+    });
+  });
+}
+
+/**
+ * Contesta con un error todas las peticiones al DM que siguen esperando (conexión cortada o "Reconectar").
+ * @param {string} [reason="ConnectionLost"]
+ */
+export function cancelPendingCalls(reason="ConnectionLost") {
+  for ( const call of [...pendingCalls] ) call.finish({ ok: false, reason });
+}

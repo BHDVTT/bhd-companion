@@ -22,6 +22,12 @@ const GM_TAP_MS = 1500;
 /** Si tras aplicar la respuesta la ventana sigue abierta sin redibujarse, se muestra al DM tras este tiempo. */
 const STUCK_MS = 2500;
 
+/** Si el jugador no contesta una ventana reenviada en este tiempo (ms), se le muestra al DM. */
+const RELAY_TIMEOUT_MS = 90 * 1000;
+
+/** Marca de "sin respuesta" (teléfono desconectado o tiempo agotado). */
+const NO_ANSWER = Symbol("noAnswer");
+
 /** Ventanas de Midi QOL que pueden salir durante un uso y son del jugador (las reacciones van aparte). */
 const MIDI_DIALOGS = ["MidiActivityChoiceDialog", "MidiRollChoiceDialog", "RollModifyDialog", "TargetConfirmationDialog"];
 
@@ -197,7 +203,23 @@ async function relay(app, element, run) {
 
   let answer;
   try {
-    answer = await getSocket().executeAsUser("relayDialog", run.user.id, snapshot);
+    // Si el teléfono se desconecta o no contesta, socketlib no avisa nunca: la ventana volvería a verse
+    // en el DM jamás y el uso (y el botón del jugador) quedaría esperando. Tiempo límite y desconexión.
+    let timer;
+    let hook;
+    const lost = new Promise(resolve => {
+      timer = setTimeout(() => resolve(NO_ANSWER), RELAY_TIMEOUT_MS);
+      hook = Hooks.on("userConnected", (user, connected) => {
+        if ( (user.id === run.user.id) && !connected ) resolve(NO_ANSWER);
+      });
+    });
+    try {
+      answer = await Promise.race([getSocket().executeAsUser("relayDialog", run.user.id, snapshot), lost]);
+    } finally {
+      clearTimeout(timer);
+      Hooks.off("userConnected", hook);
+    }
+    if ( answer === NO_ANSWER ) throw new Error("sin respuesta del teléfono");
   } catch(err) {
     console.warn(`${tag} | El teléfono no contestó; la ventana se muestra aquí`, err);
     element.classList.remove("bhd-relayed");

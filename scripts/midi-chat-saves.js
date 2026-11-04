@@ -186,6 +186,7 @@ export function listenMidiChatSaves(app) {
     if ( !document.hidden ) query("el teléfono volvió");
   });
   game.socket.io?.on("reconnect", () => query("reconexión"));
+  Hooks.on("bhd-companion.reconnected", () => query("botón Reconectar"));
   query("al abrir la vista");
 }
 

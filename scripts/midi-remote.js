@@ -15,7 +15,7 @@
  */
 
 import { MODULE_ID } from "./constants.js";
-import { getSocket, registerSocketHandler } from "./remote-socket.js";
+import { callGM, getSocket, registerSocketHandler } from "./remote-socket.js";
 import { endRemoteRun, getRemotePlacement, isRemoteRun, startRemoteRun } from "./dialog-relay.js";
 import { needsUsageDialog } from "./quick-actions.js";
 import { patchGmTemplatePlacement, patchTokenPlacement } from "./mobile-templates.js";
@@ -99,20 +99,9 @@ export async function requestMidiReaction(data) {
  * @param {string} name
  * @param {object} data
  */
-async function askGM(name, data) {
-  let timer;
-  const timeout = new Promise(resolve => {
-    timer = setTimeout(() => resolve({ ok: false, reason: "Timeout" }), REQUEST_TIMEOUT_MS);
-  });
-  try {
-    return await Promise.race([getSocket().executeAsGM(name, data), timeout]);
-  } catch(err) {
-    // El DM tiene una versión vieja del módulo (no conoce la función): que recargue.
-    const unregistered = err instanceof (globalThis.socketlib?.errors?.SocketlibUnregisteredHandlerError ?? class {});
-    return { ok: false, reason: unregistered ? "GMOutdated" : "Error", error: err?.message ?? String(err) };
-  } finally {
-    clearTimeout(timer);
-  }
+function askGM(name, data) {
+  // Sin respuesta (o conexión cortada) nunca se queda esperando: ver callGM.
+  return callGM(name, data, REQUEST_TIMEOUT_MS);
 }
 
 /* -------------------------------------------- */

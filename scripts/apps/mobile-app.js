@@ -32,6 +32,9 @@ import {
 import { findSavePrompts, getSavePromptLabel, rollSavePrompt } from "../save-prompts.js";
 import { rollMidiChatSave } from "../midi-chat-saves.js";
 import { renderItemDetails } from "../item-details.js";
+import { BUSY_TIMEOUT_MS, BusyLocks, withTimeout } from "../busy.js";
+import { cancelPendingCalls } from "../remote-socket.js";
+import { restartConnection } from "../connection.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -41,11 +44,24 @@ const TOAST_DURATION = 4000;
 /** Cuánto tiempo (ms) se ve el resultado de un uso hecho por el DM con Midi QOL. */
 const MIDI_RESULT_DURATION = 12000;
 
-/** Cuánto hay que mantener el dedo (ms) en Ataque o Daño para abrir el menú (ventaja / crítico). */
-const LONG_PRESS_MS = 450;
+/**
+ * Cuánto hay que mantener el dedo (ms) para abrir el menú (ventaja / crítico). Menos que el toque largo del
+ * sistema (iPhone ~500 ms: lupa / selección; Android: menú del navegador), para llegar antes que él.
+ */
+const LONG_PRESS_MS = 400;
 
 /** Cuánto se puede mover el dedo (px) sin que deje de contar como toque largo. */
-const LONG_PRESS_TOLERANCE = 10;
+const LONG_PRESS_TOLERANCE = 12;
+
+/** Cuánto (ms) después de soltar un toque largo se descarta el clic que manda el navegador. */
+const LONG_PRESS_CLICK_GUARD = 700;
+
+/** Botones con toque largo: menú de ventaja / normal / desventaja (o normal / crítico en Daño). */
+const LONG_PRESS_SELECTOR = [
+  '.bhd-roll-btn[data-kind="attack"]', '.bhd-roll-btn[data-kind="damage"]', '.bhd-roll-btn[data-kind="midi"]',
+  '.bhd-rollable[data-type="ability"]', '.bhd-rollable[data-type="save"]', '.bhd-rollable[data-type="skill"]',
+  '.bhd-rollable[data-type="death"]', ".bhd-save-alert-roll[data-midi-chat]"
+].join(", ");
 
 /** Cuánto se espera (ms) desde la última tecla para guardar las notas personales. */
 const NOTES_SAVE_DELAY = 1000;
@@ -84,6 +100,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       actionFilter: BHDMobileApp.#onActionFilter,
       closeTray: BHDMobileApp.#onCloseTray,
       chooseUse: BHDMobileApp.#onChooseUse,
+      bhdCheckMode: BHDMobileApp.#onCheckMode,
+      bhdReconnect: BHDMobileApp.#onReconnect,
       bhdChooseSlot: BHDMobileApp.#onChooseSlot,
       bhdPlaceRotate: BHDMobileApp.#onPlaceRotate,
       bhdPlaceConfirm: BHDMobileApp.#onPlaceConfirm,
@@ -178,8 +196,23 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Cantidad escrita en el control de vida (se conserva si la vista se vuelve a dibujar). */
   #hpAmount = "";
 
-  /** ¿Hay una tirada en curso? Evita tiradas dobles por tocar dos veces. */
-  #rolling = false;
+  /**
+   * Botones ocupados: "roll" (características, salvaciones, habilidades...) y "use" (objetos, hechizos, acciones).
+   * Evitan tiradas o usos dobles por tocar dos veces y se liberan siempre (como mucho a los 10 s).
+   */
+  #busy = new BusyLocks({
+    isWaiting: () => this.#isWaitingForPlayer(),
+    onTimeout: lock => this.#onBusyTimeout(lock)
+  });
+
+  /** Objetos con un uso pedido al DM (Midi) sin respuesta: no se piden dos veces aunque el botón ya esté libre. */
+  #midiPending = new Set();
+
+  /** Hasta cuándo (ms) se ignora el clic que llega al soltar un toque largo. */
+  #suppressClickUntil = 0;
+
+  /** Escuchadores ya puestos en cada elemento de la vista (para no repetirlos al redibujar). */
+  #boundListeners = new WeakMap();
 
   /** Temporizador del aviso con el resultado de la tirada. */
   #toastTimeout;
@@ -189,9 +222,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Texto del buscador de hechizos. */
   #spellSearch = "";
-
-  /** ¿Se está usando un objeto? Evita usos dobles por tocar dos veces. */
-  #using = false;
 
   /** Botones de tirada: nivel de espacio elegido, lanzamientos en curso y último ataque (crítico). */
   #quick = new QuickActionState();
@@ -539,13 +569,40 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     chooser.hidden = true;
     this.element.append(chooser);
 
-    // Toque largo en los botones Ataque y Daño. Se escucha en el contenedor (que no se
-    // vuelve a crear al redibujar), así sirve para todas las filas.
+    // Toque largo en los botones de tirada (Ataque, Daño, características, habilidades...). Se escucha en el
+    // contenedor (que no se vuelve a crear al redibujar), así sirve para todas las filas y nunca se duplica.
+    // En iPhone y Android el navegador manda "pointercancel" en cuanto cree que el dedo va a desplazar la
+    // lista (o a seleccionar texto); por eso, con el dedo, el movimiento se mide con los eventos táctiles.
     this.element.addEventListener("pointerdown", this.#onPointerDown.bind(this));
-    this.element.addEventListener("pointermove", this.#onPointerMove.bind(this));
-    for ( const type of ["pointerup", "pointercancel"] ) {
-      this.element.addEventListener(type, () => clearTimeout(this.#longPress?.timer));
-    }
+    this.element.addEventListener("pointermove", event => this.#onPressMove(event.clientX, event.clientY), { passive: true });
+    this.element.addEventListener("touchmove", event => {
+      const touch = event.touches?.[0];
+      if ( touch ) this.#onPressMove(touch.clientX, touch.clientY);
+    }, { passive: true });
+    this.element.addEventListener("pointerup", () => this.#endPress());
+    this.element.addEventListener("pointercancel", event => {
+      if ( event.pointerType !== "touch" ) this.#endPress();
+    });
+    this.element.addEventListener("touchend", event => {
+      // Tras un toque largo, que el navegador no mande además el clic (abriría o cerraría otra cosa).
+      if ( this.#longPress?.fired && event.cancelable ) event.preventDefault();
+      this.#endPress();
+    }, { passive: false });
+    this.element.addEventListener("touchcancel", () => this.#endPress());
+    // Ni menú del navegador ni selección de texto en los botones con toque largo.
+    this.element.addEventListener("contextmenu", event => {
+      if ( this.#longPress || event.target.closest?.(LONG_PRESS_SELECTOR) ) event.preventDefault();
+    });
+    this.element.addEventListener("selectstart", event => {
+      if ( event.target.closest?.(LONG_PRESS_SELECTOR) ) event.preventDefault();
+    });
+    // El clic que llega al soltar un toque largo se descarta antes de que llegue a ningún botón.
+    document.addEventListener("click", event => {
+      if ( Date.now() >= this.#suppressClickUntil ) return;
+      this.#suppressClickUntil = 0;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, { capture: true });
     // Flechas de "Colocar área": un toque mueve una casilla; mantener pulsado mueve seguido.
     this.element.addEventListener("pointerdown", event => {
       const arrow = event.target.closest(".bhd-place-arrow");
@@ -568,11 +625,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       event.stopImmediatePropagation();
       this.#openLinkedDocument(link.dataset.uuid);
     }, { capture: true });
-
-    // Android abre un menú del navegador con el toque largo: lo evitamos en las filas.
-    this.element.addEventListener("contextmenu", event => {
-      if ( event.target.closest(".bhd-roll-btn, .bhd-save-alert-roll") ) event.preventDefault();
-    });
 
     const toast = document.createElement("div");
     toast.className = "bhd-toast";
@@ -641,30 +693,35 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   async _onRender(context, options) {
     await super._onRender(context, options);
-    const amount = this.element.querySelector("[data-bhd-hp-amount]");
-    amount?.addEventListener("input", event => this.#hpAmount = event.currentTarget.value);
-    const select = this.element.querySelector("[data-bhd-character-select]");
-    select?.addEventListener("change", event => game.user.update({ character: event.currentTarget.value }));
-    const moveSelect = this.element.querySelector("[data-bhd-move-token]");
-    moveSelect?.addEventListener("change", event => {
+    // Cada elemento recibe cada escuchador una sola vez: al dibujar solo una parte (p. ej. "main"), los de la
+    // cabecera siguen siendo los mismos y antes se les añadía otro escuchador en cada dibujo.
+    const on = (element, type, listener) => {
+      if ( !element ) return;
+      let bound = this.#boundListeners.get(element);
+      if ( !bound ) this.#boundListeners.set(element, bound = new Set());
+      if ( bound.has(type) ) return;
+      bound.add(type);
+      element.addEventListener(type, listener);
+    };
+    on(this.element.querySelector("[data-bhd-hp-amount]"), "input", event => this.#hpAmount = event.currentTarget.value);
+    on(this.element.querySelector("[data-bhd-character-select]"), "change",
+      event => game.user.update({ character: event.currentTarget.value }));
+    on(this.element.querySelector("[data-bhd-move-token]"), "change", event => {
       this.#moveTokenId = event.currentTarget.value;
       this.render({ parts: ["main"] });
     });
-    const search = this.element.querySelector("[data-bhd-spell-search]");
-    search?.addEventListener("input", event => {
+    on(this.element.querySelector("[data-bhd-spell-search]"), "input", event => {
       this.#spellSearch = event.currentTarget.value;
       this.#applyActionFilters();
     });
     this.#applyActionFilters();
 
     // Pestaña Hechizos: buscador y nivel (los demás filtros son botones).
-    const spellSearch = this.element.querySelector("[data-bhd-spelltab-search]");
-    spellSearch?.addEventListener("input", event => {
+    on(this.element.querySelector("[data-bhd-spelltab-search]"), "input", event => {
       this.#spellFilters.search = event.currentTarget.value;
       this.#applySpellFilters();
     });
-    const spellLevel = this.element.querySelector("[data-bhd-spell-level]");
-    spellLevel?.addEventListener("change", event => {
+    on(this.element.querySelector("[data-bhd-spell-level]"), "change", event => {
       this.#spellFilters.level = event.currentTarget.value;
       this.#applySpellFilters();
     });
@@ -672,7 +729,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Nivel de espacio de los hechizos: cambia la fórmula de daño de la fila.
     for ( const select of this.element.querySelectorAll("[data-bhd-slot]") ) {
-      select.addEventListener("change", event => {
+      on(select, "change", event => {
         this.#quick.slots.set(select.dataset.itemId, event.currentTarget.value);
         this.render({ parts: ["main"] });
       });
@@ -680,24 +737,25 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Inventario: monedas editables y contenedores abiertos o cerrados.
     for ( const input of this.element.querySelectorAll("[data-bhd-currency]") ) {
-      input.addEventListener("change", this.#onCurrencyChange.bind(this));
-      input.addEventListener("focus", () => input.select());
+      on(input, "change", this.#onCurrencyChange.bind(this));
+      on(input, "focus", () => input.select());
     }
     for ( const [itemId, pending] of this.#pendingQuantities ) this.#showQuantity(itemId, pending.value);
     for ( const details of this.element.querySelectorAll(".bhd-inv-container") ) {
-      details.addEventListener("toggle", () => {
+      on(details, "toggle", () => {
         if ( details.open ) this.#openContainers.add(details.dataset.containerId);
         else this.#openContainers.delete(details.dataset.containerId);
       });
     }
     // Diario: abierto o cerrado se recuerda al redibujar.
-    this.element.querySelector("[data-bhd-diary]")?.addEventListener("toggle", event => {
+    on(this.element.querySelector("[data-bhd-diary]"), "toggle", event => {
       this.#diaryOpen = event.currentTarget.open;
     });
 
     // Notas personales: se guardan solas un momento después de dejar de escribir.
     const notes = this.element.querySelector("[data-bhd-notes]");
-    notes?.addEventListener("input", event => {
+    on(notes, "change", () => this.#saveNotes());
+    on(notes, "input", event => {
       const actor = this.actor;
       if ( !actor ) return;
       this.#notesDraft = { actorId: actor.id, text: event.currentTarget.value };
@@ -706,7 +764,6 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       clearTimeout(this.#notesTimeout);
       this.#notesTimeout = setTimeout(() => this.#saveNotes(), NOTES_SAVE_DELAY);
     });
-    notes?.addEventListener("change", () => this.#saveNotes());
 
     this.#syncCombatHud(context);
   }
@@ -931,38 +988,67 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #onPointerDown(event) {
     clearTimeout(this.#longPress?.timer);
     this.#longPress = null;
-    const target = event.target.closest(
-      '.bhd-roll-btn[data-kind="attack"], .bhd-roll-btn[data-kind="damage"], .bhd-roll-btn[data-kind="midi"], '
-      + ".bhd-save-alert-roll[data-midi-chat]"
-    );
-    if ( !target || (event.button !== 0) ) return;
+    const target = event.target.closest?.(LONG_PRESS_SELECTOR);
+    if ( !target || (event.button > 0) || !event.isPrimary ) return;
+    if ( target.disabled ) return;
     const press = this.#longPress = { target, x: event.clientX, y: event.clientY, fired: false };
     press.timer = setTimeout(() => {
+      if ( this.#longPress !== press ) return;
       press.fired = true;
-      navigator.vibrate?.(20);
-      // Aviso de salvación por chat de Midi: las tres opciones salen dentro del mismo aviso.
-      if ( target.matches(".bhd-save-alert-roll") ) {
-        const modes = target.parentElement.querySelector(".bhd-save-alert-modes");
-        if ( modes ) modes.hidden = false;
-        target.hidden = true;
-        useLog("Salvación por chat: toque largo, elige ventaja / normal / desventaja");
-        return;
+      try {
+        if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.(20);
+      } catch(err) {}
+      // Si el botón se volvió a dibujar mientras tanto, se usa el nuevo (mismos datos).
+      const button = target.isConnected ? target : this.#findSameButton(target);
+      try {
+        // Aviso de salvación por chat de Midi: las tres opciones salen dentro del mismo aviso.
+        if ( button?.matches(".bhd-save-alert-roll") ) {
+          const modes = button.parentElement.querySelector(".bhd-save-alert-modes");
+          if ( modes ) modes.hidden = false;
+          button.hidden = true;
+          useLog("Salvación por chat: toque largo, elige ventaja / normal / desventaja");
+          return;
+        }
+        useLog("Toque largo: menú de opciones", { ...(button ?? target).dataset });
+        this.#openChooser(button ?? target);
+      } catch(err) {
+        useError("Toque largo | No se pudo abrir el menú", err);
       }
-      this.#openChooser(target);
     }, LONG_PRESS_MS);
   }
 
   /**
    * Si el dedo se mueve (el jugador está desplazando la lista), no es un toque largo.
-   * @param {PointerEvent} event
+   * @param {number} x
+   * @param {number} y
    */
-  #onPointerMove(event) {
+  #onPressMove(x, y) {
     const press = this.#longPress;
     if ( !press || press.fired ) return;
-    if ( Math.hypot(event.clientX - press.x, event.clientY - press.y) > LONG_PRESS_TOLERANCE ) {
+    if ( Math.hypot(x - press.x, y - press.y) > LONG_PRESS_TOLERANCE ) {
       clearTimeout(press.timer);
       this.#longPress = null;
     }
+  }
+
+  /** El dedo se levantó: si el toque largo ya abrió el menú, el clic que viene ahora se descarta. */
+  #endPress() {
+    const press = this.#longPress;
+    if ( !press ) return;
+    clearTimeout(press.timer);
+    if ( press.fired ) this.#suppressClickUntil = Date.now() + LONG_PRESS_CLICK_GUARD;
+    else this.#longPress = null;
+  }
+
+  /**
+   * El mismo botón tras volver a dibujar la vista (busca por sus datos).
+   * @param {HTMLElement} old
+   * @returns {HTMLElement|null}
+   */
+  #findSameButton(old) {
+    const keys = ["action", "kind", "itemId", "activityId", "type", "key", "hudBlock"];
+    return [...(this.element?.querySelectorAll(LONG_PRESS_SELECTOR) ?? [])].find(el =>
+      keys.every(k => el.dataset[k] === old.dataset[k])) ?? null;
   }
 
   /**
@@ -971,6 +1057,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {HTMLElement} button  Botón tocado (con data-kind, data-item-id, data-activity-id).
    */
   #openChooser(button) {
+    if ( button.matches(".bhd-rollable") ) return this.#openCheckChooser(button);
     const { kind, itemId, activityId, hudBlock } = button.dataset;
     const item = this.actor?.items.get(itemId);
     const chooser = this.element.querySelector(".bhd-chooser");
@@ -1062,6 +1149,36 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     chooser.hidden = false;
   }
 
+  /**
+   * Menú del toque largo en una característica, salvación, habilidad o salvación de muerte:
+   * ventaja / normal / desventaja.
+   * @param {HTMLElement} button  Botón con data-type, data-key y data-label.
+   */
+  #openCheckChooser(button) {
+    const chooser = this.element.querySelector(".bhd-chooser");
+    const actor = this.actor;
+    if ( !chooser || !actor ) return;
+    const escape = foundry.utils.escapeHTML;
+    const { type, key, label } = button.dataset;
+    const data = `data-type="${escape(type ?? "")}" data-key="${escape(key ?? "")}" data-label="${escape(label ?? "")}"`;
+    const option = (mode, icon, text, cssClass) => `
+      <button type="button" class="${cssClass}" data-action="bhdCheckMode" data-mode="${mode}" ${data}>
+        <i class="${icon}" aria-hidden="true"></i><span>${escape(game.i18n.localize(text))}</span>
+      </button>`;
+    chooser.innerHTML = `
+      <div class="bhd-chooser-backdrop" data-action="closeChooser"></div>
+      <section class="bhd-chooser-sheet" role="dialog" aria-modal="true">
+        <header class="bhd-chooser-header"><img src="${escape(actor.img ?? "")}" alt=""><span class="bhd-chooser-name">${escape(label ?? "")}</span></header>
+        <div class="bhd-chooser-modes">
+          ${option("advantage", "fa-solid fa-angles-up", "BHD.Actions.Advantage", "bhd-mode bhd-mode-adv")}
+          ${option("normal", "fa-solid fa-dice-d20", "BHD.Actions.Normal", "bhd-mode")}
+          ${option("disadvantage", "fa-solid fa-angles-down", "BHD.Actions.Disadvantage", "bhd-mode bhd-mode-dis")}
+        </div>
+        <button type="button" class="bhd-chooser-cancel" data-action="closeChooser">${escape(game.i18n.localize("BHD.Actions.Cancel"))}</button>
+      </section>`;
+    chooser.hidden = false;
+  }
+
   /** Cierra el menú del toque largo. */
   #closeChooser() {
     const chooser = this.element.querySelector(".bhd-chooser");
@@ -1084,7 +1201,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   async #runQuick(kind, item, activity, { mode="auto", event, button, hudBlock }={}) {
     if ( !this.actor || (item.actor !== this.actor) ) return;
-    if ( this.#using ) {
+    if ( this.#busy.isBusy("use") ) {
       ui.notifications.info(game.i18n.format("BHD.Use.Busy", { name: item.name }));
       return;
     }
@@ -1102,8 +1219,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const tag = `${item.name} (${kind})`;
     const block = (hudBlock === "opportunity") ? "reaction" : (hudBlock ?? activity?.activation?.type);
-    this.#using = true;
-    button?.classList.add("bhd-rolling");
+    const lock = this.#busy.acquire("use", { button, label: item.name });
+    if ( !lock ) return;
     this.#prepareTray(item);
     try {
       useLog(`${tag} | Toque`, { mode, targets: Array.from(game.user.targets).map(t => t.name) });
@@ -1169,8 +1286,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       useError(`${tag} | Error`, err);
       ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: item.name, error: err?.message ?? String(err) }));
     } finally {
-      this.#using = false;
-      button?.classList.remove("bhd-rolling");
+      const late = lock.timedOut;
+      this.#busy.release(lock);
+      if ( late ) useLog(`${tag} | Terminó tarde (el botón ya estaba libre)`);
       this.#renderRows();
     }
   }
@@ -1188,7 +1306,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   async #runMidi(item, activity, { mode="normal", button, hudBlock }={}) {
     if ( !this.actor || (item.actor !== this.actor) || !activity ) return;
-    if ( this.#using ) {
+    if ( this.#busy.isBusy("use") || this.#midiPending.has(item.id) ) {
       ui.notifications.info(game.i18n.format("BHD.Use.Busy", { name: item.name }));
       return;
     }
@@ -1219,8 +1337,12 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     const block = (hudBlock === "opportunity") ? "reaction" : (hudBlock ?? activity.activation?.type);
 
-    this.#using = true;
-    button?.classList.add("bhd-rolling");
+    // El botón se libera como mucho a los 10 s; el uso sigue en el PC del DM y su resultado se enseña al llegar.
+    // Mientras tanto, ese mismo objeto no se vuelve a pedir (no se gasta dos veces).
+    const lock = this.#busy.acquire("use", { button, label: item.name });
+    if ( !lock ) return;
+    lock.midi = true;
+    this.#midiPending.add(item.id);
     this.#prepareTray(item);
     this.#showWaiting(item);
     try {
@@ -1249,8 +1371,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       useError(`${tag} | Error`, err);
       ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: item.name, error: err?.message ?? String(err) }));
     } finally {
-      this.#using = false;
-      button?.classList.remove("bhd-rolling");
+      this.#midiPending.delete(item.id);
+      this.#busy.release(lock);
       this.#renderRows();
     }
   }
@@ -1610,8 +1732,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {Event} [event]
    */
   async #useFull(item, activity, event) {
-    if ( this.#using ) return;
-    this.#using = true;
+    const lock = this.#busy.acquire("use", { label: item.name });
+    if ( !lock ) {
+      ui.notifications.info(game.i18n.format("BHD.Use.Busy", { name: item.name }));
+      return;
+    }
     this.#fullOptionsItem = item.id;
     this.#prepareTray(item);
     try {
@@ -1622,7 +1747,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       useError(`${item.name} (más opciones) | Error`, err);
       ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: item.name, error: err?.message ?? String(err) }));
     } finally {
-      this.#using = false;
+      this.#busy.release(lock);
     }
   }
 
@@ -1785,7 +1910,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         result.attack = { total: roll.total, crit: !!roll.isCritical, fumble: !!roll.isFumble };
         result.verdicts = this.#getAttackVerdicts(roll);
       }
-      if ( !this.#using ) this.#renderRows();
+      if ( !this.#busy.isBusy("use") ) this.#renderRows();
       return;
     }
     const total = rolls.reduce((sum, roll) => sum + (roll.total ?? 0), 0);
@@ -1798,7 +1923,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       result.damage = { total, label };
       result.hint = null;
     }
-    if ( !this.#using ) this.#renderRows();
+    if ( !this.#busy.isBusy("use") ) this.#renderRows();
   }
 
   /* -------------------------------------------- */
@@ -2183,7 +2308,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {Activity} activity
    */
   onPostUseActivity(activity) {
-    if ( (activity.actor !== this.actor) || this.#using ) return;
+    if ( (activity.actor !== this.actor) || this.#busy.isBusy("use") ) return;
     this.#markUsed(activity.activation?.type);
   }
 
@@ -2219,14 +2344,19 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   async #useBasicAction(basic, event) {
     const actor = this.actor;
-    if ( !actor || this.#using ) return;
     const label = game.i18n.localize(`BHD.Hud.Basic.${basic.id}.Name`);
+    if ( !actor ) return;
+    if ( this.#busy.isBusy("use") ) {
+      ui.notifications.info(game.i18n.format("BHD.Use.Busy", { name: label }));
+      return;
+    }
     if ( basic.target ) {
       const ids = await this.#pickTargets({ title: label, max: 1 });
       if ( ids === null ) return;
       setTargets(ids);
     }
-    this.#using = true;
+    const lock = this.#busy.acquire("use", { label });
+    if ( !lock ) return;
     try {
       await this.#postBasicAction(actor, basic, label);
       if ( basic.status && CONFIG.statusEffects.some(e => e.id === basic.status) ) {
@@ -2239,8 +2369,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       else this.#showRollResult(label, { total: "✓" });
       const own = getOwnCombatant(actor);
       if ( own ) await setEconomy(own.combat, own.combatant, { action: true, ...(basic.id === "dash" ? { dash: true } : {}) });
+    } catch(err) {
+      useError(`${label} | Error`, err);
+      ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: label, error: err?.message ?? String(err) }));
     } finally {
-      this.#using = false;
+      this.#busy.release(lock);
     }
   }
 
@@ -2565,26 +2698,90 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {HTMLElement} target
    */
   static async #onRoll(event, target) {
+    // Al soltar un toque largo también llega un clic: ese ya abrió el menú, no se tira.
+    if ( this.#consumeLongPressClick(target) ) return;
+    await this.#rollCheck(target.dataset, { event, button: target });
+  }
+
+  /**
+   * Tirada de característica, salvación, habilidad, iniciativa o muerte con dnd5e (sin ventana).
+   * El botón queda ocupado como mucho 10 s; si la tirada termina después, el resultado se enseña igual.
+   * @param {{type: string, key?: string, label?: string}} data
+   * @param {object} [options]
+   * @param {"normal"|"advantage"|"disadvantage"} [options.mode="normal"]
+   * @param {Event} [options.event]
+   * @param {HTMLElement} [options.button]
+   */
+  async #rollCheck({ type, key, label }, { mode="normal", event, button }={}) {
     const actor = this.actor;
-    if ( !actor || this.#rolling ) return;
-    const { type, key, label } = target.dataset;
+    if ( !actor ) return;
+    const lock = this.#busy.acquire("roll", { button, label });
+    if ( !lock ) {
+      ui.notifications.info(game.i18n.format("BHD.Use.Busy", { name: label ?? "" }));
+      return;
+    }
     const dialog = { configure: false };
-    this.#rolling = true;
-    target.classList.add("bhd-rolling");
+    // Ventaja / desventaja elegidas con el toque largo (dnd5e suma las de sus reglas igual que en la hoja).
+    const config = { event };
+    if ( mode === "advantage" ) config.advantage = true;
+    else if ( mode === "disadvantage" ) config.disadvantage = true;
     try {
+      useLog(`Tirada: ${label ?? type}`, { type, key, mode });
       let rolls;
       switch ( type ) {
-        case "ability": rolls = await actor.rollAbilityCheck({ ability: key, event }, dialog); break;
-        case "save": rolls = await actor.rollSavingThrow({ ability: key, event }, dialog); break;
-        case "skill": rolls = await actor.rollSkill({ skill: key, event }, dialog); break;
+        case "ability": rolls = await actor.rollAbilityCheck({ ...config, ability: key }, dialog); break;
+        case "save": rolls = await actor.rollSavingThrow({ ...config, ability: key }, dialog); break;
+        case "skill": rolls = await actor.rollSkill({ ...config, skill: key }, dialog); break;
         case "initiative": rolls = [await this.#rollInitiative(actor)]; break;
-        case "death": rolls = await actor.rollDeathSave({ event }, dialog); break;
+        case "death": rolls = await actor.rollDeathSave(config, dialog); break;
       }
+      if ( lock.timedOut ) useLog(`Tirada: ${label ?? type} terminó tarde (el botón ya estaba libre)`);
       this.#showRollResult(label, rolls?.[0]);
+    } catch(err) {
+      useError(`Tirada: ${label ?? type} | Error`, err);
+      ui.notifications.error(game.i18n.format("BHD.Use.Error", { name: label ?? "", error: err?.message ?? String(err) }));
     } finally {
-      this.#rolling = false;
-      target.classList.remove("bhd-rolling");
+      this.#busy.release(lock);
     }
+  }
+
+  /**
+   * ¿El jugador está contestando algo (ventana de dnd5e o de Midi, objetivos, colocar un área, menú)?
+   * Mientras tanto un botón ocupado espera más de 10 s.
+   * @returns {boolean}
+   */
+  #isWaitingForPlayer() {
+    if ( this.#picker || this.#place ) return true;
+    const chooser = this.element?.querySelector(".bhd-chooser");
+    if ( chooser && !chooser.hidden ) return true;
+    return !!document.querySelector(".bhd-window:not(.bhd-window-blocked), .bhd-relay-dialog");
+  }
+
+  /**
+   * Un botón ocupado se liberó por tiempo: aviso (en vez de quedarse trabado).
+   * @param {object} lock
+   */
+  #onBusyTimeout(lock) {
+    useWarn(`Botón liberado a los ${Math.round((Date.now() - lock.started) / 1000)} s: ${lock.label || lock.name}`);
+    const key = lock.midi ? "BHD.Busy.StillWaiting" : "BHD.Busy.Timeout";
+    ui.notifications.warn(game.i18n.format(key, { name: lock.label || "" }));
+    if ( !lock.midi ) this.#hideToast();
+    this.#renderRows();
+  }
+
+  /**
+   * Al soltar un toque largo el navegador también manda un clic: se ignora (el menú ya está abierto).
+   * @param {HTMLElement} target
+   * @returns {boolean}  true si este clic hay que ignorarlo.
+   */
+  #consumeLongPressClick(target) {
+    const press = this.#longPress;
+    if ( (press?.fired && (press.target === target)) || (Date.now() < this.#suppressClickUntil) ) {
+      this.#longPress = null;
+      this.#suppressClickUntil = 0;
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -2717,10 +2914,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static async #onQuick(event, target) {
     // Al soltar un toque largo también llega un clic: ese ya abrió el menú, no se tira.
-    if ( this.#longPress?.fired && (this.#longPress.target === target) ) {
-      this.#longPress = null;
-      return;
-    }
+    if ( this.#consumeLongPressClick(target) ) return;
     const { kind, itemId, activityId, hudBlock } = target.dataset;
     const item = this.actor?.items.get(itemId);
     if ( !item ) return;
@@ -2744,6 +2938,71 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( kind === "midi" ) await this.#runMidi(item, activity, { mode, hudBlock });
     else if ( mode === "full" ) await this.#useFull(item, activity, event);
     else await this.#runQuick(kind, item, activity ?? null, { mode, event, hudBlock });
+  }
+
+  /**
+   * Opción del toque largo en una característica, salvación o habilidad: Ventaja, Normal o Desventaja.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onCheckMode(event, target) {
+    this.#closeChooser();
+    const { mode, ...data } = target.dataset;
+    await this.#rollCheck(data, { mode, event });
+  }
+
+  /**
+   * Botón "Reconectar" del panel de ajustes: suelta todo lo que esperaba (botones ocupados, peticiones al DM,
+   * menús), reinicia la conexión con el servidor y vuelve a dibujar la vista, sin recargar la página.
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onReconnect(event, target) {
+    if ( target.disabled ) return;
+    target.disabled = true;
+    target.classList.add("bhd-rolling");
+    useLog("Reconectar: reinicio de la conexión y de la vista");
+    try {
+      this.resetPending();
+      const ok = await restartConnection();
+      const panel = this.element.querySelector(".bhd-settings");
+      if ( panel ) panel.hidden = true;
+      // Si un dibujo anterior se quedó colgado, no se espera más de 10 s.
+      const rendered = await withTimeout(this.render({ force: true }).then(() => true), BUSY_TIMEOUT_MS, false);
+      if ( !rendered ) useWarn("Reconectar: la vista tardó demasiado en dibujarse");
+      this.onCombatUpdate();
+      if ( ok ) Hooks.callAll("bhd-companion.reconnected");
+      ui.notifications[ok ? "info" : "warn"](ok ? "BHD.Reconnect.Done" : "BHD.Reconnect.Failed", { localize: true });
+    } catch(err) {
+      useError("Reconectar | Error", err);
+      ui.notifications.error("BHD.Reconnect.Failed", { localize: true });
+    } finally {
+      target.disabled = false;
+      target.classList.remove("bhd-rolling");
+    }
+  }
+
+  /**
+   * Suelta todo lo que estaba esperando: botones ocupados, peticiones al DM sin respuesta, selector de
+   * objetivos, colocar un área, menú del toque largo y aviso de "esperando al DM".
+   */
+  resetPending() {
+    cancelPendingCalls("ConnectionLost");
+    this.#busy.releaseAll();
+    this.#midiPending.clear();
+    clearTimeout(this.#longPress?.timer);
+    this.#longPress = null;
+    this.#suppressClickUntil = 0;
+    if ( this.#placeHold ) this.#placeHold.active = false;
+    if ( this.#place ) {
+      requestPlacementEnd(this.#place.sessionId, false);   // quita la vista previa de la TV (si llega)
+      this.#finishPlace(null);
+    }
+    this.#closePicker(null);
+    this.#closeChooser();
+    this.#hideToast();
   }
 
   /**
@@ -2843,10 +3102,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static async #onSaveRoll(event, target) {
     // Al soltar un toque largo también llega un clic: ese ya abrió las opciones, no se tira.
-    if ( this.#longPress?.fired && (this.#longPress.target === target) ) {
-      this.#longPress = null;
-      return;
-    }
+    if ( this.#consumeLongPressClick(target) ) return;
     // Petición por chat de Midi: tira el jugador, con la ventaja / desventaja que calculó Midi.
     if ( this.#savePrompts[0]?.midiChat ) return this.#rollMidiChat(null, event);
     // Petición de Midi: la tirada la hace Midi (midi-prompts.js) en cuanto el jugador toca.

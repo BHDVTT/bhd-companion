@@ -328,6 +328,16 @@
       "Attempt": "Attempt {attempt}",
       "Reload": "Reload now"
     },
+    "Reconnect": {
+      "Button": "Reconnect",
+      "Hint": "If a button stops responding: restarts the connection and redraws the view, without reloading the page.",
+      "Done": "Reconnected. The view is up to date.",
+      "Failed": "Couldn't reconnect yet. Check the Wi-Fi; it keeps trying on its own."
+    },
+    "Busy": {
+      "Timeout": "{name} took too long: the button is free again. If the roll shows in the chat, it's done.",
+      "StillWaiting": "The DM is still working on {name}: the result will show here when it arrives. Meanwhile you can use other things."
+    },
     "Install": {
       "Title": "Add to Home Screen",
       "Description": "Your Battlehammer's Dungeon character sheet.",
@@ -451,6 +461,7 @@
         "GMNotViewing": "The DM's PC is looking at another scene: ask them to go back to the TV scene to use {name}.",
         "Cancelled": "{name} didn't finish (no slots or uses, cancelled or it took too long). Check the chat.",
         "Timeout": "The DM didn't answer in time for {name}. Check that their Foundry is still open.",
+        "ConnectionLost": "The connection dropped while waiting for the DM with {name}. Check the chat before trying again.",
         "Error": "{name} couldn't be used on the DM's PC: {error}"
       }
     },

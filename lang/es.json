@@ -328,6 +328,16 @@
       "Attempt": "Intento {attempt}",
       "Reload": "Recargar ahora"
     },
+    "Reconnect": {
+      "Button": "Reconectar",
+      "Hint": "Si algún botón no responde: reinicia la conexión y vuelve a dibujar la vista, sin recargar la página.",
+      "Done": "Reconectado. La vista está al día.",
+      "Failed": "No se pudo reconectar todavía. Revisa el Wi-Fi; se sigue intentando solo."
+    },
+    "Busy": {
+      "Timeout": "{name} tardó demasiado: el botón vuelve a estar libre. Si la tirada sale en el chat, ya está hecha.",
+      "StillWaiting": "El DM sigue con {name}: el resultado saldrá aquí cuando llegue. Mientras, puedes usar otras cosas."
+    },
     "Install": {
       "Title": "Añadir a la pantalla de inicio",
       "Description": "Tu hoja de personaje de Battlehammer's Dungeon.",
@@ -451,6 +461,7 @@
         "GMNotViewing": "El PC del DM está mirando otra escena: pídele que vuelva a la escena de la TV para usar {name}.",
         "Cancelled": "{name} no se completó (sin espacios o usos, cancelado o tardó demasiado). Mira el chat.",
         "Timeout": "El DM no respondió a tiempo con {name}. Revisa que su Foundry siga abierto.",
+        "ConnectionLost": "Se cortó la conexión mientras se esperaba al DM con {name}. Mira el chat antes de repetirlo.",
         "Error": "No se pudo usar {name} en el PC del DM: {error}"
       }
     },
