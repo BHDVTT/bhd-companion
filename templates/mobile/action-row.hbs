@@ -2,7 +2,7 @@
      En el HUD de combate (row.hudBlock) los botones pasan por el selector de objetivos.
      En la pestaña Hechizos (row.spell) también escuela, componentes, concentración, ritual y preparado. --}}
 <div class="bhd-action {{#if row.cast}}bhd-cast-active{{/if}} {{#if row.passive}}bhd-passive-row{{/if}} {{#if row.spell}}bhd-spell-row{{/if}}"
-     data-activation="{{row.activation}}" data-search="{{row.search}}"
+     data-activation="{{row.activation}}" data-search="{{row.search}}" {{#if row.sourceClassId}}data-source-class="{{row.sourceClassId}}"{{/if}}
      {{#if row.spell}}data-level="{{row.spell.level}}" data-spell-flags="{{row.spell.flags}}"{{/if}}>
   <button type="button" class="bhd-action-main" data-action="itemInfo" data-item-id="{{row.id}}"
           aria-label="{{row.name}} · {{localize 'BHD.Actions.Info'}}">
@@ -11,6 +11,7 @@
       <span class="bhd-action-name">
         {{row.name}}
         {{#each row.tags}}<span class="bhd-tag">{{this}}</span>{{/each}}
+        {{#if row.sourceClass}}<span class="bhd-tag bhd-class-tag">{{row.sourceClass}}</span>{{/if}}
         {{#if row.spell.concentration}}<span class="bhd-spell-icon bhd-conc" title="{{localize 'BHD.Spells.Concentration'}}">C</span>{{/if}}
         {{#if row.spell.ritual}}<span class="bhd-spell-icon bhd-ritual" title="{{localize 'BHD.Spells.Ritual'}}">R</span>{{/if}}
       </span>

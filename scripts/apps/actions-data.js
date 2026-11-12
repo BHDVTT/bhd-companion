@@ -172,7 +172,17 @@ export function prepareSpellbook(actor, spells, state, { all=false, row=prepareR
     sections[key].items.push(spell);
   }
 
-  const byLevelAndName = (a, b) => ((a.system.level ?? 0) - (b.system.level ?? 0))
+  // Multiclase (p. ej. Paladín y Bardo): el mismo hechizo puede estar dos veces, una por clase. Dentro de cada
+  // sección se agrupan por la clase de la que vienen (`system.classIdentifier`, de `sourceItem` / `sourceClass`) y
+  // cada fila lleva el nombre de su clase. Los hechizos sin clase (raza, dote, objeto) van primero, sin etiqueta.
+  const classOf = spell => spell.system.classIdentifier || "";
+  const classIds = [...new Set(Object.values(sections).flatMap(s => s.items.map(classOf)).filter(_ => _))].sort();
+  const multiclass = classIds.length > 1;
+  const classLabel = id => actor.spellcastingClasses?.[id]?.name ?? actor.classes?.[id]?.name ?? id;
+  const classOrder = spell => classIds.indexOf(classOf(spell));
+
+  const byLevelAndName = (a, b) => (multiclass ? (classOrder(a) - classOrder(b)) : 0)
+    || ((a.system.level ?? 0) - (b.system.level ?? 0))
     || a.name.localeCompare(b.name, game.i18n.lang);
   return Object.values(sections)
     .filter(section => section.items.length || section.slots?.max)
@@ -181,7 +191,22 @@ export function prepareSpellbook(actor, spells, state, { all=false, row=prepareR
       // En secciones por nivel ("Nivel 2") el nivel ya se ve en el título; en las demás (pacto,
       // innatos, rituales...) cada hechizo muestra su nivel.
       const showLevel = !/^spell\d+$/.test(section.key);
-      return { ...section, items: section.items.sort(byLevelAndName).map(item => row(item, { showLevel, state })) };
+      const items = section.items.sort(byLevelAndName);
+      const mixed = multiclass && (new Set(items.map(classOf)).size > 1);
+      let previous = null;
+      const rows = items.map(item => {
+        const data = row(item, { showLevel, state });
+        const id = classOf(item);
+        if ( multiclass && id ) {
+          data.sourceClass = classLabel(id);
+          data.sourceClassId = id;
+        }
+        // Subtítulo de grupo cuando empieza otra clase dentro de la sección (solo si la sección mezcla clases).
+        if ( mixed && (id !== previous) ) data.classHeader = id ? classLabel(id) : game.i18n.localize("BHD.Spells.OtherSource");
+        previous = id;
+        return data;
+      });
+      return { ...section, items: rows };
     });
 }
 

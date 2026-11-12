@@ -62,7 +62,14 @@ export function prepareSpellsTab(actor, state, filters) {
 
   const levels = [...new Set(spells.map(s => s.system.level ?? 0))].sort((a, b) => a - b);
   const localize = key => game.i18n.localize(key);
+
+  // Listas largas (un druida con todo su libro): por defecto solo lo que se puede lanzar ya (preparados, trucos,
+  // siempre preparados, innatos...). Los sin preparar se ven con el filtro, para prepararlos o despreparlos.
+  const unprepared = spells.filter(s => canTogglePrepared(s) && !s.system.prepared).length;
+  const readyOnly = (filters.prepared ?? (unprepared > 0)) && (unprepared > 0);
   return {
+    readyOnly,
+    unprepared,
     sections,
     spellcasting: {
       dc: attributes.dc ?? null,
@@ -82,8 +89,8 @@ export function prepareSpellsTab(actor, state, filters) {
       toggles: [
         { id: "concentration", icon: "fa-solid fa-c", label: localize("BHD.Spells.Concentration"), on: filters.concentration },
         { id: "ritual", icon: "fa-solid fa-r", label: localize("BHD.Spells.Ritual"), on: filters.ritual },
-        ...(spells.some(s => s.system.canPrepare) ? [
-          { id: "prepared", icon: "fa-solid fa-book-open", label: localize("BHD.Spells.Prepared"), on: filters.prepared }
+        ...(unprepared > 0 ? [
+          { id: "prepared", icon: "fa-solid fa-book-open", label: localize("BHD.Spells.OnlyReady"), on: readyOnly }
         ] : [])
       ],
       activations: ["all", ...SPELL_ACTIVATIONS].map(id => ({
@@ -112,7 +119,10 @@ function prepareSpellRow(item, options) {
   const always = system.prepared === states.always.value;
   // Como el filtro "Preparados" de la hoja de dnd5e: método que prepara y marcado (o siempre preparado).
   const prepared = !!system.canPrepare && !!system.prepared;
-  const flags = [concentration ? "concentration" : "", ritual ? "ritual" : "", prepared ? "prepared" : ""].filter(_ => _);
+  // "Listo para lanzar": truco, siempre preparado, preparado o de un método que no prepara (innato, pacto...).
+  const ready = !canTogglePrepared(item) || !!system.prepared;
+  const flags = [concentration ? "concentration" : "", ritual ? "ritual" : "", prepared ? "prepared" : "", ready ? "ready" : ""]
+    .filter(_ => _);
 
   // Concentración y ritual van como iconos: de las etiquetas cortas solo queda el nivel (en pacto, innatos...).
   row.tags = (options.showLevel && (system.level > 0)) ? [game.i18n.format("BHD.Actions.LevelShort", { level: system.level })] : [];

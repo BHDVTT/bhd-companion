@@ -102,6 +102,10 @@ scripts/midi-prompts.js      con Midi: salvaciones y reacciones que Midi pide al
 scripts/midi-chat-saves.js   con Midi en modo "Chat Message": la petición de salvación va del flujo (DM) al teléfono; tirada ligada por speaker.token
 scripts/template-placement.js con Midi: colocar el área desde el teléfono (vista previa en el DM y la TV, alcance, quién queda dentro)
 scripts/dialog-relay.js      con Midi: ventanas que salen en el DM durante un uso del teléfono → al teléfono y vuelta
+scripts/cpr-dialogs.js       Cauldron (chris-premades): sus preguntas (DialogApp.dialog) en el aviso de la vista; en el DM, al teléfono
+scripts/decisions.js         aviso grande de decisión (campos y botones de otro módulo) dentro de la vista
+scripts/prompt-queue.js      cola única de preguntas: salvaciones, reacciones, decisiones, ventanas de Midi, Epic Rolls
+scripts/transform.js         volver a la forma original (Wild Shape) pidiéndolo al DM
 scripts/apps/status-data.js  concentración, condiciones y efectos activos (duración, quién lo aplicó, cambios, quitar)
 scripts/apps/companions-data.js compañeros e invocaciones: fichas de la escena activa de las que el jugador es dueño
 scripts/apps/resources-data.js  recursos limitados (system.uses de rasgos/objetos, system.resources) para Acciones
@@ -627,7 +631,7 @@ lang/es.json, en.json        traducciones
      Foundry visibles en la TV, resultado impacta / falla y daño.
 7. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
-8. **Publicación** (0.17.0 publicada: salvaciones por chat de Midi en el teléfono; 0.16.0: v14 / dnd5e 6, cámara, iniciativa entera; falta probar en v14) — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
+8. **Publicación** (0.20.0: preguntas de Cauldron y Midi en la vista, cola única, Wild Shape, hechizos multiclase; 0.17.0 publicada: salvaciones por chat de Midi en el teléfono; 0.16.0: v14 / dnd5e 6, cámara, iniciativa entera; falta probar en v14) — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
    `download` en `module.json` para instalar en The Forge.
 9. **Tiradas estilo D&D Beyond** ✅ (0.10.0, probada en Foundry local) — botones Ataque / Daño / CD /
    Curar / Usar en cada fila, crítico, nivel del hechizo en la fila, salvaciones pendientes, concentración y
@@ -715,3 +719,39 @@ lang/es.json, en.json        traducciones
   contestants, type: "save.dex", options: { DC, showDC, blindRoll, rollSettings } })` → `{ canceled, results:
   [{ actor, roll }] }`). Pendiente: estudiar su código desde `Data/modules/epic-rolls-5e` cuando el usuario lo
   instale en local, antes de integrarlo.
+
+## Preguntas de Cauldron y Midi, transformación y hechizos multiclase (0.20.0, sin probar en partida)
+
+- **Cauldron of Plentiful Resources** = `chris-premades` (1.5.52 en local; código legible extrayendo
+  `dist/main.js.map` con un script de Node: `sourcesContent`). Todas sus preguntas acaban en
+  `DialogApp.dialog(title, content, inputs, buttons, config)` (`chrisPremades.DialogApp`). Para otro usuario usa su
+  socketlib `executeAsUser("dialog", userId, ...)` (y `queuedDialog`), que en ese cliente llama a `DialogApp.dialog`.
+  Sin `userId` pregunta en el cliente del flujo (con Midi, el DM). Respuesta: cerrar `null`; botón `false`
+  `{buttons:false}`; otro botón = `expandObject(FormDataExtended)` + `buttons: true | nombre`.
+- `cpr-dialogs.js`: teléfono → `DialogApp.dialog` sustituido por `showDecision` (decisions.js) con los mismos campos
+  (button, checkbox con `totalMax`, radio, selectAmount con `totalMax`/`weight`, selectOption, selectMany, text,
+  number; `filePicker` → ventana original) y la misma respuesta (probado en Chrome sin pantalla con el
+  `FormDataExtended` real). DM → durante un uso remoto (`getActiveRemoteRun`) manda los argumentos a `cprDialog` del
+  teléfono (`askPhone`, 90 s / desconexión → ventana en el DM). Por eso `dialog-relay.js` ya no copia `DialogApp`.
+- **Midi**: `rollAbility`, `rollConcentration`, `chooseReactions` siguen en midi-prompts.js; `bonusCheck` (bonificaciones
+  opcionales, `RollModifyDialog`) llega como ventana al teléfono → cola + estilo `.bhd-decision-window`. Las ventanas
+  de Midi en el DM durante un uso se copian como antes, ahora en el aviso de decisión; si la ventana real se cierra
+  sola, `relayClose` quita la copia.
+- **Cola única** (`prompt-queue.js`): primero lo que tiene cuenta atrás (por fin de plazo), luego por llegada. Entradas:
+  aviso de salvación (una mientras haya), reacción, cada decisión, cada ventana que llega sola (sin toque en 3 s) y
+  Epic Rolls (`.epic-roll-5e`, sin marco). Lo que no toca: `.bhd-prompt-waiting` / `.bhd-window-waiting`.
+- **Ventanas** (`mobile-windows.js`): se cierran hojas (`DocumentSheetV2`, V1 `DocumentSheet`), popouts de la barra
+  lateral y clases cuyo nombre lleva Sheet/Tracker/Directory/Compendium/Journal/FilePicker/Config/Settings/Popout...;
+  se dejan dnd5e, propias, Cauldron, `MidiQOL.apps.*Dialog`, `DialogV2`/`Dialog` (salvo los 10 s de carga sin toque)
+  y clases `*Dialog`/`*Prompt`.
+- **Invocar con Midi**: `dnd5e.preSummonToken` en el DM da OWNER al jugador del uso remoto (`actorUpdates.ownership`;
+  `ActorDelta` admite `ownership`). Cauldron ya copia la propiedad del invocador.
+- **Encantar con Midi**: tras el resultado, si la actividad es `enchant` sin `enchant.self`, se abre la lista de
+  enchantments.js en cuanto llega la tarjeta (`#openEnchantWhenReady`).
+- **Transformación**: `getTransformedForm(personaje)` = ficha de la escena activa cuyo actor tiene
+  `flags.dnd5e.isPolymorphed` y `originalActor` = id del personaje. `app.actor` la usa; no sale como compañero.
+  Botón "Volver" en la cabecera → `revertForm` en el DM (`revertOriginalForm` necesita mapa y borrar el actor).
+- **Hechizos**: multiclase → etiqueta de clase (`classIdentifier`) en cada fila y subtítulos por clase en Hechizos.
+  Filtro "Solo preparados" (bandera `ready`: truco, siempre, preparado o método que no prepara) encendido por defecto
+  si hay hechizos sin preparar; `#spellFilters.prepared` null = automático.
+- Consumos: el uso real nunca pasa `consume` (dnd5e aplica todos, también `attribute` con fórmula negativa).

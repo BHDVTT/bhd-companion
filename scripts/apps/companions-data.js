@@ -5,7 +5,7 @@
  * (OWNER) de la ficha. Cuando la ficha se borra (fin de la concentración o de la duración), deja de estar.
  */
 
-import { getCharacterChoices } from "./character-data.js";
+import { getCharacterChoices, isTransformedCharacter } from "./character-data.js";
 
 /**
  * Fichas de compañeros en la escena activa (la de la TV), por nombre.
@@ -23,6 +23,8 @@ export function getCompanionTokens() {
       if ( characters.has(actor) || (actor.type === "character" && characters.has(game.actors.get(token.actorId))) ) {
         return false;
       }
+      // Su personaje transformado (Wild Shape, Polymorph): se ve como el personaje, no como compañero.
+      if ( isTransformedCharacter(actor) ) return false;
       return actor.type !== "group";
     })
     .sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));

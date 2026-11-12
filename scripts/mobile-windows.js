@@ -1,31 +1,54 @@
 /**
  * Ventanas en la vista móvil: solo las que sirven en el teléfono, y de una en una.
  *
- * Otros módulos (y Foundry) abren ventanas por su cuenta: el registro de combate en ventana,
- * paneles de combate, avisos de ajustes... En el teléfono taparían la app, así que se cierran
- * en cuanto aparecen. Se dejan:
- * - Las ventanas de dnd5e para usar y tirar (`Dialog5e`: uso de actividad, opciones de tirada,
- *   descansos) y la de elegir actividad.
- * - Las ventanas propias del módulo (clase `bhd-dialog`), también las preguntas que reenvía el DM.
- * - Las preguntas de Chris's Premades y de Midi QOL que llegan al teléfono durante un uso.
- * - Otros diálogos (`DialogV2` o el `Dialog` antiguo) solo si el jugador acaba de tocar la pantalla:
- *   son la respuesta a algo que pidió (p. ej. una confirmación de dnd5e). Los que salen solos se cierran.
+ * Se cierran al aparecer las ventanas que no forman parte de un flujo de juego: hojas de personaje u objeto,
+ * registros y rastreadores (combate en ventana, paneles de otros módulos), ventanas sacadas de la barra lateral,
+ * diarios, compendios, ajustes, elegir archivo... En el teléfono taparían la vista y nadie las espera.
  *
- * Si quedan dos ventanas permitidas a la vez, solo se ve la última; la otra vuelve al cerrarse esta.
+ * Se dejan:
+ * - Las ventanas de dnd5e para usar y tirar (`Dialog5e`: uso de actividad, opciones de tirada, descansos) y la de
+ *   elegir actividad.
+ * - Las ventanas propias del módulo (clase `bhd-dialog`).
+ * - Todo lo que pide una decisión al jugador: preguntas de Cauldron of Plentiful Resources / Chris's Premades
+ *   (`DialogApp`, si no salen ya en el aviso de la vista), ventanas de Midi QOL (`MidiQOL.apps.*Dialog`:
+ *   bonificaciones opcionales, reacciones, confirmar objetivos...), diálogos genéricos de Foundry (`DialogV2`, el
+ *   `Dialog` antiguo) y otras ventanas cuyo nombre de clase acaba en "Dialog" o "Prompt". También la tirada de grupo
+ *   de Epic Rolls 5e (sin marco).
+ *
+ * Las que llegan solas (sin que el jugador acabe de tocar la pantalla) son preguntas de un flujo: entran en la cola
+ * única de preguntas (prompt-queue.js) con el estilo de "decisión" y vibración, y solo se ve la primera.
+ * Las que abre el jugador con un toque salen al momento; si quedan dos a la vez, solo se ve la última.
  * Mientras no se decide, el CSS mantiene invisible cualquier ventana sin la clase `bhd-window`.
  */
 
-/** Tiempo tras un toque en el que un diálogo se considera pedido por el jugador. */
+import { dequeuePrompt, enqueuePrompt, isActivePrompt, onPromptQueueChange } from "./prompt-queue.js";
+
+/** Tiempo tras un toque en el que una ventana se considera pedida por el jugador. */
 const TAP_WINDOW_MS = 3000;
 
 /** Momento del último toque en la pantalla. */
 let lastTap = 0;
 
+/** Al cargar se cierran también los diálogos genéricos (avisos de The Forge, de otros módulos...). */
+let loading = true;
+
 /**
- * Ventanas permitidas abiertas, de la más antigua a la más nueva (la última es la visible).
+ * Ventanas pedidas por el jugador, de la más antigua a la más nueva (la última es la visible).
  * @type {Array<ApplicationV2|Application>}
  */
 const stack = [];
+
+/**
+ * Ventanas que llegaron solas (preguntas de un flujo), con su entrada en la cola de preguntas.
+ * @type {Map<ApplicationV2|Application, {entry: object, vibrated: boolean}>}
+ */
+const queued = new Map();
+
+/** Clases de ventana que nunca se dejan (no piden una decisión). */
+const BLOCKED_NAMES = /(Sheet|Tracker|Directory|Compendium|Journal|FilePicker|Browser|Config|Settings|Popout|Explorer|Editor|Manager|Display|Panel|Tour)/;
+
+/** Nombres de clase de ventanas que piden una decisión. */
+const DECISION_NAMES = /(Dialog|Prompt)$/;
 
 /**
  * Activa el control de ventanas. Debe llamarse en "setup" y solo en vista móvil.
@@ -36,11 +59,12 @@ export function registerMobileWindows() {
   Hooks.on("renderApplication", onRender);
   Hooks.on("closeApplicationV2", onClose);
   Hooks.on("closeApplication", onClose);
+  onPromptQueueChange(() => updateVisibleWindow());
 }
 
 /**
- * Cierra las ventanas que se abrieron antes de activar el control (p. ej. durante la carga).
- * Se llama en "ready".
+ * Cierra las ventanas que se abrieron antes de activar el control (p. ej. durante la carga). Se llama en "ready".
+ * Los diálogos genéricos que salgan en los 10 s siguientes también se cierran (avisos de la carga).
  */
 export function closeStrayWindows() {
   const apps = [...foundry.applications.instances.values(), ...Object.values(ui.windows)];
@@ -48,6 +72,7 @@ export function closeStrayWindows() {
     const element = getElement(app);
     if ( element ) onRender(app, element);
   }
+  setTimeout(() => loading = false, 10000);
 }
 
 /* -------------------------------------------- */
@@ -71,26 +96,61 @@ function isWindow(app) {
 }
 
 /**
- * ¿Esta ventana puede quedarse abierta en el teléfono?
+ * ¿Es la tirada de grupo de Epic Rolls 5e? (Ventana sin marco a pantalla completa.)
  * @param {ApplicationV2|Application} app
  * @param {HTMLElement} element
  */
-function isAllowed(app, element) {
-  if ( element.classList.contains("bhd-dialog") ) return true;
+function isEpicRoll(app, element) {
+  return element.classList.contains("epic-roll-5e") || (app.constructor?.name === "EpicRoll");
+}
+
+/**
+ * Nombres de las clases de una ventana (la suya y las de las que hereda).
+ * @param {object} app
+ * @returns {string[]}
+ */
+function classNames(app) {
+  const names = [];
+  let proto = Object.getPrototypeOf(app);
+  while ( proto && (proto !== Object.prototype) && (names.length < 12) ) {
+    if ( proto.constructor?.name ) names.push(proto.constructor.name);
+    proto = Object.getPrototypeOf(proto);
+  }
+  return names;
+}
+
+/**
+ * Qué hacer con una ventana nueva.
+ * @param {ApplicationV2|Application} app
+ * @param {HTMLElement} element
+ * @returns {"own"|"dnd5e"|"decision"|"blocked"}
+ */
+function classify(app, element) {
+  if ( element.classList.contains("bhd-dialog") ) return "own";
   const dnd5eApps = globalThis.dnd5e?.applications;
-  if ( dnd5eApps?.api?.Dialog5e && (app instanceof dnd5eApps.api.Dialog5e) ) return true;
+  if ( dnd5eApps?.api?.Dialog5e && (app instanceof dnd5eApps.api.Dialog5e) ) return "dnd5e";
   if ( dnd5eApps?.activity?.ActivityChoiceDialog && (app instanceof dnd5eApps.activity.ActivityChoiceDialog) ) {
-    return true;
+    return "dnd5e";
   }
-  // Preguntas que Chris's Premades y Midi QOL mandan al dueño del personaje durante un uso (llegan solas).
-  const asked = [globalThis.chrisPremades?.DialogApp, ...Object.entries(globalThis.MidiQOL?.apps ?? {})
-    .filter(([name]) => name.endsWith("Dialog")).map(([, cls]) => cls)];
-  if ( asked.some(cls => (typeof cls === "function") && (app instanceof cls) ) ) {
-    console.log(`BHD Companion | Pregunta de ${app.constructor?.name} en el teléfono`);
-    return true;
-  }
-  const isDialog = (app instanceof foundry.applications.api.DialogV2) || (app instanceof foundry.appv1.api.Dialog);
-  return isDialog && (Date.now() - lastTap < TAP_WINDOW_MS);
+
+  // Preguntas de Cauldron / Chris's Premades y ventanas de Midi QOL que llegan al teléfono durante un flujo.
+  const known = [globalThis.chrisPremades?.DialogApp, ...Object.entries(globalThis.MidiQOL?.apps ?? {})
+    .filter(([name]) => DECISION_NAMES.test(name)).map(([, cls]) => cls)];
+  if ( known.some(cls => (typeof cls === "function") && (app instanceof cls)) ) return "decision";
+
+  // Hojas de documentos: nunca.
+  const sheetClasses = [foundry.applications.api.DocumentSheetV2, foundry.appv1?.api?.DocumentSheet]
+    .filter(cls => typeof cls === "function");
+  if ( sheetClasses.some(cls => app instanceof cls) ) return "blocked";
+  if ( app.isPopout || app._original ) return "blocked";   // ventana sacada de la barra lateral
+
+  const names = classNames(app);
+  const isGenericDialog = (app instanceof foundry.applications.api.DialogV2) || (app instanceof foundry.appv1.api.Dialog);
+  if ( isGenericDialog ) return loading && (Date.now() - lastTap >= TAP_WINDOW_MS) ? "blocked" : "decision";
+  const own = names[0] ?? "";
+  if ( BLOCKED_NAMES.test(own) ) return "blocked";
+  if ( DECISION_NAMES.test(own) ) return "decision";
+  return "blocked";
 }
 
 /**
@@ -107,20 +167,32 @@ function windowName(app) {
  * @param {HTMLElement|jQuery} html
  */
 function onRender(app, html) {
-  if ( !isWindow(app) ) return;
   const element = (html instanceof HTMLElement) ? html : (html?.[0] ?? getElement(app));
   if ( !element ) return;
 
-  // Ya permitida: al redibujarse conserva su sitio en la pila (no se adelanta a otra).
-  if ( stack.includes(app) ) {
+  // Epic Rolls: sin marco, pero es una tirada que espera al jugador → a la cola.
+  if ( isEpicRoll(app, element) ) {
+    if ( !queued.has(app) ) {
+      queued.set(app, { entry: enqueuePrompt({ kind: "window", label: "Epic Rolls" }), vibrated: false });
+      console.log("BHD Companion | Tirada de Epic Rolls en el teléfono (en la cola de preguntas)");
+    }
+    updateVisibleWindow();
+    return;
+  }
+
+  if ( !isWindow(app) ) return;
+
+  // Ya permitida: al redibujarse conserva su sitio (no se adelanta a otra).
+  if ( stack.includes(app) || queued.has(app) ) {
     element.classList.add("bhd-window");
     updateVisibleWindow();
     return;
   }
 
-  if ( !isAllowed(app, element) ) {
+  const kind = classify(app, element);
+  if ( kind === "blocked" ) {
     element.classList.add("bhd-window-blocked");
-    console.warn(`BHD Companion | Ventana cerrada en el teléfono: ${windowName(app)}`);
+    console.warn(`BHD Companion | Ventana cerrada en el teléfono (no pide una decisión): ${windowName(app)}`);
     if ( app instanceof foundry.applications.api.ApplicationV2 ) app.close({ animate: false }).catch(() => {});
     else app.close({ force: true });
     return;
@@ -131,8 +203,17 @@ function onRender(app, html) {
   if ( !element.classList.contains("bhd-dialog") && !element.classList.contains("dnd5e2") ) {
     element.classList.add("bhd-foreign-window");
   }
-  stack.push(app);
-  console.log(`BHD Companion | Ventana mostrada en el teléfono: ${windowName(app)}`);
+
+  const tapped = Date.now() - lastTap < TAP_WINDOW_MS;
+  if ( ["decision", "dnd5e"].includes(kind) && !tapped ) {
+    // Llegó sola: es una pregunta de un flujo (Midi, Cauldron, otro módulo). Estilo de decisión y a la cola.
+    element.classList.add("bhd-decision-window");
+    queued.set(app, { entry: enqueuePrompt({ kind: "window", label: windowName(app) }), vibrated: false });
+    console.log(`BHD Companion | Pregunta en ventana (en la cola): ${windowName(app)}`);
+  } else {
+    stack.push(app);
+    console.log(`BHD Companion | Ventana mostrada en el teléfono: ${windowName(app)}`);
+  }
   updateVisibleWindow();
 }
 
@@ -141,20 +222,40 @@ function onRender(app, html) {
  */
 function onClose(app) {
   const index = stack.indexOf(app);
-  if ( index < 0 ) return;
-  stack.splice(index, 1);
+  if ( index >= 0 ) stack.splice(index, 1);
+  const item = queued.get(app);
+  if ( item ) {
+    queued.delete(app);
+    dequeuePrompt(item.entry);
+    console.log(`BHD Companion | Pregunta en ventana cerrada: ${windowName(app)}`);
+  }
   updateVisibleWindow();
 }
 
 /**
- * Muestra solo la ventana más nueva; las demás esperan ocultas.
+ * Muestra solo la ventana pedida más nueva y, de las que llegaron solas, la que toca en la cola de preguntas.
  */
 function updateVisibleWindow() {
   // Por si alguna se quitó sin pasar por "close".
   for ( let i = stack.length - 1; i >= 0; i-- ) {
     if ( !getElement(stack[i])?.isConnected ) stack.splice(i, 1);
   }
+  for ( const [app, item] of [...queued] ) {
+    if ( getElement(app)?.isConnected ) continue;
+    queued.delete(app);
+    dequeuePrompt(item.entry);
+  }
   stack.forEach((app, index) => {
     getElement(app)?.classList.toggle("bhd-window-waiting", index < stack.length - 1);
   });
+  for ( const [app, item] of queued ) {
+    const active = isActivePrompt(item.entry);
+    getElement(app)?.classList.toggle("bhd-window-waiting", !active);
+    if ( active && !item.vibrated ) {
+      item.vibrated = true;
+      try {
+        if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([200, 80, 200]);
+      } catch(err) {}
+    }
+  }
 }

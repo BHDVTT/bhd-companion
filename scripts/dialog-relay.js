@@ -13,6 +13,7 @@
  */
 
 import { getSocket, registerSocketHandler } from "./remote-socket.js";
+import { showDecision } from "./decisions.js";
 
 const { DialogV2 } = foundry.applications.api;
 
@@ -27,6 +28,12 @@ const RELAY_TIMEOUT_MS = 90 * 1000;
 
 /** Marca de "sin respuesta" (teléfono desconectado o tiempo agotado). */
 const NO_ANSWER = Symbol("noAnswer");
+export const RELAY_NO_ANSWER = NO_ANSWER;
+
+/** Copias abiertas en el teléfono, por id (el DM las cierra si su ventana se cierra sola, p. ej. por tiempo). */
+const phoneCopies = new Map();
+
+let relayCounter = 0;
 
 /** Ventanas de Midi QOL que pueden salir durante un uso y son del jugador (las reacciones van aparte). */
 const MIDI_DIALOGS = ["MidiActivityChoiceDialog", "MidiRollChoiceDialog", "RollModifyDialog", "TargetConfirmationDialog"];
@@ -57,12 +64,54 @@ let lastGmTap = 0;
  */
 export function registerDialogRelay() {
   registerSocketHandler("relayDialog", showRelayedDialog);
+  registerSocketHandler("relayClose", closeRelayedDialog);
   Hooks.once("ready", () => {
     if ( !game.user.isGM ) return;
     document.addEventListener("pointerdown", () => lastGmTap = Date.now(), { capture: true });
     Hooks.on("renderApplicationV2", onGmRender);
     Hooks.on("renderApplication", onGmRender);
   });
+}
+
+/**
+ * DM: el uso remoto en curso al que van las preguntas, o null (no hay uso remoto, o el DM acaba de tocar su
+ * pantalla: entonces la ventana es suya).
+ * @returns {object|null}
+ */
+export function getActiveRemoteRun() {
+  if ( !game.user.isGM ) return null;
+  if ( Date.now() - lastGmTap < GM_TAP_MS ) return null;
+  return runs.at(-1) ?? null;
+}
+
+/**
+ * DM: pregunta algo al teléfono del jugador de un uso remoto y espera la respuesta. Si el teléfono se desconecta o
+ * no contesta en 90 s, devuelve `RELAY_NO_ANSWER` (socketlib no avisa nunca en esos casos).
+ * @param {object} run
+ * @param {string} handler  Función del canal del módulo en el teléfono.
+ * @param {...*} args
+ * @returns {Promise<*>}
+ */
+export async function askPhone(run, handler, ...args) {
+  const socket = getSocket();
+  if ( !socket || !run?.user?.active ) return NO_ANSWER;
+  let timer;
+  let hook;
+  const lost = new Promise(resolve => {
+    timer = setTimeout(() => resolve(NO_ANSWER), RELAY_TIMEOUT_MS);
+    hook = Hooks.on("userConnected", (user, connected) => {
+      if ( (user.id === run.user.id) && !connected ) resolve(NO_ANSWER);
+    });
+  });
+  try {
+    return await Promise.race([socket.executeAsUser(handler, run.user.id, ...args), lost]);
+  } catch(err) {
+    console.warn(`BHD Companion | [${run.user.name}] El teléfono no pudo contestar "${handler}"`, err);
+    return NO_ANSWER;
+  } finally {
+    clearTimeout(timer);
+    Hooks.off("userConnected", hook);
+  }
 }
 
 /**
@@ -89,6 +138,16 @@ export function getRemotePlacement(actor) {
   const run = runs.findLast(r => sameActor(r.actor, actor));
   if ( !run ) return null;
   return run.template ? { ...run.template, fillColor: run.user.color?.css ?? run.user.color } : {};
+}
+
+/**
+ * Uso remoto en curso de este actor (el más reciente), o null.
+ * @param {Actor} actor
+ * @returns {object|null}
+ */
+export function getRemoteRunFor(actor) {
+  if ( !actor ) return null;
+  return runs.findLast(run => sameActor(run.actor, actor)) ?? null;
 }
 
 /**
@@ -160,10 +219,11 @@ function isRelayable(app, run) {
   if ( midiApps.ReactionDialog && (app instanceof midiApps.ReactionDialog) ) return false;
   const related = getRelatedActor(app);
   if ( related && !sameActor(related, run.actor) ) return false;
+  // Las preguntas de Cauldron (DialogApp) no se copian: cpr-dialogs.js las manda con sus datos antes de abrirse.
+  // Si llega a abrirse una aquí, es porque el teléfono no contestó: se queda en el DM.
   const classes = [
     DialogV2,
     foundry.appv1?.api?.Dialog,
-    globalThis.chrisPremades?.DialogApp,
     globalThis.dnd5e?.applications?.api?.Dialog5e,
     ...MIDI_DIALOGS.map(name => midiApps[name])
   ].filter(cls => typeof cls === "function");
@@ -201,27 +261,26 @@ async function relay(app, element, run) {
   const tag = `BHD Companion | [${run.user.name}] ${run.label}`;
   console.log(`${tag} | Ventana enviada a su teléfono: ${snapshot.title}`, snapshot.buttons.map(b => b.label));
 
+  // Si la ventana real se cierra sola (p. ej. la de bonificaciones de Midi tiene tiempo límite), se quita
+  // también la copia del teléfono.
+  snapshot.id = `${game.user.id}-${++relayCounter}`;
+  const onClosed = closed => {
+    if ( closed !== app ) return;
+    getSocket()?.executeAsUser("relayClose", run.user.id, snapshot.id).catch(() => {});
+  };
+  const closeHooks = [["closeApplicationV2", Hooks.on("closeApplicationV2", onClosed)],
+    ["closeApplication", Hooks.on("closeApplication", onClosed)]];
+
+  // Si el teléfono se desconecta o no contesta, socketlib no avisa nunca: la ventana volvería a verse
+  // en el DM jamás y el uso (y el botón del jugador) quedaría esperando. Tiempo límite y desconexión.
   let answer;
   try {
-    // Si el teléfono se desconecta o no contesta, socketlib no avisa nunca: la ventana volvería a verse
-    // en el DM jamás y el uso (y el botón del jugador) quedaría esperando. Tiempo límite y desconexión.
-    let timer;
-    let hook;
-    const lost = new Promise(resolve => {
-      timer = setTimeout(() => resolve(NO_ANSWER), RELAY_TIMEOUT_MS);
-      hook = Hooks.on("userConnected", (user, connected) => {
-        if ( (user.id === run.user.id) && !connected ) resolve(NO_ANSWER);
-      });
-    });
-    try {
-      answer = await Promise.race([getSocket().executeAsUser("relayDialog", run.user.id, snapshot), lost]);
-    } finally {
-      clearTimeout(timer);
-      Hooks.off("userConnected", hook);
-    }
-    if ( answer === NO_ANSWER ) throw new Error("sin respuesta del teléfono");
-  } catch(err) {
-    console.warn(`${tag} | El teléfono no contestó; la ventana se muestra aquí`, err);
+    answer = await askPhone(run, "relayDialog", snapshot);
+  } finally {
+    for ( const [name, id] of closeHooks ) Hooks.off(name, id);
+  }
+  if ( answer === NO_ANSWER ) {
+    console.warn(`${tag} | El teléfono no contestó; la ventana se muestra aquí`);
     element.classList.remove("bhd-relayed");
     return;
   }
@@ -335,32 +394,44 @@ function applyFields(root, answers) {
  */
 async function showRelayedDialog(snapshot) {
   console.log(`BHD Companion | Pregunta del DM en el teléfono: ${snapshot.title}`, snapshot.buttons.map(b => b.label));
-  try {
-    if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([120, 80, 120]);
-  } catch(err) {}
-
   const buttons = [];
   snapshot.buttons.forEach((choice, index) => {
     if ( choice.disabled ) return;
-    buttons.push({
-      action: `bhdChoice${index}`,
-      label: choice.label,
-      default: !buttons.length,
-      callback: (event, button) => ({ button: index, fields: collectFields(button.form) })
-    });
+    buttons.push({ label: choice.label, value: String(index), style: buttons.length ? "plain" : "primary" });
   });
-  if ( !buttons.length ) buttons.push({ action: "close", label: "BHD.Actions.Close", callback: () => null });
 
-  const result = await DialogV2.wait({
-    window: { title: snapshot.title || "BHD.Relay.Title" },
-    classes: ["bhd-dialog", "bhd-relay-dialog"],
-    content: `<div class="bhd-relay-content">${snapshot.html}</div>`,
+  // Sale en el aviso grande de la vista, en la cola de preguntas (no como ventana suelta).
+  const decision = showDecision({
+    kind: "relay",
+    title: snapshot.title || game.i18n.localize("BHD.Relay.Title"),
+    icon: "fa-solid fa-hand-pointer",
+    html: `<div class="bhd-relay-content">${snapshot.html}</div>`,
     buttons,
-    rejectClose: false
+    closable: true,
+    closeValue: null,
+    collect: (value, form) => ({ button: Number(value), fields: collectFields(form) })
   });
+  if ( snapshot.id ) phoneCopies.set(snapshot.id, decision);
+  let result;
+  try {
+    result = await decision.promise;
+  } finally {
+    if ( snapshot.id ) phoneCopies.delete(snapshot.id);
+  }
   const answer = (result && (typeof result === "object")) ? result : null;
   console.log(`BHD Companion | Respuesta enviada al DM: ${answer ? (snapshot.buttons[answer.button]?.label ?? "?") : "(cerrada)"}`);
   return answer;
+}
+
+/**
+ * La ventana real se cerró en el DM (p. ej. se acabó su tiempo): se quita la copia del teléfono.
+ * @param {string} id
+ */
+function closeRelayedDialog(id) {
+  const copy = phoneCopies.get(id);
+  if ( !copy ) return;
+  console.log("BHD Companion | La ventana del DM se cerró; se quita su copia del teléfono");
+  copy.cancel(null);
 }
 
 /**

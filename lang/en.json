@@ -474,6 +474,9 @@
       "NotUsed": "{name} couldn't be used. Check the chat."
     },
     "Spells": {
+      "OnlyReady": "Prepared only",
+      "HiddenUnprepared": "{count} unprepared spells hidden. Tap “Prepared only” to see them all and prepare or unprepare them.",
+      "OtherSource": "Other sources",
       "AllLevels": "All levels",
       "Level": "Level",
       "Filters": "Filter spells",
@@ -527,6 +530,18 @@
     },
     "Relay": {
       "Title": "The DM asks"
+    },
+    "Decision": {
+      "Close": "Close without choosing",
+      "More": "{count} more question(s) waiting"
+    },
+    "Transform": {
+      "Label": "{name}'s form",
+      "Revert": "Revert",
+      "RevertTitle": "Revert to original form",
+      "RevertConfirm": "End {name}'s transformation and return to the original form?",
+      "RevertFailed": "Could not revert to the original form. {error}",
+      "Reverted": "You are back in your original form."
     },
     "Conditions": {
       "blinded": "You can't see. You fail checks that require sight. Your attacks have disadvantage and attacks against you have advantage.",

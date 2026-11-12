@@ -22,6 +22,37 @@ export function getActiveCharacter() {
   return game.user.character ?? getCharacterChoices()[0] ?? null;
 }
 
+/**
+ * Forma en la que está transformado un personaje (Wild Shape, Polymorph...), o null.
+ * dnd5e (`Actor5e#transformInto`) crea un actor nuevo con `flags.dnd5e.isPolymorphed` y
+ * `flags.dnd5e.originalActor` = id del personaje, y cambia las fichas de la escena a ese actor (o, si la ficha no
+ * está vinculada, la transforma en el sitio). Solo se mira la escena de la TV: un actor transformado que quedó
+ * suelto en la barra lateral de otra sesión no cuenta.
+ * @param {Actor|null} actor  El personaje original.
+ * @returns {Actor|null}
+ */
+export function getTransformedForm(actor) {
+  const scene = game.scenes?.active;
+  if ( !actor || !scene ) return null;
+  const token = scene.tokens.find(t => {
+    const form = t.actor;
+    return !!form && (form !== actor) && form.getFlag("dnd5e", "isPolymorphed")
+      && (form.getFlag("dnd5e", "originalActor") === actor.id) && t.isOwner;
+  });
+  return token?.actor ?? null;
+}
+
+/**
+ * ¿Es este actor una forma transformada de alguno de los personajes del usuario?
+ * @param {Actor|null} actor
+ * @returns {boolean}
+ */
+export function isTransformedCharacter(actor) {
+  if ( !actor?.getFlag("dnd5e", "isPolymorphed") ) return false;
+  const originalId = actor.getFlag("dnd5e", "originalActor");
+  return getCharacterChoices().some(character => character.id === originalId);
+}
+
 /* -------------------------------------------- */
 
 /**

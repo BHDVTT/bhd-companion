@@ -5,8 +5,13 @@
   <img class="bhd-portrait" src="{{character.img}}" alt="">
   <div class="bhd-identity">
     <span class="bhd-name">{{character.name}}</span>
-    <span class="bhd-player">{{#if isCompanion}}{{localize "BHD.Companion.Label"}}{{else}}{{userName}}{{/if}}</span>
+    <span class="bhd-player">{{#if isCompanion}}{{localize "BHD.Companion.Label"}}{{else if transformed}}{{localize "BHD.Transform.Label" name=transformed.original}}{{else}}{{userName}}{{/if}}</span>
   </div>
+  {{#if transformed}}
+  <button type="button" class="bhd-revert-form" data-action="bhdRevertForm" aria-label="{{localize 'BHD.Transform.Revert'}}">
+    <i class="fa-solid fa-person-rays" aria-hidden="true"></i> <span>{{localize "BHD.Transform.Revert"}}</span>
+  </button>
+  {{/if}}
   {{else}}
   <div class="bhd-portrait bhd-portrait-empty"><i class="fa-solid fa-user" aria-hidden="true"></i></div>
   <div class="bhd-identity">

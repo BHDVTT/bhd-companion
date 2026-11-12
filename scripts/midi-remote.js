@@ -16,7 +16,7 @@
 
 import { MODULE_ID } from "./constants.js";
 import { callGM, getSocket, registerSocketHandler } from "./remote-socket.js";
-import { endRemoteRun, getRemotePlacement, isRemoteRun, startRemoteRun } from "./dialog-relay.js";
+import { endRemoteRun, getRemotePlacement, getRemoteRunFor, isRemoteRun, startRemoteRun } from "./dialog-relay.js";
 import { needsUsageDialog } from "./quick-actions.js";
 import { patchGmTemplatePlacement, patchTokenPlacement } from "./mobile-templates.js";
 
@@ -42,6 +42,21 @@ export function registerMidiRemote() {
 export function enableGmRemoteHelpers() {
   patchGmTemplatePlacement(activity => getRemotePlacement(activity?.actor));
   patchTokenPlacement(() => isRemoteRun());
+  // Invocar (Wildfire Spirit, Find Familiar, Dancing Lights...) con la actividad Invocar de dnd5e: la ejecuta el DM,
+  // así que la criatura sería solo suya. Se le da al jugador la misma propiedad (OWNER) que tendría si la hubiera
+  // invocado él (Cauldron ya lo hace en sus invocaciones: copia la propiedad del invocador).
+  Hooks.on("dnd5e.preSummonToken", (activity, profile, config) => {
+    const run = getRemoteRunFor(activity?.actor);
+    if ( !run || !config ) return;
+    const OWNER = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+    config.actorUpdates ??= {};
+    config.actorUpdates.ownership = {
+      ...(config.actor?.ownership ?? {}),
+      ...(config.actorUpdates.ownership ?? {}),
+      [run.user.id]: OWNER
+    };
+    console.log(`BHD Companion | [${run.user.name}] ${run.label} | Invocación: ${config.actor?.name ?? "?"} será de ${run.user.name}`);
+  });
   console.log("BHD Companion | Midi QOL activo: este cliente del DM ejecuta los usos de los teléfonos");
 }
 

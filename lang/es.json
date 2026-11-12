@@ -474,6 +474,9 @@
       "NotUsed": "No se pudo usar {name}. Mira el chat."
     },
     "Spells": {
+      "OnlyReady": "Solo preparados",
+      "HiddenUnprepared": "{count} hechizos sin preparar ocultos. Toca «Solo preparados» para verlos todos y prepararlos o despreparlos.",
+      "OtherSource": "Otros orígenes",
       "AllLevels": "Todos los niveles",
       "Level": "Nivel",
       "Filters": "Filtrar hechizos",
@@ -527,6 +530,18 @@
     },
     "Relay": {
       "Title": "El DM pregunta"
+    },
+    "Decision": {
+      "Close": "Cerrar sin elegir",
+      "More": "{count} pregunta(s) más esperando"
+    },
+    "Transform": {
+      "Label": "Forma de {name}",
+      "Revert": "Volver",
+      "RevertTitle": "Volver a la forma original",
+      "RevertConfirm": "¿Terminar la transformación de {name} y volver a la forma original?",
+      "RevertFailed": "No se pudo volver a la forma original. {error}",
+      "Reverted": "Has vuelto a tu forma original."
     },
     "Conditions": {
       "blinded": "No ves. Fallas las pruebas que necesitan la vista. Tus ataques tienen desventaja y los ataques contra ti tienen ventaja.",

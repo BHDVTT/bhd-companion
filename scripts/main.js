@@ -17,6 +17,8 @@ import { broadcastTargets, pruneTargets } from "./targets.js";
 import { registerUseLogSocket, useLog } from "./use-log.js";
 import { enableGmRemoteHelpers, registerMidiRemote } from "./midi-remote.js";
 import { registerDialogRelay } from "./dialog-relay.js";
+import { registerCprDialogSocket, registerCprDialogsGM, registerCprDialogsPhone } from "./cpr-dialogs.js";
+import { registerTransformSocket } from "./transform.js";
 import { registerMidiPrompts } from "./midi-prompts.js";
 import { listenMidiChatSaves, registerMidiChatSaves } from "./midi-chat-saves.js";
 import { registerTemplatePlacement } from "./template-placement.js";
@@ -29,6 +31,8 @@ let mobileView = false;
 // Con Midi QOL los teléfonos piden al DM que use sus objetos (socketlib avisa durante "init").
 registerMidiRemote();
 registerDialogRelay();
+registerCprDialogSocket();
+registerTransformSocket();
 registerTemplatePlacement();
 
 Hooks.once("init", () => {
@@ -53,6 +57,8 @@ Hooks.once("ready", () => {
   if ( isMidiActive() ) registerMidiChatSaves();
   // DM: estrella junto a cada jugador para dar Inspiración (al teléfono le llega un aviso).
   if ( game.user.isGM ) registerGmInspiration();
+  // Cauldron of Plentiful Resources: durante un uso del teléfono, sus preguntas van a ese teléfono.
+  if ( game.user.isGM ) registerCprDialogsGM();
   if ( mobileView ) openMobileView();
   else if ( canUseMobileView() ) addReturnToMobileButton();
 });
@@ -71,6 +77,8 @@ function openMobileView() {
   updateWakeLock();
   // Con Midi QOL: sus salvaciones y reacciones salen en los avisos de la vista.
   registerMidiPrompts(app);
+  // Cauldron of Plentiful Resources: sus preguntas salen en el aviso grande de la vista.
+  registerCprDialogsPhone();
   if ( isMidiActive() ) listenMidiChatSaves(app);
 
   // Varios cambios seguidos (p. ej. el GM aplica daño y un estado) producen un solo redibujado.
@@ -178,6 +186,15 @@ function openMobileView() {
     else if ( token.actor === app.actor ) refresh();
   };
   for ( const action of ["create", "update", "delete"] ) Hooks.on(`${action}Token`, token => onCompanionToken(token, action));
+  // Transformación (Wild Shape, Polymorph): dnd5e cambia el actor de la ficha; la vista pasa a la forma o vuelve.
+  Hooks.on("updateToken", (token, changes) => {
+    if ( (token.parent !== game.scenes.active) || !token.isOwner ) return;
+    const transformed = ("actorId" in changes) || ("delta" in changes)
+      || foundry.utils.hasProperty(changes, "flags.dnd5e.isPolymorphed");
+    if ( !transformed ) return;
+    useLog(`Ficha ${token.name}: cambió de actor (¿transformación?) → redibujar`);
+    refresh();
+  });
   // Objetivos: si su ficha desaparece o el DM cambia de escena, dejan de ser objetivos.
   Hooks.on("deleteToken", () => pruneTargets());
   Hooks.on("updateScene", (scene, changes) => {

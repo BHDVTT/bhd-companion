@@ -28,6 +28,12 @@
     </div>
   </div>
 
+  {{#if spells.unprepared}}
+  <p class="bhd-spell-note" data-bhd-unprepared-note {{#unless spells.readyOnly}}hidden{{/unless}}>
+    <i class="fa-solid fa-eye-slash" aria-hidden="true"></i> {{localize "BHD.Spells.HiddenUnprepared" count=spells.unprepared}}
+  </p>
+  {{/if}}
+
   <p class="bhd-spellcasting">
     {{#if spells.spellcasting.dc}}<span>{{localize "BHD.Actions.SpellDC"}} <strong>{{spells.spellcasting.dc}}</strong></span>{{/if}}
     {{#if spells.spellcasting.attack}}<span>{{localize "BHD.Actions.SpellAttack"}} <strong>{{spells.spellcasting.attack}}</strong></span>{{/if}}
@@ -53,7 +59,10 @@
       {{/if}}
     </div>
     <div class="bhd-action-list">
-      {{#each items}}{{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}{{/each}}
+      {{#each items}}
+      {{#if this.classHeader}}<h5 class="bhd-class-header" data-class-header>{{this.classHeader}}</h5>{{/if}}
+      {{> "modules/bhd-companion/templates/mobile/action-row.hbs" row=this}}
+      {{/each}}
     </div>
   </section>
   {{/each}}

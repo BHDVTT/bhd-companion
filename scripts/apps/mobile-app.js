@@ -1,5 +1,6 @@
 import { isMidiActive, MODULE_ID, TEMPLATE_PATH } from "../constants.js";
-import { getActiveCharacter, getCharacterChoices, prepareCharacterSheet } from "./character-data.js";
+import { getActiveCharacter, getCharacterChoices, getTransformedForm, prepareCharacterSheet } from "./character-data.js";
+import { requestRevertForm } from "../transform.js";
 import { getCompanionActor, getCompanionTokens, prepareCompanionChoices } from "./companions-data.js";
 import { adjustResource, prepareResources } from "./resources-data.js";
 import { clearDiary, prepareDiary } from "../diary.js";
@@ -35,6 +36,8 @@ import { renderItemDetails } from "../item-details.js";
 import { BUSY_TIMEOUT_MS, BusyLocks, withTimeout } from "../busy.js";
 import { cancelPendingCalls } from "../remote-socket.js";
 import { restartConnection } from "../connection.js";
+import { dequeuePrompt, enqueuePrompt, hasPendingPrompts, isActivePrompt, onPromptQueueChange, setPromptDeadline } from "../prompt-queue.js";
+import { cancelAllDecisions, isDecisionShown } from "../decisions.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -120,7 +123,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       endTurn: BHDMobileApp.#onEndTurn,
       dismissTurnAlert: BHDMobileApp.#onDismissTurnAlert,
       bhdCompanion: BHDMobileApp.#onCompanion,
-      bhdResource: BHDMobileApp.#onResource,
+      bhdRevertForm: BHDMobileApp.#onRevertForm,
+      bhdResource:BHDMobileApp.#onResource,
       bhdResourceStep: BHDMobileApp.#onResourceStep,
       bhdDiaryFilter: BHDMobileApp.#onDiaryFilter,
       bhdDiaryClear: BHDMobileApp.#onDiaryClear,
@@ -279,6 +283,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   #reaction = null;
 
+  /** Sitio del aviso de salvación en la cola única de preguntas (prompt-queue.js), mientras haya alguna. */
+  #saveEntry = null;
+
   /**
    * Toque largo en curso sobre una fila de la pestaña Acciones.
    * @type {{target: HTMLElement, x: number, y: number, timer: number, fired: boolean}|null}
@@ -384,7 +391,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * Filtros de la pestaña Hechizos.
    * @type {{level: string, activation: string, concentration: boolean, ritual: boolean, prepared: boolean, search: string}}
    */
-  #spellFilters = { level: "all", activation: "all", concentration: false, ritual: false, prepared: false, search: "" };
+  #spellFilters = { level: "all", activation: "all", concentration: false, ritual: false, prepared: null, readyOnly: false, search: "" };
 
   /** Pestaña visible ahora mismo. */
   get activeTab() {
@@ -396,16 +403,19 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @type {Actor|null}
    */
   get actor() {
-    return getCompanionActor(this.#companionUuid) ?? getActiveCharacter();
+    const character = getActiveCharacter();
+    // Transformado (Wild Shape, Polymorph): la vista enseña la forma, con sus datos y acciones.
+    return getCompanionActor(this.#companionUuid) ?? getTransformedForm(character) ?? character;
   }
 
   /**
-   * El personaje del jugador y sus compañeros en la escena (avisos de turno, efectos, inspiración).
+   * El personaje del jugador (y su forma transformada, si la tiene) y sus compañeros en la escena (avisos de turno,
+   * efectos, inspiración).
    * @returns {Actor[]}
    */
   get myActors() {
     const character = getActiveCharacter();
-    return [character, ...getCompanionTokens().map(t => t.actor)].filter(a => a);
+    return [character, getTransformedForm(character), ...getCompanionTokens().map(t => t.actor)].filter(a => a);
   }
 
   /**
@@ -456,6 +466,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     context.actions = (actor && (tab === "actions")) ? prepareActions(actor, this.#quick) : null;
     if ( context.actions ) context.actions.resources = prepareResources(actor, this.#openResource, this.#quick);
     context.spells = (actor && (tab === "spells")) ? prepareSpellsTab(actor, this.#quick, this.#spellFilters) : null;
+    if ( context.spells ) this.#spellFilters.readyOnly = context.spells.readyOnly;
     context.spellSearch = this.#spellSearch;
     context.actionFilters = ["all", ...ACTION_FILTERS].map(id => ({
       id,
@@ -482,8 +493,14 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     context.choices = (choices.length > 1) ? choices.map(a => ({
       id: a.id, name: a.name, selected: a === character
     })) : null;
+    const form = getTransformedForm(character);
     context.companions = prepareCompanionChoices(character, (actor !== character) ? this.#companionUuid : null);
-    context.isCompanion = !!actor && (actor !== character);
+    if ( context.companions && form ) {
+      const own = context.companions.find(c => c.character);
+      if ( own ) Object.assign(own, { name: form.name, img: form.img });
+    }
+    context.transformed = (form && (actor === form)) ? { name: form.name, original: character.name } : null;
+    context.isCompanion = !!actor && (actor !== character) && (actor !== form);
     return context;
   }
 
@@ -653,6 +670,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     reactionAlert.setAttribute("role", "alertdialog");
     reactionAlert.hidden = true;
     this.element.append(reactionAlert);
+    // Cola única de preguntas: cuando llega o sale una, se decide qué aviso se ve.
+    onPromptQueueChange(() => this.#syncPromptAlerts());
     const midiResult = document.createElement("section");
     midiResult.className = "bhd-midi-result";
     midiResult.setAttribute("role", "status");
@@ -961,12 +980,22 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         || ((filters.activation !== "all") && !activation.includes(filters.activation))
         || (filters.concentration && !flags.includes("concentration"))
         || (filters.ritual && !flags.includes("ritual"))
-        || (filters.prepared && !flags.includes("prepared"))
+        || (filters.readyOnly && !flags.includes("ready"))
         || (!!query && !row.dataset.search.includes(query));
     }
+    // Subtítulos de clase (multiclase): solo si queda alguna fila suya a la vista.
+    for ( const header of root.querySelectorAll("[data-class-header]") ) {
+      let visible = false;
+      for ( let el = header.nextElementSibling; el && !el.matches("[data-class-header]"); el = el.nextElementSibling ) {
+        if ( el.matches(".bhd-action:not([hidden])") ) { visible = true; break; }
+      }
+      header.hidden = !visible;
+    }
+    const note = root.querySelector("[data-bhd-unprepared-note]");
+    if ( note ) note.hidden = !filters.readyOnly;
     let any = false;
     const filtering = (filters.level !== "all") || (filters.activation !== "all") || filters.concentration
-      || filters.ritual || filters.prepared || !!query;
+      || filters.ritual || filters.readyOnly || !!query;
     for ( const section of root.querySelectorAll("[data-spell-section]") ) {
       const empty = !section.querySelector(".bhd-action:not([hidden])");
       // Sin filtros, los niveles vacíos con espacios se ven (para gastar o recuperar a mano).
@@ -1364,6 +1393,11 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       useLog(`${tag} | 2. Resultado del DM`, result);
       this.#markUsed(block);
       if ( result.messageId ) this.#openTrayById(result.messageId);
+      // Encantar (Shillelagh, Repelling Blast, arma del pacto...): el DM hizo el uso; qué objeto se encanta lo elige
+      // el jugador aquí, con la lista de dnd5e (lo mismo que soltar el objeto en la tarjeta).
+      if ( (activity.type === "enchant") && !activity.enchant?.self && result.messageId ) {
+        this.#openEnchantWhenReady(result.messageId, tag);
+      }
       this.#showMidiResult(item, result);
       if ( hudBlock ) this.#hudResult = this.#toHudResult(item, result);
     } catch(err) {
@@ -1375,6 +1409,29 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#busy.release(lock);
       this.#renderRows();
     }
+  }
+
+  /**
+   * Abre la lista de encantar de una tarjeta que hizo el DM, en cuanto la tarjeta llega a este teléfono (5 s máx.).
+   * @param {string} messageId
+   * @param {string} tag  Para el registro.
+   */
+  async #openEnchantWhenReady(messageId, tag) {
+    let message = game.messages.get(messageId);
+    for ( let waited = 0; !message && (waited < 5000); waited += 250 ) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      message = game.messages.get(messageId);
+    }
+    if ( !message ) {
+      useWarn(`${tag} | La tarjeta de encantar no llegó; usa "Elegir objeto" en el panel`);
+      return;
+    }
+    if ( !message.getFlag("dnd5e", "use.enchantmentProfile") ) {
+      useLog(`${tag} | La tarjeta no trae encantamiento elegido (dnd5e no pide objeto)`);
+      return;
+    }
+    useLog(`${tag} | 3. Elegir el objeto que se encanta`);
+    this.#openEnchantPicker(message);
   }
 
   /**
@@ -1968,9 +2025,16 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( !alert ) return;
     if ( !prompt || !actor ) {
       alert.hidden = true;
+      dequeuePrompt(this.#saveEntry);
+      this.#saveEntry = null;
       this.#tickSaveAlert();
       return;
     }
+    // Una sola pregunta a la vez: el aviso de salvación tiene su sitio en la cola única (con la cuenta atrás de
+    // la primera salvación, si tiene).
+    const deadline = prompt.endsAt ?? prompt.deadline ?? null;
+    if ( !this.#saveEntry ) this.#saveEntry = enqueuePrompt({ kind: "save", label: prompt.type ?? "", deadline });
+    else setPromptDeadline(this.#saveEntry, deadline);
     const localize = key => game.i18n.localize(key);
     const concentration = prompt.type === "concentration";
     const title = concentration ? "BHD.Save.ConcentrationTitle"
@@ -2019,6 +2083,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     alert.querySelector(".bhd-save-alert-source").textContent = source;
     alert.querySelector(".bhd-save-alert-label").textContent = getSavePromptLabel(prompt, actor);
     alert.hidden = false;
+    this.#syncPromptAlerts();
     this.#tickSaveAlert();
     if ( !vibrate ) return;
     try {
@@ -2048,7 +2113,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         resolve(tapped);
       };
       prompt.resolve = finish;
-      if ( prompt.timeout > 0 ) prompt.timer = setTimeout(() => finish(false), prompt.timeout * 1000);
+      if ( prompt.timeout > 0 ) {
+        prompt.deadline = Date.now() + (prompt.timeout * 1000);
+        prompt.timer = setTimeout(() => finish(false), prompt.timeout * 1000);
+      }
       this.#savePrompts.push(prompt);
       this.#showSaveAlert(true);
     });
@@ -2229,6 +2297,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     return new Promise(resolve => {
       const ends = Date.now() + (timeout * 1000);
+      // En la cola única: con cuenta atrás, así sale antes que lo que puede esperar.
+      const entry = enqueuePrompt({ kind: "reaction", label: activities.map(a => a.item.name).join(", "), deadline: ends });
       const bar = alert.querySelector(".bhd-reaction-bar");
       const seconds = alert.querySelector(".bhd-reaction-seconds");
       const update = () => {
@@ -2240,13 +2310,26 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#reaction = {
         activities,
         resolve,
+        entry,
         tick: setInterval(update, 250),
         timer: setTimeout(() => {
           useLog("Reacción: se acabó el tiempo");
           this.#closeReaction(null);
         }, timeout * 1000)
       };
+      this.#syncPromptAlerts();
     });
+  }
+
+  /**
+   * Cola única de preguntas: de los avisos de la vista (salvación, reacción) solo se ve el que toca; los demás
+   * esperan ocultos (los de Cauldron y las ventanas se ocultan solos, ver decisions.js y mobile-windows.js).
+   */
+  #syncPromptAlerts() {
+    const save = this.element?.querySelector(".bhd-save-alert");
+    save?.classList.toggle("bhd-prompt-waiting", !!this.#saveEntry && !isActivePrompt(this.#saveEntry));
+    const reaction = this.element?.querySelector(".bhd-reaction-alert");
+    reaction?.classList.toggle("bhd-prompt-waiting", !!this.#reaction && !isActivePrompt(this.#reaction.entry));
   }
 
   /**
@@ -2261,6 +2344,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( !reaction ) return;
     clearTimeout(reaction.timer);
     clearInterval(reaction.tick);
+    dequeuePrompt(reaction.entry);
     reaction.resolve(activity);
   }
 
@@ -2754,6 +2838,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( this.#picker || this.#place ) return true;
     const chooser = this.element?.querySelector(".bhd-chooser");
     if ( chooser && !chooser.hidden ) return true;
+    if ( isDecisionShown() || hasPendingPrompts() ) return true;
     return !!document.querySelector(".bhd-window:not(.bhd-window-blocked), .bhd-relay-dialog");
   }
 
@@ -3003,6 +3088,8 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#closePicker(null);
     this.#closeChooser();
     this.#hideToast();
+    // Preguntas de Cauldron o del DM que quedaron colgadas: se cierran (el DM las enseña en su PC si aún esperan).
+    cancelAllDecisions();
   }
 
   /**
@@ -3229,9 +3316,16 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static #onSpellToggle(event, target) {
     const id = target.dataset.filter;
     if ( !["concentration", "ritual", "prepared"].includes(id) ) return;
-    this.#spellFilters[id] = !this.#spellFilters[id];
-    target.classList.toggle("bhd-on", this.#spellFilters[id]);
-    target.setAttribute("aria-pressed", String(this.#spellFilters[id]));
+    let on;
+    if ( id === "prepared" ) {
+      // "Solo preparados" empieza encendido si hay hechizos sin preparar; el jugador lo apaga para verlos todos.
+      on = this.#spellFilters.prepared = !this.#spellFilters.readyOnly;
+      this.#spellFilters.readyOnly = on;
+      useLog(`Hechizos: ${on ? "solo los preparados" : "todos (también sin preparar)"}`);
+    }
+    else on = this.#spellFilters[id] = !this.#spellFilters[id];
+    target.classList.toggle("bhd-on", on);
+    target.setAttribute("aria-pressed", String(on));
     this.#applySpellFilters();
   }
 
@@ -3614,6 +3708,35 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       useError("Recursos | Error", err?.message ?? String(err));
       ui.notifications.error(err?.message ?? String(err));
     }
+  }
+
+  /**
+   * Cabecera: vuelve de la forma transformada (Wild Shape...) a la original (lo hace el DM si está conectado).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onRevertForm(event, target) {
+    const form = getTransformedForm(getActiveCharacter());
+    if ( !form ) return;
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "BHD.Transform.RevertTitle" },
+      classes: ["bhd-dialog"],
+      content: `<p>${foundry.utils.escapeHTML(game.i18n.format("BHD.Transform.RevertConfirm", { name: form.name }))}</p>`,
+      rejectClose: false
+    });
+    if ( !confirmed ) return;
+    target.disabled = true;
+    useLog(`Volver a la forma original: ${form.name}`);
+    const result = await requestRevertForm(form);
+    if ( !result?.ok ) {
+      useWarn("Volver a la forma original: no se pudo", result);
+      target.disabled = false;
+      ui.notifications.warn(game.i18n.format("BHD.Transform.RevertFailed", { error: result?.error ?? result?.reason ?? "" }));
+      return;
+    }
+    ui.notifications.info(game.i18n.localize("BHD.Transform.Reverted"));
+    this.render();
   }
 
   /**
