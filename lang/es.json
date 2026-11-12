@@ -521,7 +521,8 @@
       "Reason": {
         "NoToken": "Tu ficha no está en la escena de la TV: no se puede colocar el área de {name}.",
         "NoArea": "dnd5e no pudo preparar el área de {name}.",
-        "Expired": "La colocación del área de {name} ya terminó. Vuelve a lanzarlo."
+        "Expired": "La colocación de {name} ya terminó. Vuelve a lanzarlo.",
+        "NoCreature": "dnd5e no encuentra la criatura que invoca {name}. Avisa al DM."
       },
       "GMTitle": "Área esperando",
       "GMContent": "{user} lleva un minuto colocando el área de {name}. Puedes colocarla tú con el ratón (clic para colocar, rueda para girar).",
@@ -530,6 +531,30 @@
     },
     "Relay": {
       "Title": "El DM pregunta"
+    },
+    "Summon": {
+      "Title": "Colocar",
+      "ChooseCreature": "¿Qué invocas con {name}?",
+      "ChooseSize": "Tamaño de la criatura",
+      "ChooseType": "Tipo de criatura",
+      "Which": "{name}: criatura {n} de {count}",
+      "Distance": "A {distance} de ti",
+      "Occupied": "Ahí ya hay alguien: muévela a una casilla libre.",
+      "Wall": "Hay una pared en medio.",
+      "Edge": "Ese es el borde del mapa."
+    },
+    "Dice": {
+      "Title": "Bandeja de dados",
+      "Empty": "Toca los dados para armar la tirada",
+      "Clear": "Borrar la tirada",
+      "Modifier": "Modificador",
+      "Visibility": "Quién la ve",
+      "Public": "Todos",
+      "GM": "Solo el DM",
+      "Recent": "Últimas",
+      "Roll": "Tirar",
+      "Flavor": "Bandeja de dados",
+      "Error": "No se pudo tirar: {error}"
     },
     "Decision": {
       "Close": "Cerrar sin elegir",

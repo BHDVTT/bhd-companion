@@ -282,9 +282,11 @@ const SUMMON_SEARCH_RINGS = 8;
  * colocan solas en las casillas libres más cercanas a la ficha del personaje (el DM las mueve en la TV).
  * El resto lo hace dnd5e igual que siempre (qué criatura, cuántas, sus cambios). Llamar en "setup": en vista
  * móvil (sin Midi), o en el DM con Midi para los usos que pide un teléfono.
+ * Si el jugador ya eligió dónde en el teléfono (summon-placement.js), se usan esas posiciones (las que falten, solas).
  * @param {function(object): boolean} [shouldPlace]  ¿Colocar solas estas fichas? Si no, como siempre (clic).
+ * @param {function(object): object[]|null} [getChosen]  Posiciones elegidas en el teléfono (`{ x, y, rotation }`).
  */
-export function patchTokenPlacement(shouldPlace=() => true) {
+export function patchTokenPlacement(shouldPlace=() => true, getChosen=() => null) {
   const TokenPlacement = dnd5e.canvas?.TokenPlacement;
   if ( !TokenPlacement ) return;
   const original = TokenPlacement.place;
@@ -292,7 +294,9 @@ export function patchTokenPlacement(shouldPlace=() => true) {
     if ( !shouldPlace(config) ) return original.call(this, config);
     const scene = canvas.scene;
     if ( !scene ) return [];
+    const chosen = getChosen(config) ?? [];
     const spots = findFreeSpots(scene, config.origin ?? null, config.tokens);
+    if ( chosen.length ) console.log(`BHD Companion | Invocación: ${chosen.length} posición(es) elegidas en el teléfono`, chosen);
     const counts = new Map();
     const placements = config.tokens.map((prototypeToken, total) => {
       const actorId = prototypeToken.parent?.id;
@@ -300,13 +304,13 @@ export function patchTokenPlacement(shouldPlace=() => true) {
       return {
         prototypeToken,
         index: { total, unique: counts.get(actorId) },
-        x: spots[total].x,
-        y: spots[total].y,
+        x: chosen[total]?.x ?? spots[total].x,
+        y: chosen[total]?.y ?? spots[total].y,
         elevation: config.origin?.elevation ?? 0,
-        rotation: prototypeToken.rotation ?? 0
+        rotation: chosen[total]?.rotation ?? prototypeToken.rotation ?? 0
       };
     });
-    if ( placements.length ) ui.notifications.info("BHD.Actions.SummonPlaced", { localize: true });
+    if ( placements.length && !chosen.length ) ui.notifications.info("BHD.Actions.SummonPlaced", { localize: true });
     return placements;
   };
 }

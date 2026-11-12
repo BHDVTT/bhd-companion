@@ -106,6 +106,8 @@ scripts/cpr-dialogs.js       Cauldron (chris-premades): sus preguntas (DialogApp
 scripts/decisions.js         aviso grande de decisión (campos y botones de otro módulo) dentro de la vista
 scripts/prompt-queue.js      cola única de preguntas: salvaciones, reacciones, decisiones, ventanas de Midi, Epic Rolls
 scripts/transform.js         volver a la forma original (Wild Shape) pidiéndolo al DM
+scripts/summon-placement.js  colocar invocaciones con la cruceta (sesión en el DM, vista previa en la TV, mirillas de Cauldron)
+scripts/dice-tray.js         bandeja de dados (botón del dado en la cabecera)
 scripts/apps/status-data.js  concentración, condiciones y efectos activos (duración, quién lo aplicó, cambios, quitar)
 scripts/apps/companions-data.js compañeros e invocaciones: fichas de la escena activa de las que el jugador es dueño
 scripts/apps/resources-data.js  recursos limitados (system.uses de rasgos/objetos, system.resources) para Acciones
@@ -631,7 +633,7 @@ lang/es.json, en.json        traducciones
      Foundry visibles en la TV, resultado impacta / falla y daño.
 7. **Tiradas** — ventaja / desventaja adaptadas al móvil para características, salvaciones y
    habilidades (los ataques ya la tienen con la ventana de dnd5e).
-8. **Publicación** (0.20.0: preguntas de Cauldron y Midi en la vista, cola única, Wild Shape, hechizos multiclase; 0.17.0 publicada: salvaciones por chat de Midi en el teléfono; 0.16.0: v14 / dnd5e 6, cámara, iniciativa entera; falta probar en v14) — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
+8. **Publicación** (0.21.0: colocar invocaciones con la cruceta, bandeja de dados; 0.20.0: preguntas de Cauldron y Midi en la vista, cola única, Wild Shape, hechizos multiclase; 0.17.0 publicada: salvaciones por chat de Midi en el teléfono; 0.16.0: v14 / dnd5e 6, cámara, iniciativa entera; falta probar en v14) — pruebas con 5 jugadores, repositorio público (GitHub) con `manifest` y
    `download` en `module.json` para instalar en The Forge.
 9. **Tiradas estilo D&D Beyond** ✅ (0.10.0, probada en Foundry local) — botones Ataque / Daño / CD /
    Curar / Usar en cada fila, crítico, nivel del hechizo en la fila, salvaciones pendientes, concentración y
@@ -755,3 +757,25 @@ lang/es.json, en.json        traducciones
   Filtro "Solo preparados" (bandera `ready`: truco, siempre, preparado o método que no prepara) encendido por defecto
   si hay hechizos sin preparar; `#spellFilters.prepared` null = automático.
 - Consumos: el uso real nunca pasa `consume` (dnd5e aplica todos, también `attribute` con fórmula negativa).
+
+## Colocar invocaciones y bandeja de dados (0.21.0, sin probar en partida)
+
+- **dnd5e** `SummonActivity`: `use()` gasta antes y `_finalizeUsage` → `placeSummons` → `getPlacement` →
+  `TokenPlacement.place` (clic por criatura; `count` = fórmula del perfil). Midi `MidiSummonActivity#getPlacement`
+  acepta `summons.placements` (no se usa: se pasa por `TokenPlacement.place` parcheado). Modo "cr" no se coloca a mano.
+- Por eso el jugador coloca **antes** del uso (`#placeSummons`): `chooseSummonOptions` (perfil / tamaño / tipo con
+  `showDecision` si hay varios) → `summonStart` en el DM (criatura del perfil con `fromUuid`, tamaño, `count` con los
+  datos del nivel, alcance de `activity.range`; personal / toque = 1 casilla) → `summonMove` / `summonEnd` (una
+  criatura tras otra) → `requestMidiUse(..., { summon })`. El DM pone `usage.summons` (perfil...), `needsUsageDialog
+  (activity, { summonChosen })` y `run.summon.placements`; `patchTokenPlacement(shouldPlace, takeSummonPlacements)`
+  las usa. Sin Midi: `setLocalSummonPlacements` antes de `activity.use` en `#cast` (si hay DM).
+- Reglas: dentro de la escena, alcance de borde a borde (`measurePath`), pared de movimiento desde el centro del
+  personaje (`CONFIG.Canvas.polygonBackends.move.testCollision`); las casillas ocupadas se cruzan pero no se confirman.
+  Vista previa: fichas sin guardar en `canvas.tokens.preview` (como dnd5e), en el DM y la TV (`summonPreview`).
+- **Cauldron**: `chrisPremades.utils.crosshairUtils.aimCrosshair` (mismo objeto que usa `Summons#_spawn` y Teleport)
+  envuelto en el DM: en un uso remoto abre una sesión `aim` y la manda al teléfono (`summonAim` → `app.placeFromGM`);
+  devuelve `{ x, y (centro), direction, cancelled, valid }`. Aquí el uso ya empezó: cancelar = Cauldron no invoca.
+- El panel de colocar de la app es común: `#place.api = { kind: "area" | "token", move, end }`.
+- **Bandeja de dados**: botón `.bhd-dice-fab` en la cabecera → `DiceTray` (panel propio en `#bhd-mobile-app`):
+  fórmula por dados, modificador, ventaja con un solo d20 (`2d20kh/kl`), `publicroll` / `gmroll`, `Roll#toMessage` con
+  `ChatMessage.getSpeaker({ actor })`; últimas 5 en `localStorage` (`bhd-companion.diceRecent`).

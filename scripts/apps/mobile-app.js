@@ -1,6 +1,7 @@
 import { isMidiActive, MODULE_ID, TEMPLATE_PATH } from "../constants.js";
 import { getActiveCharacter, getCharacterChoices, getTransformedForm, prepareCharacterSheet } from "./character-data.js";
 import { requestRevertForm } from "../transform.js";
+import { DiceTray } from "../dice-tray.js";
 import { getCompanionActor, getCompanionTokens, prepareCompanionChoices } from "./companions-data.js";
 import { adjustResource, prepareResources } from "./resources-data.js";
 import { clearDiary, prepareDiary } from "../diary.js";
@@ -36,6 +37,7 @@ import { renderItemDetails } from "../item-details.js";
 import { BUSY_TIMEOUT_MS, BusyLocks, withTimeout } from "../busy.js";
 import { cancelPendingCalls } from "../remote-socket.js";
 import { restartConnection } from "../connection.js";
+import { chooseSummonOptions, needsSummonPlacement, requestSummonEnd, requestSummonMove, requestSummonStart, setLocalSummonPlacements } from "../summon-placement.js";
 import { dequeuePrompt, enqueuePrompt, hasPendingPrompts, isActivePrompt, onPromptQueueChange, setPromptDeadline } from "../prompt-queue.js";
 import { cancelAllDecisions, isDecisionShown } from "../decisions.js";
 
@@ -124,6 +126,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       dismissTurnAlert: BHDMobileApp.#onDismissTurnAlert,
       bhdCompanion: BHDMobileApp.#onCompanion,
       bhdRevertForm: BHDMobileApp.#onRevertForm,
+      bhdDiceTray: BHDMobileApp.#onDiceTray,
       bhdResource:BHDMobileApp.#onResource,
       bhdResourceStep: BHDMobileApp.#onResourceStep,
       bhdDiaryFilter: BHDMobileApp.#onDiaryFilter,
@@ -282,6 +285,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @type {{activities: Activity[], resolve: Function, timer: number, tick: number}|null}
    */
   #reaction = null;
+
+  /** Bandeja de dados (dice-tray.js). */
+  #diceTray = null;
 
   /** Sitio del aviso de salvación en la cola única de preguntas (prompt-queue.js), mientras haya alguna. */
   #saveEntry = null;
@@ -670,7 +676,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     reactionAlert.setAttribute("role", "alertdialog");
     reactionAlert.hidden = true;
     this.element.append(reactionAlert);
-    // Cola única de preguntas: cuando llega o sale una, se decide qué aviso se ve.
+    onPromptQueueChange(() => this.#syncPromptAlerts());
+    // Bandeja de dados (botón del dado en la cabecera).
+    this.#diceTray = new DiceTray(this);
     onPromptQueueChange(() => this.#syncPromptAlerts());
     const midiResult = document.createElement("section");
     midiResult.className = "bhd-midi-result";
@@ -1352,9 +1360,14 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const slot = this.#quick.getSlot(activity);
     let targetIds = [];
     let template = null;
+    let summon = null;
     if ( needsAreaPlacement(activity) ) {
       template = await this.#placeArea(item, activity, slot);
       if ( !template ) return;
+    } else if ( needsSummonPlacement(activity) ) {
+      // Invocar: el jugador elige y coloca las criaturas antes (si cancela, no se gasta nada).
+      summon = await this.#placeSummons(item, activity, slot);
+      if ( !summon ) return;
     } else {
       const need = getTargetNeed([activity]);
       if ( need ) {
@@ -1379,7 +1392,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         activity: activity.name, type: activity.type, mode, slot,
         targets: targetIds.map(id => game.scenes.active?.tokens.get(id)?.name ?? id)
       });
-      const result = await requestMidiUse(activity, { targetIds, slot, mode, template });
+      const result = await requestMidiUse(activity, { targetIds, slot, mode, template, summon });
       this.#hideToast();
       if ( !result?.ok ) {
         useWarn(`${tag} | 2. El DM no lo usó: ${result?.reason}`, result?.error ?? "", result?.notices ?? []);
@@ -1453,7 +1466,18 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const panel = this.element.querySelector(".bhd-place");
     if ( !panel ) return null;
     return new Promise(resolve => {
-      this.#place = { sessionId: start.sessionId, item, state: start, busy: false, resolve };
+      const api = {
+        kind: "area",
+        move: (id, change) => requestPlacementMove(id, change),
+        // Confirmar devuelve la posición; el área no tiene más pasos.
+        end: async (id, confirm) => {
+          const result = await requestPlacementEnd(id, confirm);
+          if ( !confirm ) return result;
+          if ( !result?.ok || !Number.isFinite(result.x) ) return { ok: false, reason: result?.reason ?? "Expired", error: result?.error };
+          return { ok: true, done: true, value: { x: result.x, y: result.y, direction: result.direction } };
+        }
+      };
+      this.#place = { sessionId: start.sessionId, item, state: start, busy: false, resolve, api };
       // Si el jugador tarda, el DM puede colocarla él: la posición llega aquí.
       waitForGmPlacement(start.sessionId, data => {
         useLog(`${tag} | 2. La colocó el DM`, data);
@@ -1465,13 +1489,82 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * "Colocar criaturas" (actividad Invocar de dnd5e): elegir la criatura si hay varias y colocarlas una a una con
+   * la cruceta, antes del uso (si cancela, no se pide nada y no se gasta nada).
+   * @param {Item} item
+   * @param {Activity} activity
+   * @param {string|null} slot
+   * @returns {Promise<object|null>}  `{ profile, creatureSize, creatureType, placements }` o null si cancela.
+   */
+  async #placeSummons(item, activity, slot) {
+    const tag = `${item.name} (invocar)`;
+    const choice = await chooseSummonOptions(activity);
+    if ( !choice ) {
+      useLog(`${tag} | Cancelado al elegir la criatura: no se usa nada`);
+      return null;
+    }
+    useLog(`${tag} | 1. Pedir vista previa al DM`, { slot, ...choice });
+    const start = await requestSummonStart(activity, slot, choice);
+    if ( !start?.ok ) {
+      useWarn(`${tag} | No se pudo empezar: ${start?.reason}`, start?.error ?? "");
+      this.#warnPlaceReason(start?.reason, item, start?.error);
+      return null;
+    }
+    const placements = await this.#openTokenPlace(start.sessionId, { name: item.name, img: item.img }, start);
+    if ( !placements ) return null;
+    useLog(`${tag} | 2. Colocadas ${placements.length}`, placements);
+    return { ...choice, placements };
+  }
+
+  /**
+   * Abre la cruceta para colocar criaturas de una sesión del DM (una tras otra).
+   * @param {string} sessionId
+   * @param {{name: string, img: string}} item
+   * @param {object} state
+   * @returns {Promise<object[]|null>}  Las posiciones, o null si cancela.
+   */
+  #openTokenPlace(sessionId, item, state) {
+    if ( this.#place ) this.#finishPlace(null);
+    const panel = this.element?.querySelector(".bhd-place");
+    if ( !panel ) return Promise.resolve(null);
+    return new Promise(resolve => {
+      const api = {
+        kind: "token",
+        move: (id, change) => requestSummonMove(id, change),
+        end: async (id, confirm) => {
+          const result = await requestSummonEnd(id, confirm);
+          if ( !confirm || !result?.ok ) return result;
+          if ( result.done ) return { ok: true, done: true, value: result.placements ?? null };
+          return { ...result, ok: true, done: false };
+        }
+      };
+      this.#place = { sessionId, item, state, busy: false, resolve, api };
+      this.#renderPlace(true);
+    });
+  }
+
+  /**
+   * El DM pide colocar algo de Cauldron (invocación, teletransporte) durante un uso (summon-placement.js).
+   * @param {{sessionId: string, title: string, img: string, state: object}} data
+   * @returns {Promise<{ok: boolean, cancelled?: boolean}>}
+   */
+  async placeFromGM(data) {
+    useLog(`Colocar (Cauldron): ${data.title}`, data.state);
+    try {
+      if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([200, 80, 200]);
+    } catch(err) {}
+    const placements = await this.#openTokenPlace(data.sessionId, { name: data.title, img: data.img }, data.state);
+    return placements?.length ? { ok: true, ...placements[0] } : { ok: true, cancelled: true };
+  }
+
+  /**
    * Aviso de por qué no se pudo colocar el área.
    * @param {string} reason
    * @param {Item} item
    * @param {string} [error]
    */
   #warnPlaceReason(reason, item, error="") {
-    const own = ["NoToken", "NoArea", "Expired"].includes(reason);
+    const own = ["NoToken", "NoArea", "Expired", "NoCreature"].includes(reason);
     const key = own ? `BHD.Place.Reason.${reason}` : `BHD.Midi.Reason.${reason ?? "Error"}`;
     ui.notifications.warn(game.i18n.format(key, { name: item.name, error }));
   }
@@ -1507,8 +1600,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
         <div class="bhd-chooser-backdrop"></div>
         <section class="bhd-place-sheet" role="dialog" aria-modal="true">
           <header class="bhd-chooser-header">
-            <img src="${escape(place.item.img)}" alt="">
-            <span class="bhd-chooser-name">${localize("BHD.Place.Title")}: ${escape(place.item.name)}</span>
+            <img class="bhd-place-img" src="${escape(place.item.img)}" alt="">
+            <span class="bhd-chooser-name">${localize(place.api?.kind === "token" ? "BHD.Summon.Title" : "BHD.Place.Title")}:
+              <span class="bhd-place-name">${escape(place.item.name)}</span></span>
           </header>
           ${state.range ? `<p class="bhd-place-range">${escape(game.i18n.format("BHD.Place.Range", { range: state.range }))}</p>` : ""}
           <div class="bhd-place-inside" aria-live="polite"></div>
@@ -1525,8 +1619,26 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       panel.hidden = false;
     }
 
+    // Criaturas: cuál se coloca (1 de 3), a qué distancia y si la casilla está ocupada.
+    if ( place.api?.kind === "token" ) {
+      const insideEl = panel.querySelector(".bhd-place-inside");
+      const img = panel.querySelector(".bhd-place-img");
+      if ( img && state.img ) img.src = state.img;
+      if ( insideEl ) {
+        const which = (state.count > 1)
+          ? escape(game.i18n.format("BHD.Summon.Which", { n: (state.index ?? 0) + 1, count: state.count, name: state.name ?? "" }))
+          : escape(state.name ?? "");
+        insideEl.innerHTML = `<strong>${which}</strong>
+          <span class="bhd-place-distance">${escape(game.i18n.format("BHD.Summon.Distance", { distance: state.distance ?? "" }))}</span>
+          ${state.occupied ? `<span class="bhd-place-occupied">${localize("BHD.Summon.Occupied")}</span>` : ""}`;
+      }
+      const confirm = panel.querySelector(".bhd-place-confirm");
+      if ( confirm ) confirm.classList.toggle("bhd-disabled-look", !!state.occupied);
+      return;
+    }
+
     // Quién queda dentro (aliados y enemigos), según el DM.
-    const sides = { ally: "BHD.Place.Ally", enemy: "BHD.Place.Enemy", neutral: "BHD.Place.Neutral", self: "BHD.Place.Self", unknown: "BHD.Place.Unknown" };
+    const sides ={ ally: "BHD.Place.Ally", enemy: "BHD.Place.Enemy", neutral: "BHD.Place.Neutral", self: "BHD.Place.Self", unknown: "BHD.Place.Unknown" };
     const inside = state.inside ?? [];
     const chips = inside.map(c => `<li class="bhd-place-chip bhd-side-${c.side}">
       ${escape(c.name || game.i18n.localize("BHD.Place.UnknownCreature"))} <small>${localize(sides[c.side] ?? sides.neutral)}</small></li>`).join("");
@@ -1546,10 +1658,10 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if ( !place || place.busy ) return true;
     place.busy = true;
     try {
-      const result = await requestPlacementMove(place.sessionId, change);
+      const result = await place.api.move(place.sessionId, change);
       if ( this.#place !== place ) return false;
       if ( !result?.ok ) {
-        useWarn(`${place.item.name} (área) | Error al mover: ${result?.reason}`, result?.error ?? "");
+        useWarn(`${place.item.name} (colocar) | Error al mover: ${result?.reason}`, result?.error ?? "");
         this.#warnPlaceReason(result?.reason, place.item, result?.error);
         if ( result?.reason === "Expired" ) this.#finishPlace(null);
         return false;
@@ -1559,21 +1671,35 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const message = this.element.querySelector(".bhd-place-msg");
       if ( message ) message.hidden = !result.blocked;
       if ( result.blocked ) {
-        if ( message ) message.textContent = game.i18n.localize("BHD.Place.OutOfRange");
-        try {
-          if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([60, 40, 60]);
-        } catch(err) {}
-        const pad = this.element.querySelector(".bhd-place-pad");
-        if ( pad ) {
-          pad.classList.remove("bhd-shake");
-          void pad.offsetWidth;
-          pad.classList.add("bhd-shake");
-        }
+        this.#placeBump(result.blockReason);
         return false;
       }
       return true;
     } finally {
       place.busy = false;
+    }
+  }
+
+  /**
+   * Choque al colocar (alcance, pared, borde, casilla ocupada): mensaje, vibración y temblor de la cruceta.
+   * @param {string} [reason]  "Range", "Wall", "Edge", "Occupied" (sin motivo: fuera de alcance, como las áreas).
+   */
+  #placeBump(reason) {
+    const message = this.element?.querySelector(".bhd-place-msg");
+    const keys = { Wall: "BHD.Summon.Wall", Edge: "BHD.Summon.Edge", Occupied: "BHD.Summon.Occupied" };
+    if ( message ) {
+      message.textContent = game.i18n.localize(keys[reason] ?? "BHD.Place.OutOfRange");
+      message.hidden = false;
+    }
+    useLog(`Colocar: choque (${reason ?? "Range"})`);
+    try {
+      if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.([60, 40, 60]);
+    } catch(err) {}
+    const pad = this.element?.querySelector(".bhd-place-pad");
+    if ( pad ) {
+      pad.classList.remove("bhd-shake");
+      void pad.offsetWidth;
+      pad.classList.add("bhd-shake");
     }
   }
 
@@ -1750,8 +1876,22 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       id: effect.id,
       name: actor.items.get(effect.getFlag("dnd5e", "item")?.id)?.name ?? effect.name
     }));
+    // Invocar (sin Midi): si hay DM, el jugador coloca las criaturas antes con la cruceta (vista previa en la TV).
+    let summonChosen = false;
+    if ( needsSummonPlacement(activity) && game.users.activeGM ) {
+      const summon = await this.#placeSummons(item, activity, slot);
+      if ( !summon ) return null;
+      usage.summons = { profile: summon.profile, creatureSize: summon.creatureSize, creatureType: summon.creatureType };
+      setLocalSummonPlacements(activity, summon.placements);
+      summonChosen = true;
+    }
     useLog(`${tag} | Lanzamiento`, { slot });
-    const results = await activity.use(usage, { configure: needsUsageDialog(activity) }, {});
+    let results;
+    try {
+      results = await activity.use(usage, { configure: needsUsageDialog(activity, { summonChosen }) }, {});
+    } finally {
+      setLocalSummonPlacements(null, null);
+    }
     if ( !results ) {
       useLog(`${tag} | No se lanzó (sin espacios, sin usos o cancelado)`);
       return null;
@@ -3082,7 +3222,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#suppressClickUntil = 0;
     if ( this.#placeHold ) this.#placeHold.active = false;
     if ( this.#place ) {
-      requestPlacementEnd(this.#place.sessionId, false);   // quita la vista previa de la TV (si llega)
+      this.#place.api.end(this.#place.sessionId, false);   // quita la vista previa de la TV (si llega)
       this.#finishPlace(null);
     }
     this.#closePicker(null);
@@ -3283,16 +3423,30 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const place = this.#place;
     if ( !place || place.busy ) return;
     place.busy = true;
-    const result = await requestPlacementEnd(place.sessionId, true);
+    const result = await place.api.end(place.sessionId, true);
     if ( this.#place !== place ) return;
     place.busy = false;
-    if ( !result?.ok || !Number.isFinite(result.x) ) {
+    if ( !result?.ok ) {
       this.#warnPlaceReason(result?.reason ?? "Expired", place.item, result?.error);
       this.#finishPlace(null);
       return;
     }
-    useLog(`${place.item.name} (área) | 2. Confirmada`, result);
-    this.#finishPlace({ x: result.x, y: result.y, direction: result.direction });
+    // Criaturas: si quedan más, la siguiente aparece junto a la anterior; si la casilla está ocupada, choca.
+    if ( !result.done ) {
+      place.state = result;
+      this.#renderPlace();
+      if ( result.blocked ) this.#placeBump(result.blockReason);
+      else {
+        const message = this.element.querySelector(".bhd-place-msg");
+        if ( message ) message.hidden = true;
+        try {
+          if ( navigator.userActivation?.hasBeenActive ?? true ) navigator.vibrate?.(30);
+        } catch(err) {}
+      }
+      return;
+    }
+    useLog(`${place.item.name} (colocar) | Confirmado`, result.value);
+    this.#finishPlace(result.value);
   }
 
   /**
@@ -3302,9 +3456,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onPlaceCancel() {
     const place = this.#place;
     if ( !place ) return;
-    useLog(`${place.item.name} (área) | Cancelada: no se usa nada`);
+    useLog(`${place.item.name} (colocar) | Cancelado: no se usa nada`);
     this.#finishPlace(null);
-    await requestPlacementEnd(place.sessionId, false);
+    await place.api.end(place.sessionId, false);
   }
 
   /**
@@ -3708,6 +3862,23 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       useError("Recursos | Error", err?.message ?? String(err));
       ui.notifications.error(err?.message ?? String(err));
     }
+  }
+
+  /**
+   * Cabecera: abre la bandeja de dados.
+   * @this {BHDMobileApp}
+   */
+  static #onDiceTray() {
+    this.#diceTray?.open();
+  }
+
+  /**
+   * Total de una tirada de la bandeja de dados en el aviso de la vista.
+   * @param {string} formula
+   * @param {Roll} roll
+   */
+  showDiceResult(formula, roll) {
+    this.#showRollResult(formula, roll);
   }
 
   /**

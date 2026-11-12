@@ -521,7 +521,8 @@
       "Reason": {
         "NoToken": "Your token isn't in the TV scene: the area of {name} can't be placed.",
         "NoArea": "dnd5e couldn't prepare the area of {name}.",
-        "Expired": "Placing the area of {name} already ended. Cast it again."
+        "Expired": "Placing {name} already ended. Use it again.",
+        "NoCreature": "dnd5e can't find the creature that {name} summons. Tell the GM."
       },
       "GMTitle": "Area waiting",
       "GMContent": "{user} has been placing the area of {name} for a minute. You can place it yourself with the mouse (click to place, wheel to rotate).",
@@ -530,6 +531,30 @@
     },
     "Relay": {
       "Title": "The DM asks"
+    },
+    "Summon": {
+      "Title": "Place",
+      "ChooseCreature": "What do you summon with {name}?",
+      "ChooseSize": "Creature size",
+      "ChooseType": "Creature type",
+      "Which": "{name}: creature {n} of {count}",
+      "Distance": "{distance} from you",
+      "Occupied": "Someone is already there: move it to a free space.",
+      "Wall": "There is a wall in the way.",
+      "Edge": "That is the edge of the map."
+    },
+    "Dice": {
+      "Title": "Dice tray",
+      "Empty": "Tap the dice to build your roll",
+      "Clear": "Clear the roll",
+      "Modifier": "Modifier",
+      "Visibility": "Who sees it",
+      "Public": "Everyone",
+      "GM": "GM only",
+      "Recent": "Recent",
+      "Roll": "Roll",
+      "Flavor": "Dice tray",
+      "Error": "Could not roll: {error}"
     },
     "Decision": {
       "Close": "Close without choosing",

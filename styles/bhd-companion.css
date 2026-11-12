@@ -5230,3 +5230,251 @@ body.bhd-mobile .bhd-decision-window > .window-content :is(button, .dialog-butto
     animation: none;
   }
 }
+
+/* ------------------------------------------ */
+/*  Colocar criaturas (0.21.0): mismo panel que "Colocar área" */
+/* ------------------------------------------ */
+
+#bhd-mobile-app .bhd-place-distance {
+  display: block;
+  color: var(--bhd-text-muted);
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-place-occupied {
+  display: block;
+  color: #ff8a8a;
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-place-confirm.bhd-disabled-look {
+  opacity: 0.5;
+}
+
+/* ------------------------------------------ */
+/*  Bandeja de dados (scripts/dice-tray.js)    */
+/* ------------------------------------------ */
+
+/* Botón del dado en la cabecera (siempre a mano, no tapa la lista) */
+#bhd-mobile-app .bhd-dice-fab {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--bhd-gold);
+  border-radius: 50%;
+  background: var(--bhd-gold-soft);
+  box-shadow: none;
+  color: var(--bhd-gold);
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-dice-tray {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+#bhd-mobile-app .bhd-dice-tray[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-dice-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 100%;
+  margin: 0 auto;
+  padding: 14px 16px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  border-top: 2px solid var(--bhd-gold);
+  border-radius: 18px 18px 0 0;
+  background: var(--bhd-surface);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.6);
+  animation: bhd-tray-in 0.18s ease-out;
+}
+
+#bhd-mobile-app .bhd-dice-sheet * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+#bhd-mobile-app .bhd-dice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+  color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-dice-x {
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--bhd-text-muted);
+  font-size: calc(20px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-dice-formula {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 6px 8px 6px 14px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-bg);
+}
+
+#bhd-mobile-app .bhd-dice-formula output {
+  flex: 1 1 auto;
+  color: #fff;
+  font-size: calc(22px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+#bhd-mobile-app .bhd-dice-formula output.bhd-dice-empty {
+  color: var(--bhd-text-muted);
+  font-size: calc(15px * var(--bhd-text-scale, 1));
+  font-weight: normal;
+}
+
+#bhd-mobile-app .bhd-dice-clear {
+  flex: none;
+  width: 48px;
+  height: 44px;
+  min-height: 0;
+  border: 1px solid var(--bhd-border);
+  border-radius: 10px;
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text);
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-dice-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 480px) {
+  #bhd-mobile-app .bhd-dice-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+#bhd-mobile-app .bhd-die {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: auto;
+  min-height: 64px;
+  padding: 6px 2px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text);
+  font-size: calc(15px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-die i {
+  font-size: calc(22px * var(--bhd-text-scale, 1));
+  color: var(--bhd-gold);
+}
+
+#bhd-mobile-app .bhd-die:active {
+  filter: brightness(1.3);
+}
+
+#bhd-mobile-app .bhd-die-count {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--bhd-gold);
+  color: #1a1206;
+  font-size: calc(12px * var(--bhd-text-scale, 1));
+  line-height: 20px;
+}
+
+#bhd-mobile-app .bhd-dice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+#bhd-mobile-app .bhd-dice-label {
+  flex: 1 1 auto;
+  color: var(--bhd-text-muted);
+  font-size: calc(14px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-dice-step {
+  width: 48px;
+  height: 48px;
+  min-height: 0;
+  border: 1px solid var(--bhd-border);
+  border-radius: 10px;
+  background: var(--bhd-surface-2);
+  color: var(--bhd-text);
+  font-size: calc(22px * var(--bhd-text-scale, 1));
+  font-weight: bold;
+}
+
+#bhd-mobile-app .bhd-dice-mod {
+  width: 72px;
+  height: 48px;
+  text-align: center;
+  font-size: calc(18px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-dice-modes .bhd-chip,
+#bhd-mobile-app .bhd-dice-visibility .bhd-chip {
+  flex: 1 1 0;
+  min-height: 44px;
+  justify-content: center;
+}
+
+#bhd-mobile-app .bhd-dice-recents {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+#bhd-mobile-app .bhd-dice-recents .bhd-dice-label {
+  flex: 1 1 100%;
+}
+
+#bhd-mobile-app .bhd-dice-roll {
+  min-height: 60px;
+  font-size: calc(22px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-dice-roll:disabled {
+  opacity: 0.45;
+}

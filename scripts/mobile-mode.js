@@ -1,5 +1,6 @@
 import { isMidiActive, MODULE_ID } from "./constants.js";
 import { patchAbilityTemplates, patchTokenPlacement } from "./mobile-templates.js";
+import { takeSummonPlacements } from "./summon-placement.js";
 import { registerCompactDialogs } from "./mobile-dialogs.js";
 import { registerMobileWindows } from "./mobile-windows.js";
 import { enableHomeScreenApp } from "./home-screen.js";
@@ -43,7 +44,7 @@ export function enterMobileMode() {
   } else {
     prepareHiddenCanvas();
     patchAbilityTemplates();
-    patchTokenPlacement();
+    patchTokenPlacement(() => true, takeSummonPlacements);
   }
   disableDiceSoNice();
   drawNoSequencerEffects();

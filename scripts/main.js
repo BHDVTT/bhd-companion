@@ -19,6 +19,7 @@ import { enableGmRemoteHelpers, registerMidiRemote } from "./midi-remote.js";
 import { registerDialogRelay } from "./dialog-relay.js";
 import { registerCprDialogSocket, registerCprDialogsGM, registerCprDialogsPhone } from "./cpr-dialogs.js";
 import { registerTransformSocket } from "./transform.js";
+import { registerSummonPlacement } from "./summon-placement.js";
 import { registerMidiPrompts } from "./midi-prompts.js";
 import { listenMidiChatSaves, registerMidiChatSaves } from "./midi-chat-saves.js";
 import { registerTemplatePlacement } from "./template-placement.js";
@@ -33,6 +34,7 @@ registerMidiRemote();
 registerDialogRelay();
 registerCprDialogSocket();
 registerTransformSocket();
+registerSummonPlacement();
 registerTemplatePlacement();
 
 Hooks.once("init", () => {

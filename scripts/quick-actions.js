@@ -218,7 +218,7 @@ export function needsCast(item, activity) {
  * @param {Activity} activity
  * @returns {boolean}
  */
-export function needsUsageDialog(activity) {
+export function needsUsageDialog(activity, { summonChosen=false }={}) {
   let config;
   try {
     config = activity._prepareUsageConfig({
@@ -230,7 +230,9 @@ export function needsUsageDialog(activity) {
     return true;
   }
   if ( activity.consumption?.scaling?.allowed && !activity.isSpell ) return true;
-  // Invocar: dnd5e solo pregunta en su ventana si hay más de una criatura, tamaño o tipo.
+  // Invocar: dnd5e solo pregunta en su ventana si hay más de una criatura, tamaño o tipo (si ya se eligió en el
+  // teléfono, summon-placement.js, no hace falta).
+  if ( summonChosen ) return false;
   const several = value => (value?.length ?? value?.size ?? 0) > 1;
   return several(activity.availableProfiles) || several(activity.creatureSizes) || several(activity.creatureTypes);
 }

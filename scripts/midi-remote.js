@@ -19,6 +19,7 @@ import { callGM, getSocket, registerSocketHandler } from "./remote-socket.js";
 import { endRemoteRun, getRemotePlacement, getRemoteRunFor, isRemoteRun, startRemoteRun } from "./dialog-relay.js";
 import { needsUsageDialog } from "./quick-actions.js";
 import { patchGmTemplatePlacement, patchTokenPlacement } from "./mobile-templates.js";
+import { takeSummonPlacements } from "./summon-placement.js";
 
 /** Cuánto espera el teléfono al DM (ms). Midi da 90 s a un uso; con preguntas al jugador puede tardar más. */
 const REQUEST_TIMEOUT_MS = 150 * 1000;
@@ -41,7 +42,8 @@ export function registerMidiRemote() {
  */
 export function enableGmRemoteHelpers() {
   patchGmTemplatePlacement(activity => getRemotePlacement(activity?.actor));
-  patchTokenPlacement(() => isRemoteRun());
+  // Invocar: donde lo eligió el jugador en el teléfono (summon-placement.js) o, si no, junto al personaje.
+  patchTokenPlacement(() => isRemoteRun(), takeSummonPlacements);
   // Invocar (Wildfire Spirit, Find Familiar, Dancing Lights...) con la actividad Invocar de dnd5e: la ejecuta el DM,
   // así que la criatura sería solo suya. Se le da al jugador la misma propiedad (OWNER) que tendría si la hubiera
   // invocado él (Cauldron ya lo hace en sus invocaciones: copia la propiedad del invocador).
@@ -83,7 +85,7 @@ export function getRemoteBlock() {
  * @param {string} options.mode         "normal", "advantage" o "disadvantage".
  * @returns {Promise<object>}  `{ ok: true, ...resultado }` o `{ ok: false, reason, error? }`.
  */
-export async function requestMidiUse(activity, { targetIds=[], slot=null, mode="normal", template=null }={}) {
+export async function requestMidiUse(activity, { targetIds=[], slot=null, mode="normal", template=null, summon=null }={}) {
   const block = getRemoteBlock();
   if ( block ) return { ok: false, reason: block };
   return askGM("midiUse", {
@@ -94,6 +96,7 @@ export async function requestMidiUse(activity, { targetIds=[], slot=null, mode="
     slot,
     mode,
     template,
+    summon,
     sceneId: game.scenes.active?.id ?? null
   });
 }
@@ -139,7 +142,7 @@ function gmMidiUse(data) {
  * @param {string} userId
  * @param {object} data
  */
-async function runMidiUse(userId, { actorUuid, itemId, activityId, targetIds=[], slot=null, mode="normal", template=null, sceneId }) {
+async function runMidiUse(userId, { actorUuid, itemId, activityId, targetIds=[], slot=null, mode="normal", template=null, summon=null, sceneId }) {
   const user = game.users.get(userId);
   const actor = fromUuidSync(actorUuid);
   const item = actor?.items?.get(itemId);
@@ -191,11 +194,16 @@ async function runMidiUse(userId, { actorUuid, itemId, activityId, targetIds=[],
   // (usos, espacios, recursos; los valores negativos recuperan), igual que desde la hoja normal.
   const usage = { midiOptions };
   if ( slot ) usage.spell = { slot };
-  // La ventana de dnd5e solo si el sistema la pide (invocar con elección, encantamientos...): va al teléfono.
-  const dialog = { configure: needsUsageDialog(activity) };
+  // Invocar: criatura, tamaño y tipo ya elegidos en el teléfono; las posiciones las usa patchTokenPlacement.
+  if ( summon ) usage.summons = { profile: summon.profile, creatureSize: summon.creatureSize, creatureType: summon.creatureType };
+  // La ventana de dnd5e solo si el sistema la pide (encantamientos, órdenes...): va al teléfono.
+  const dialog = { configure: needsUsageDialog(activity, { summonChosen: !!summon }) };
 
-  // Área colocada en el teléfono (template-placement.js): se crea ahí cuando dnd5e la pida.
-  const remote = startRemoteRun(user, actor, item.name, template ? { template } : {});
+  // Área colocada en el teléfono (template-placement.js) o criaturas colocadas (summon-placement.js).
+  const extra = {};
+  if ( template ) extra.template = template;
+  if ( summon ) extra.summon = { placements: summon.placements ?? null };
+  const remote = startRemoteRun(user, actor, item.name, extra);
   try {
     console.log(`${tag} | 2. Midi QOL empieza (objetivos: ${targetUuids.length}, ventana de dnd5e: ${dialog.configure}, `
       + `consumos: ${activity.consumption?.targets?.length ?? 0})`);
