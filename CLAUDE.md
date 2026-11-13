@@ -779,3 +779,31 @@ lang/es.json, en.json        traducciones
 - **Bandeja de dados**: botón `.bhd-dice-fab` en la cabecera → `DiceTray` (panel propio en `#bhd-mobile-app`):
   fórmula por dados, modificador, ventaja con un solo d20 (`2d20kh/kl`), `publicroll` / `gmroll`, `Roll#toMessage` con
   `ChatMessage.getSpeaker({ actor })`; últimas 5 en `localStorage` (`bhd-companion.diceRecent`).
+
+## Selector de actividad, salvaciones de Midi al instante y preguntas de Cauldron (0.22.0, sin probar en partida)
+
+- **Actividades ocultas** (`isHiddenActivity`, quick-actions.js; también en `getUsableActivities`): riders de dnd5e,
+  `midiProperties.automationOnly` de Midi y `chrisPremades.utils.activityUtils.isHidden` (automationOnly o
+  `flags.chris-premades.hiddenActivities`). Ojo: Cauldron parchea `canUse` y devuelve **true** para sus ocultas.
+- **Selector** (`prepareChooseButton`): con más de una actividad usable en la fila (en el HUD, las del bloque) sale un
+  solo botón `kind: "choose"` con `data-activity-ids` → `#openActivityPicker` (hoja `.bhd-chooser`, `describeActivity`:
+  icono, nombre, tipo `metadata.title`, activación, ataque, CD, daño escalado, alcance). Con Midi, como `doItemUse`:
+  un solo ataque + su `otherActivity` no pregunta; se llama al hook `midi-qol.itemUseActivitySelect`. Elegir →
+  `#runMidi` o `#runQuick(getQuickKind(...))`. El nivel del hechizo sigue en la fila.
+- **Salvaciones por chat de Midi** (Midi 13.0.74 y 14.6.7): `processSaveRoll` escucha `renderChatMessageHTML`, que
+  solo corre cuando el registro del chat del DM dibuja el mensaje (`ChatLog#postOne`, cola de dibujado). Liga por
+  `speaker.token` = `saveRequests[target.id]` y exige mensaje de tirada (dnd5e 5: `flags.dnd5e.messageType = "roll"`;
+  Midi 14: `message.type` save/check...). No hay botón en la línea de chat de Midi (`requestPCSave` = texto).
+  `deliverSaveRoll` (DM, `createChatMessage`) llama a `workflow.processSaveRoll(message)` en cuanto existe el
+  documento; Midi borra la petición al recibirla, así que la del dibujado no hace nada. En el teléfono, Midi crea el
+  mensaje él mismo tras `displayDSNForRoll` (sin espera: `showForRoll` anulado) y `bonusCheck` (ventana de
+  bonificaciones opcionales): `holdUserFlow()` (mobile-windows.js) hace que esas ventanas cuenten como pedidas por el
+  jugador (no esperan en la cola). Tiempos en consola (toque → mensaje, toque → Midi; en el DM petición → mensaje →
+  Midi) y pastilla `.bhd-save-wait` si pasan 3 s sin `midiSaveRolled`.
+- **Cauldron** (1.5.52, `macros/2024/spells/divineSmite.js`, `classFeatures/rogue/sneakAttack.js`): pase de Midi
+  `damageRollComplete` en el cliente del flujo; `dialogUtils.selectDocumentDialog` / `confirm` sin `userId` →
+  `DialogApp.dialog` local (el DM). Condiciones del smite: `mwak`, sin `MidiQOL.hasUsedBonusAction`, y si hay
+  `game.combat` (el del DM) el combatiente actual debe ser `workflow.token`. `logCauldronGates` las enseña en la
+  consola del DM tras cada ataque remoto. Reenvío: `getActiveRemoteRun({ ignoreGmTap: true })`, `askPhoneWithin`
+  35 s → sin respuesta = `null` (como cerrar la ventana = "no usar"); solo sale en el DM si el teléfono no está
+  conectado. En el teléfono el aviso tiene 30 s (`timeoutMs` en decisions.js, barra y segundos) y "No usar".

@@ -5478,3 +5478,100 @@ body.bhd-mobile .bhd-decision-window > .window-content :is(button, .dialog-butto
 #bhd-mobile-app .bhd-dice-roll:disabled {
   opacity: 0.45;
 }
+
+/* Selector de actividad (objetos con varias actividades: Command, Unarmed Strike...) */
+#bhd-mobile-app .bhd-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 55dvh;
+  overflow-y: auto;
+}
+
+#bhd-mobile-app .bhd-activity-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid var(--bhd-border);
+  border-radius: 12px;
+  background: var(--bhd-bg);
+  color: var(--bhd-text);
+  text-align: left;
+}
+
+#bhd-mobile-app .bhd-activity-option:active {
+  border-color: var(--bhd-gold);
+  background: var(--bhd-gold-soft);
+}
+
+#bhd-mobile-app .bhd-activity-option img {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+#bhd-mobile-app .bhd-activity-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#bhd-mobile-app .bhd-activity-text strong {
+  font-size: calc(15px * var(--bhd-text-scale, 1));
+}
+
+#bhd-mobile-app .bhd-activity-type {
+  font-size: calc(11px * var(--bhd-text-scale, 1));
+  color: var(--bhd-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#bhd-mobile-app .bhd-activity-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: calc(12px * var(--bhd-text-scale, 1));
+  color: var(--bhd-text-muted);
+}
+
+#bhd-mobile-app .bhd-activity-option > .fa-chevron-right {
+  flex: 0 0 auto;
+  color: var(--bhd-text-muted);
+}
+
+/* Salvación por chat de Midi: la tirada se mandó y Midi aún no la confirma */
+#bhd-mobile-app .bhd-save-wait {
+  position: absolute;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--bhd-gold);
+  border-radius: 999px;
+  background: var(--bhd-surface);
+  color: var(--bhd-text);
+  font-size: calc(13px * var(--bhd-text-scale, 1));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+#bhd-mobile-app .bhd-save-wait[hidden] {
+  display: none;
+}
+
+#bhd-mobile-app .bhd-save-wait.bhd-save-wait-late {
+  border-color: var(--bhd-red-bright);
+}

@@ -65,6 +65,8 @@
       "Disadvantage": "Desventaja",
       "Use": "Usar",
       "MoreOptions": "Ventana de dnd5e (munición, modo de ataque…)",
+      "ChooseCount": "Elegir ({count})",
+      "ChooseActivity": "¿Qué quieres hacer?",
       "Cancel": "Cancelar",
       "Attack": "Ataque",
       "Damage": "Daño",
@@ -437,7 +439,9 @@
       "HoldForMode": "Mantén presionado para elegir ventaja, normal o desventaja",
       "ChooseMode": "¿Cómo tiras?",
       "MidiRolled": "Se acabó el tiempo: Midi la tiró por ti",
-      "Rolled": "Midi recibió tu tirada"
+      "Rolled": "Midi recibió tu tirada",
+      "Waiting": "Tirada enviada · Midi aún no la recibe ({seconds} s)",
+      "ReceivedLate": "Midi recibió tu tirada ({seconds} s)"
     },
     "Midi": {
       "Attack": "Atacar",
@@ -558,7 +562,9 @@
     },
     "Decision": {
       "Close": "Cerrar sin elegir",
-      "More": "{count} pregunta(s) más esperando"
+      "More": "{count} pregunta(s) más esperando",
+      "SecondsLeft": "Quedan {seconds} s: después, no se usa",
+      "DontUse": "No usar"
     },
     "Transform": {
       "Label": "Forma de {name}",

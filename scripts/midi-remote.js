@@ -215,12 +215,43 @@ async function runMidiUse(userId, { actorUuid, itemId, activityId, targetIds=[],
     }
     const result = { ...summarizeWorkflow(workflow), notices };
     console.log(`${tag} | 3. Terminado`, result);
+    logCauldronGates(tag, workflow);
     return { ok: true, ...result };
   } catch(err) {
     console.error(`${tag} | Error en Midi QOL`, err);
     return { ok: false, reason: "Error", error: err?.message ?? String(err) };
   } finally {
     endRemoteRun(remote);
+  }
+}
+
+/**
+ * Cauldron (chris-premades) solo pregunta por un smite o Sneak Attack tras un ataque que pega si se cumplen sus
+ * condiciones (macros `divineSmite` / `sneakAttack` de 2024, pase `damageRollComplete` en este cliente):
+ * - smite: ataque cuerpo a cuerpo con arma (`mwak`), sin acción adicional gastada (`MidiQOL.hasUsedBonusAction`) y,
+ *   si hay `game.combat` (el combate de la escena que mira el DM), que el combatiente actual sea la ficha que ataca;
+ * - Sneak Attack: un solo objetivo impactado, ataque a distancia o arma sutil, usos y ventaja o un enemigo al lado.
+ * Si el teléfono no recibe la pregunta, esto dice en la consola del DM cuál falló.
+ * @param {string} tag
+ * @param {object} workflow
+ */
+function logCauldronGates(tag, workflow) {
+  if ( !game.modules.get("chris-premades")?.active || !workflow?.attackRoll ) return;
+  try {
+    const combat = game.combat;
+    const current = combat?.combatants.get(combat?.current?.combatantId);
+    const currentToken = game.scenes.get(current?.sceneId)?.tokens.get(current?.tokenId)?.object ?? null;
+    console.log(`${tag} | Condiciones de Cauldron para preguntar (smite / Sneak Attack)`, {
+      impactados: workflow.hitTargets?.size ?? 0,
+      tipoDeAtaque: workflow.activity?.actionType ?? null,
+      combateDelDM: combat ? `${combat.id} (ronda ${combat.round})` : "ninguno",
+      turnoDe: currentToken?.name ?? current?.name ?? null,
+      esSuTurno: combat ? (currentToken === workflow.token) : true,
+      adicionalGastada: globalThis.MidiQOL?.hasUsedBonusAction?.(workflow.actor) ?? null,
+      ventaja: !!workflow.advantage, desventaja: !!workflow.disadvantage
+    });
+  } catch(err) {
+    console.warn(`${tag} | No se pudieron leer las condiciones de Cauldron`, err);
   }
 }
 

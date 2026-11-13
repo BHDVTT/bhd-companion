@@ -115,7 +115,89 @@ export function getTurnKey() {
  * @returns {Activity[]}
  */
 export function getUsableActivities(item) {
-  return item.system.activities?.filter(a => a.canUse) ?? [];
+  return item.system.activities?.filter(a => a.canUse && !isHiddenActivity(a)) ?? [];
+}
+
+/**
+ * ¿La oculta otro módulo de la elección del jugador? Se pregunta a cada uno con su propio criterio:
+ * - dnd5e: actividades "rider" (`flags.dnd5e.riders.activity`, ya fuera de `canUse` en dnd5e 5 y 6).
+ * - Midi QOL: `midiProperties.automationOnly` (su `MidiActivityChoiceDialog` y `doItemUse` las quitan).
+ * - Cauldron (chris-premades): `activityUtils.isHidden` (automationOnly o `flags.chris-premades.hiddenActivities`);
+ *   su parche de `canUse` devuelve true para las ocultas, por eso no basta con `canUse`.
+ * @param {Activity} activity
+ * @returns {boolean}
+ */
+export function isHiddenActivity(activity) {
+  if ( activity.isRider ) return true;
+  if ( activity.item?.getFlag?.("dnd5e", "riders.activity")?.includes?.(activity.id) ) return true;
+  if ( activity.midiProperties?.automationOnly ) return true;
+  try {
+    if ( globalThis.chrisPremades?.utils?.activityUtils?.isHidden?.(activity) ) return true;
+  } catch(err) {}
+  return false;
+}
+
+/**
+ * Actividades entre las que el jugador elige al tocar el botón de la fila (como el selector de la hoja nativa).
+ * Con Midi, igual que su `doItemUse`: si hay un solo ataque y lo único más es su "otra actividad"
+ * (`otherActivity`, la salvación o el daño que Midi hace después del ataque), no se pregunta: va el ataque.
+ * @param {Activity[]} activities  Actividades usables de la fila.
+ * @returns {Activity[]}
+ */
+export function getChoiceActivities(activities) {
+  if ( !isMidiActive() || (activities.length < 2) ) return activities;
+  const attacks = activities.filter(a => a.type === "attack");
+  if ( attacks.length !== 1 ) return activities;
+  let other = null;
+  try {
+    other = attacks[0].otherActivity ?? null;
+  } catch(err) {}
+  const rest = activities.filter(a => (a !== attacks[0]) && (a !== other));
+  return rest.length ? activities : [attacks[0]];
+}
+
+/**
+ * Lo que hace una actividad, para el selector: tipo (nombre de dnd5e), activación, ataque, CD y daño / curación.
+ * @param {Activity} activity
+ * @param {QuickActionState} [state]
+ * @returns {{id: string, name: string, img: string, type: string, facts: string[]}}
+ */
+export function describeActivity(activity, state) {
+  const labels = activity.labels ?? {};
+  const title = activity.constructor?.metadata?.title ?? activity.metadata?.title;
+  const slot = state?.getSlot(activity) ?? null;
+  const scaled = getScaledActivity(activity, getScaling(activity, slot)).labels ?? labels;
+  const damage = (scaled.damage ?? []).map(d => d.label || d.formula).filter(_ => _);
+  const facts = [
+    labels.activation,
+    labels.toHit ? `${game.i18n.localize("BHD.Actions.Attack")} ${labels.toHit}` : null,
+    activity.save ? getSaveLabel(activity) : null,
+    ...damage,
+    labels.range,
+    labels.target
+  ].filter(_ => _).map(String);
+  return {
+    id: activity.id,
+    name: activity.name || activity.item.name,
+    img: activity.img || activity.item.img,
+    type: title ? game.i18n.localize(title) : "",
+    facts: [...new Set(facts)]
+  };
+}
+
+/**
+ * Botón que toca la fila al elegir esta actividad sin Midi (lo que haría la fila si solo tuviera esa).
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {"attack"|"save"|"damage"|"heal"|"use"}
+ */
+export function getQuickKind(item, activity) {
+  const { attack, save, damage, heal } = getRowActivities(item, [activity]);
+  if ( attack ) return "attack";
+  if ( save ) return "save";
+  if ( heal ) return "heal";
+  if ( damage ) return "damage";
+  return "use";
 }
 
 /**
@@ -247,7 +329,10 @@ export function needsUsageDialog(activity, { summonChosen=false }={}) {
  * @returns {{buttons: object[], slots: object[]|null, cast: object|null}}
  */
 export function prepareRowButtons(item, activities, state) {
-  if ( isMidiActive() ) return prepareMidiButton(item, activities, state);
+  // Varias actividades (Command, Unarmed Strike...): un solo botón que abre el selector.
+  const choices = getChoiceActivities(activities);
+  if ( choices.length > 1 ) return prepareChooseButton(item, choices, state);
+  if ( isMidiActive() ) return prepareMidiButton(item, choices, state);
   const { attack, save, damage, heal, use, primary } = getRowActivities(item, activities);
   // Solo los hechizos que gastan espacio muestran su lanzamiento en curso ("Lanzado ✕").
   const active = state?.getCast(item) ?? null;
@@ -349,6 +434,40 @@ function prepareMidiButton(item, activities, state) {
     }],
     slots,
     cast: null
+  };
+}
+
+/**
+ * Fila con varias actividades: un botón "Elegir" que abre el selector (`data-activity-ids`). El nivel del hechizo
+ * se sigue eligiendo en la fila (es del objeto, vale para cualquier actividad que gaste espacio).
+ * @param {Item} item
+ * @param {Activity[]} activities
+ * @param {QuickActionState} [state]
+ * @returns {{buttons: object[], slots: object[]|null, cast: object|null}}
+ */
+function prepareChooseButton(item, activities, state) {
+  const slotted = activities.find(a => getSlotOptions(a));
+  const options = slotted ? getSlotOptions(slotted) : null;
+  const slot = options ? (state?.getSlot(slotted) ?? null) : null;
+  const slots = (options?.length > 1) ? options.map(o => ({ ...o, selected: o.value === slot })) : null;
+  const active = isMidiActive() ? null : (state?.getCast(item) ?? null);
+  const cast = active?.sticky ? active : null;
+  const verb = (item.type === "spell") ? "Cast" : (activities.some(a => a.type === "attack") ? "Attack" : "Use");
+  return {
+    buttons: [{
+      kind: "choose",
+      activityId: "",
+      activityIds: activities.map(a => a.id).join(","),
+      caption: game.i18n.localize(`BHD.Midi.${verb}`),
+      value: game.i18n.format("BHD.Actions.ChooseCount", { count: activities.length }),
+      icon: "fa-solid fa-list-ul"
+    }],
+    slots,
+    cast: cast ? {
+      label: cast.slot
+        ? game.i18n.format("BHD.Actions.CastAt", { level: item.actor?.system.spells?.[cast.slot]?.level ?? "" })
+        : game.i18n.localize("BHD.Actions.Cast")
+    } : null
   };
 }
 

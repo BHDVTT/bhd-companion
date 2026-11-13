@@ -54,13 +54,27 @@ let listening = false;
  */
 export function showDecision(spec) {
   listen();
+  // Plazo de verdad: al acabarse se contesta solo con el valor de cierre (= "no usar" en Cauldron).
+  if ( spec.timeoutMs > 0 ) spec.deadline = Date.now() + spec.timeoutMs;
   const entry = enqueuePrompt({ kind: "decision", label: `${spec.kind}: ${spec.title ?? ""}`, deadline: spec.deadline });
   let resolve;
   const promise = new Promise(r => resolve = r);
-  const decision = { entry, spec, node: null, vibrated: false, done: false, resolve: null };
+  const decision = { entry, spec, node: null, vibrated: false, done: false, resolve: null, timer: null };
+  if ( spec.timeoutMs > 0 ) {
+    decision.timer = setInterval(() => {
+      const left = spec.deadline - Date.now();
+      if ( left <= 0 ) {
+        console.log(`BHD Companion | Decisión (${spec.kind}) "${spec.title}": se acabó el tiempo; no se usa`);
+        decision.resolve(spec.closeValue ?? null);
+        return;
+      }
+      updateTimer(decision, left);
+    }, 250);
+  }
   decision.resolve = value => {
     if ( decision.done ) return;
     decision.done = true;
+    clearInterval(decision.timer);
     pending.delete(entry.id);
     if ( shown === decision ) shown = null;
     console.log(`BHD Companion | Decisión (${spec.kind}) "${spec.title}": respuesta`, value);
@@ -148,6 +162,20 @@ function sync() {
 }
 
 /**
+ * Barra y segundos de una decisión con plazo.
+ * @param {object} decision
+ * @param {number} left  ms que quedan.
+ */
+function updateTimer(decision, left) {
+  const node = decision.node;
+  if ( !node ) return;
+  const bar = node.querySelector(".bhd-decision-bar");
+  if ( bar ) bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / decision.spec.timeoutMs))})`;
+  const seconds = node.querySelector(".bhd-decision-seconds");
+  if ( seconds ) seconds.textContent = game.i18n.format("BHD.Decision.SecondsLeft", { seconds: Math.ceil(left / 1000) });
+}
+
+/**
  * "N preguntas más esperando".
  * @param {HTMLElement} node
  */
@@ -182,7 +210,9 @@ function build(decision) {
     <div class="bhd-decision-body">${spec.html ?? ""}</div>
     ${buttons ? `<div class="bhd-decision-buttons">${buttons}</div>` : ""}
     ${(spec.closable ?? true) ? `<button type="button" class="bhd-decision-close" data-bhd-decision-close>
-      ${escape(game.i18n.localize("BHD.Decision.Close"))}</button>` : ""}
+      ${escape(spec.closeLabel ?? game.i18n.localize("BHD.Decision.Close"))}</button>` : ""}
+    ${spec.timeoutMs > 0 ? `<div class="bhd-reaction-timer"><span class="bhd-reaction-bar bhd-decision-bar"></span></div>
+      <span class="bhd-decision-more bhd-decision-seconds"></span>` : ""}
     <span class="bhd-decision-more" hidden></span>`;
   // Nada de scripts ni enlaces que saquen de la vista.
   form.querySelectorAll("script, iframe, object, embed").forEach(e => e.remove());

@@ -60,6 +60,7 @@
       {{#each row.buttons}}
       <button type="button" class="bhd-roll-btn bhd-roll-{{kind}} {{#if critical}}bhd-crit{{/if}}"
               data-action="bhdQuick" data-kind="{{kind}}" data-item-id="{{../row.id}}" data-activity-id="{{activityId}}"
+              {{#if activityIds}}data-activity-ids="{{activityIds}}"{{/if}}
               {{#if ../row.hudBlock}}data-hud-block="{{../row.hudBlock}}"{{/if}}>
         {{#if caption}}<span class="bhd-roll-caption"><i class="{{icon}}" aria-hidden="true"></i> {{caption}}</span>{{/if}}
         <span class="bhd-roll-value">{{#unless caption}}<i class="{{icon}}" aria-hidden="true"></i> {{/unless}}{{value}}</span>

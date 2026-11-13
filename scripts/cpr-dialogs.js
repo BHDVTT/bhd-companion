@@ -23,9 +23,12 @@
  *   a ese teléfono con sus datos (no una copia de la ventana). Si el teléfono no contesta, salen en el DM.
  */
 
-import { askPhone, getActiveRemoteRun, RELAY_NO_ANSWER } from "./dialog-relay.js";
+import { askPhoneWithin, getActiveRemoteRun, RELAY_NO_ANSWER } from "./dialog-relay.js";
 import { buttonHTML, showDecision } from "./decisions.js";
 import { registerSocketHandler } from "./remote-socket.js";
+
+/** Tiempo para contestar una pregunta de Cauldron en el teléfono; después, "no usar" (respuesta null). */
+export const CPR_TIMEOUT_MS = 30000;
 
 /** Tipos de campo de Cauldron que la vista sabe dibujar. */
 const SUPPORTED = new Set(["button", "checkbox", "radio", "selectAmount", "selectOption", "selectMany", "text", "number"]);
@@ -76,8 +79,14 @@ export function registerCprDialogsGM() {
   if ( !game.user.isGM || (typeof DialogApp?.dialog !== "function") || DialogApp.dialog.bhdWrapped ) return;
   const original = DialogApp.dialog;
   const wrapped = async function(...options) {
-    const run = getActiveRemoteRun();
-    if ( !run ) return original.apply(this, options);
+    // Las preguntas de Cauldron salen de las macros del flujo en curso (no de un clic del DM): van al jugador del
+    // uso remoto aunque el DM acabe de tocar su pantalla (si no, un clic en el mapa le robaba el smite al jugador).
+    const run = getActiveRemoteRun({ ignoreGmTap: true });
+    if ( !run ) {
+      console.log(`BHD Companion | Pregunta de Cauldron en el DM (no hay uso de un teléfono en curso): `
+        + game.i18n.localize(String(options[0] ?? "")));
+      return original.apply(this, options);
+    }
     const tag = `BHD Companion | [${run.user.name}] ${run.label}`;
     const payload = sanitize(options);
     if ( !payload ) {
@@ -86,11 +95,16 @@ export function registerCprDialogsGM() {
     }
     console.log(`${tag} | Pregunta de Cauldron enviada a su teléfono: ${game.i18n.localize(String(options[0] ?? ""))}`,
       summarize(options));
-    const answer = await askPhone(run, "cprDialog", payload);
+    const startedAt = Date.now();
+    // El teléfono tiene 30 s (luego contesta "no usar" él solo); 5 s más de margen por la red. Si aun así no llega
+    // nada, también "no usar" (null, como cerrar la ventana de Cauldron): la pregunta nunca sale en el PC del DM
+    // salvo que el teléfono no esté conectado.
+    const answer = await askPhoneWithin(run, "cprDialog", [payload], { timeoutMs: CPR_TIMEOUT_MS + 5000, timeoutValue: null });
     if ( answer === RELAY_NO_ANSWER ) {
-      console.warn(`${tag} | El teléfono no contestó la pregunta de Cauldron; sale aquí`);
+      console.warn(`${tag} | El teléfono no está conectado; la pregunta de Cauldron sale aquí`);
       return original.apply(this, options);
     }
+    console.log(`${tag} | Respuesta en ${Date.now() - startedAt} ms`);
     console.log(`${tag} | Respuesta del jugador a Cauldron`, answer);
     return answer;
   };
@@ -157,8 +171,12 @@ export function buildCprDecision([title, content, inputs, buttons]) {
     icon: "fa-solid fa-flask",
     html,
     buttons: footer,
+    // Cerrar = lo mismo que cerrar la ventana de Cauldron (null): todas sus macros lo toman como "no usar".
+    // Sin respuesta en 30 s, igual, para que el combate no se trabe.
     closable: true,
     closeValue: null,
+    closeLabel: game.i18n.localize("BHD.Decision.DontUse"),
+    timeoutMs: CPR_TIMEOUT_MS,
     setup: form => setupLimits(form, inputs),
     collect: (value, form) => collectAnswer(value, form)
   };

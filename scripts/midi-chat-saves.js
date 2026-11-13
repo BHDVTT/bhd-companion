@@ -19,6 +19,7 @@
 
 import { MODULE_ID } from "./constants.js";
 import { useError, useLog, useWarn } from "./use-log.js";
+import { holdUserFlow } from "./mobile-windows.js";
 
 const SOCKET = `module.${MODULE_ID}`;
 
@@ -63,6 +64,7 @@ export function registerMidiChatSaves() {
     return result;
   };
   Hooks.on("midi-qol.postCheckSaves", announceResults);
+  Hooks.on("createChatMessage", deliverSaveRoll);
   game.socket.on(SOCKET, data => {
     if ( data?.type === "midiSaveQuery" ) resendPending(data.userId);
   });
@@ -110,7 +112,8 @@ function announceRequest(workflow, { target, player, saveDetails, rollType, roll
     timeout,
     remainingMs: timeout * 1000
   };
-  pending.set(id, { data, endsAt: timeout ? Date.now() + (timeout * 1000) : null });
+  const requestedAt = Date.now();
+  pending.set(id, { data, endsAt: timeout ? requestedAt + (timeout * 1000) : null, workflow, requestedAt, messageAt: null });
   console.log(`BHD Companion | Salvación por chat de Midi → teléfono de ${player.name}`, {
     actor: actor.name, tipo: data.rollType, habilidad: data.abilities[0] ?? data.skills[0], cd: data.dc,
     ventaja: data.advantage, desventaja: data.disadvantage, de: data.source, tiempo: timeout
@@ -118,10 +121,16 @@ function announceRequest(workflow, { target, player, saveDetails, rollType, roll
   game.socket.emit(SOCKET, data, { recipients: [player.id] });
 
   Promise.resolve(promise).then(result => {
+    const entry = pending.get(id);
     pending.delete(id);
     const roll = Array.isArray(result) ? result[0] : result;
     const total = Number.isFinite(roll?.total) ? roll.total : null;
-    console.log(`BHD Companion | Salvación por chat: Midi recibió la tirada de ${actor.name} (${total ?? "?"})`);
+    const now = Date.now();
+    const times = entry ? {
+      desdePetición: `${now - entry.requestedAt} ms`,
+      desdeMensaje: entry.messageAt ? `${now - entry.messageAt} ms` : "sin mensaje del jugador (la tiró Midi)"
+    } : {};
+    console.log(`BHD Companion | Salvación por chat: Midi recibió la tirada de ${actor.name} (${total ?? "?"})`, times);
     awaitingResult.set(id, { userId: player.id, workflowId: workflow.id, tokenId: target.id });
     game.socket.emit(SOCKET, { type: "midiSaveRolled", id, userId: player.id, total }, { recipients: [player.id] });
   }).catch(err => {
@@ -129,6 +138,44 @@ function announceRequest(workflow, { target, player, saveDetails, rollType, roll
     console.error("BHD Companion | Salvación por chat: error en la petición de Midi", err);
     game.socket.emit(SOCKET, { type: "midiSaveRolled", id, userId: player.id, total: null }, { recipients: [player.id] });
   });
+}
+
+/**
+ * Hook `createChatMessage` en el cliente del flujo: la tirada de un jugador que Midi espera.
+ *
+ * Midi la liga en `Workflow#processSaveRoll`, que escucha `renderChatMessageHTML`: solo corre cuando el registro del
+ * chat de ESTE cliente dibuja el mensaje (`ChatLog#postOne`, en una cola de dibujado, y nada si el registro no está
+ * dibujado). Si el chat del DM va lento (muchos mensajes, Dice So Nice, pestaña en segundo plano), la tirada ya está
+ * en el chat pero Midi aún no la tiene y puede acabar tirándola él por tiempo. Por eso, en cuanto el documento
+ * existe, se llama a esa misma función de Midi con el mensaje (Midi también la usa con `createChatMessage` en su
+ * otro tipo de flujo). Midi borra `saveRequests[ficha]` al recibirla: la llamada de después (al dibujarse) no hace
+ * nada, así que no se cuenta dos veces.
+ * @param {ChatMessage} message
+ * @param {object} options
+ * @param {string} userId
+ */
+function deliverSaveRoll(message, options, userId) {
+  const tokenId = message?.speaker?.token;
+  if ( !tokenId || !pending.size || !message.rolls?.length ) return;
+  for ( const [id, entry] of pending ) {
+    if ( entry.data.tokenId !== tokenId ) continue;
+    const workflow = entry.workflow;
+    const waiting = !!workflow?.saveRequests?.[tokenId];
+    entry.messageAt ??= Date.now();
+    console.log(`BHD Companion | Salvación por chat: llegó al DM el mensaje de tirada de ${message.speaker.alias ?? tokenId}`, {
+      id, mensaje: message.id, autor: game.users.get(userId)?.name ?? userId,
+      desdePetición: `${entry.messageAt - entry.requestedAt} ms`, midiEspera: waiting
+    });
+    if ( !waiting || (typeof workflow.processSaveRoll !== "function") ) continue;
+    try {
+      workflow.processSaveRoll(message, options, userId);
+      if ( workflow.saveRequests?.[tokenId] ) {
+        console.warn("BHD Companion | Salvación por chat: Midi no aceptó el mensaje (¿no es una tirada de dnd5e?)", message);
+      }
+    } catch(err) {
+      console.error("BHD Companion | Salvación por chat: error al entregar la tirada a Midi", err);
+    }
+  }
 }
 
 /**
@@ -278,6 +325,8 @@ export async function rollMidiChatSave(prompt, mode, event) {
   useLog(`Salvación por chat: ${actor.name} tira (${mode ?? "según Midi"})`, {
     tipo: prompt.type, habilidad: config.skill ?? config.ability, ventaja: advantage, desventaja: disadvantage
   });
+  const startedAt = Date.now();
+  const release = holdUserFlow();
   try {
     const dialog = { configure: false };
     let rolls;
@@ -286,12 +335,14 @@ export async function rollMidiChatSave(prompt, mode, event) {
     else if ( concentration && !config.ability ) rolls = await actor.rollConcentration(config, dialog);
     else rolls = await actor.rollSavingThrow(config, dialog);
     const roll = Array.isArray(rolls) ? rolls[0] : rolls;
-    useLog(`Salvación por chat: tirada hecha (${roll?.total ?? "sin tirada"}); Midi la recibe en el DM`);
+    useLog(`Salvación por chat: tirada hecha (${roll?.total ?? "sin tirada"}) y mensaje creado en `
+      + `${Date.now() - startedAt} ms; Midi la recibe en el DM`);
     return roll ?? null;
   } catch(err) {
     useError("Salvación por chat | Error al tirar", err?.message ?? String(err));
     throw err;
   } finally {
+    release();
     Hooks.off("preCreateChatMessage", hookId);
   }
 }

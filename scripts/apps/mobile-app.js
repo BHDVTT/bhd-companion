@@ -25,7 +25,8 @@ import { getInstallMode, promptInstall } from "../home-screen.js";
 import { reloadWithoutUrlMode } from "../device.js";
 import { useError, useLog, useWarn } from "../use-log.js";
 import {
-  getScaledActivity, getScaling, getSlotOptions, getTurnKey, needsCast, needsUsageDialog, QuickActionState, ROLL_KINDS
+  describeActivity, getQuickKind, getScaledActivity, getScaling, getSlotOptions, getTurnKey, getUsableActivities, needsCast,
+  needsUsageDialog, QuickActionState, ROLL_KINDS
 } from "../quick-actions.js";
 import { applyEnchantment, prepareEnchantPicker, removeEnchantment } from "../enchantments.js";
 import {
@@ -105,6 +106,7 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       actionFilter: BHDMobileApp.#onActionFilter,
       closeTray: BHDMobileApp.#onCloseTray,
       chooseUse: BHDMobileApp.#onChooseUse,
+      bhdPickActivity: BHDMobileApp.#onPickActivity,
       bhdCheckMode: BHDMobileApp.#onCheckMode,
       bhdReconnect: BHDMobileApp.#onReconnect,
       bhdChooseSlot: BHDMobileApp.#onChooseSlot,
@@ -254,6 +256,9 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Reloj de la cuenta atrás del aviso de salvación (salvaciones por chat de Midi). */
   #saveTick = null;
+
+  /** Salvación por chat tirada que Midi aún no confirma (pastilla "Midi aún no la recibe"). */
+  #saveWait = null;
 
   /**
    * Mensajes del chat que se ven en el panel de resultados: la tarjeta del último objeto usado
@@ -1146,6 +1151,69 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     chooser.querySelector(".bhd-chooser-header img").src = item.img;
     chooser.querySelector(".bhd-chooser-name").textContent = item.name;
     chooser.hidden = false;
+  }
+
+  /**
+   * Selector de actividad (como el de la hoja nativa de dnd5e): un objeto con varias actividades que el jugador
+   * puede usar (Command: Approach / Drop / Flee / Grovel / Halt; Unarmed Strike: ataque, agarrar, empujar...).
+   * Cada opción con su icono, nombre, tipo y lo que hace (ataque, CD, daño), todo de dnd5e. Solo las que ofrece la
+   * fila (`data-activity-ids`) y que siguen siendo usables (sin las ocultas de dnd5e, Midi o Cauldron).
+   * @param {Item} item
+   * @param {string} ids  Ids separados por comas.
+   * @param {object} [options]
+   * @param {string} [options.hudBlock]
+   */
+  #openActivityPicker(item, ids, { hudBlock }={}) {
+    const chooser = this.element?.querySelector(".bhd-chooser");
+    if ( !chooser ) return;
+    const wanted = new Set(String(ids ?? "").split(",").filter(_ => _));
+    let activities = getUsableActivities(item).filter(a => !wanted.size || wanted.has(a.id))
+      .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+    // Midi deja que otros módulos quiten opciones de su selector con este hook (la misma lista que le pasa Midi).
+    if ( isMidiActive() ) {
+      const list = activities.map(a => ({ id: a.id, name: a.name, img: a.img, sort: a.sort }));
+      try {
+        Hooks.callAll("midi-qol.itemUseActivitySelect", { activities: list, item });
+        const kept = new Set(list.map(a => a.id));
+        activities = activities.filter(a => kept.has(a.id));
+      } catch(err) {
+        useWarn("Selector de actividad: error en midi-qol.itemUseActivitySelect", err?.message ?? String(err));
+      }
+    }
+    if ( !activities.length ) return;
+    if ( activities.length === 1 ) {
+      // Solo queda una: se usa directamente, como hace Midi.
+      const [activity] = activities;
+      if ( isMidiActive() ) this.#runMidi(item, activity, { hudBlock });
+      else this.#runQuick(getQuickKind(item, activity), item, activity, { hudBlock });
+      return;
+    }
+    const escape = foundry.utils.escapeHTML;
+    const block = hudBlock ? ` data-hud-block="${escape(hudBlock)}"` : "";
+    const entries = activities.map(activity => {
+      const info = describeActivity(activity, this.#quick);
+      return `
+        <button type="button" class="bhd-activity-option" data-action="bhdPickActivity" data-item-id="${item.id}"
+                data-activity-id="${escape(info.id)}"${block}>
+          <img src="${escape(info.img ?? "")}" alt="">
+          <span class="bhd-activity-text">
+            <strong>${escape(info.name)}</strong>
+            ${info.type ? `<span class="bhd-activity-type">${escape(info.type)}</span>` : ""}
+            ${info.facts.length ? `<span class="bhd-activity-facts">${info.facts.map(f => `<span>${escape(f)}</span>`).join("")}</span>` : ""}
+          </span>
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+        </button>`;
+    }).join("");
+    chooser.innerHTML = `
+      <div class="bhd-chooser-backdrop" data-action="closeChooser"></div>
+      <section class="bhd-chooser-sheet bhd-activity-picker" role="dialog" aria-modal="true">
+        <header class="bhd-chooser-header"><img src="${escape(item.img ?? "")}" alt=""><span class="bhd-chooser-name">${escape(item.name)}</span></header>
+        <h4 class="bhd-chooser-heading">${escape(game.i18n.localize("BHD.Actions.ChooseActivity"))}</h4>
+        <div class="bhd-activity-list">${entries}</div>
+        <button type="button" class="bhd-chooser-cancel" data-action="closeChooser">${escape(game.i18n.localize("BHD.Actions.Cancel"))}</button>
+      </section>`;
+    chooser.hidden = false;
+    useLog(`${item.name} | Selector de actividad (${activities.length})`, activities.map(a => a.name || a.type));
   }
 
   /**
@@ -2350,18 +2418,76 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const prompt = this.#savePrompts[0];
     if ( !prompt?.midiChat ) return;
     this.#finishMidiChat(prompt, true);
+    const tapAt = Date.now();
+    const done = this.#midiChatDone.get(prompt.id);
+    if ( done ) done.tapAt = tapAt;
+    this.#startSaveWait(prompt);
     try {
       const roll = await rollMidiChatSave(prompt, mode, event);
       const entry = this.#midiChatDone.get(prompt.id);
+      if ( entry ) entry.messageAt = Date.now();
       if ( roll && entry && (entry.total === null) ) {
         entry.total = roll.total;
         this.#showRollResult(getSavePromptLabel(prompt, prompt.actor), roll);
       }
     } catch(err) {
+      this.#stopSaveWait(prompt.id);
       ui.notifications.error(game.i18n.format("BHD.Use.Error", {
         name: getSavePromptLabel(prompt, prompt.actor), error: err?.message ?? String(err)
       }));
     }
+  }
+
+  /**
+   * Tras tocar "Tirar": si en 3 s Midi (en el DM) no confirma que recibió la tirada, se enseña una pastilla
+   * "Tirada enviada · Midi aún no la recibe (N s)" que cuenta los segundos hasta que llega `midiSaveRolled`.
+   * @param {object} prompt
+   */
+  #startSaveWait(prompt) {
+    this.#stopSaveWait();
+    let pill = this.element?.querySelector(".bhd-save-wait");
+    if ( !pill && this.element ) {
+      pill = document.createElement("div");
+      pill.className = "bhd-save-wait";
+      pill.setAttribute("role", "status");
+      pill.hidden = true;
+      this.element.append(pill);
+    }
+    const tapAt = Date.now();
+    // Hasta que Midi la tire por tiempo (más un margen) o, sin límite, 2 minutos.
+    const giveUpAt = (prompt.endsAt ? prompt.endsAt + 5000 : tapAt + 120000);
+    const tick = () => {
+      const now = Date.now();
+      if ( now >= giveUpAt ) {
+        useWarn(`Salvación por chat: ${Math.round((now - tapAt) / 1000)} s sin confirmación de Midi; dejo de esperar`);
+        return this.#stopSaveWait();
+      }
+      if ( (now - tapAt) < 3000 || !pill ) return;
+      if ( pill.hidden ) useWarn("Salvación por chat: pasaron 3 s y Midi aún no confirma la tirada");
+      pill.hidden = false;
+      pill.classList.add("bhd-save-wait-late");
+      pill.innerHTML = `<i class="fa-solid fa-hourglass-half" aria-hidden="true"></i><span></span>`;
+      pill.querySelector("span").textContent = game.i18n.format("BHD.Save.Waiting", { seconds: Math.floor((now - tapAt) / 1000) });
+    };
+    this.#saveWait = { id: prompt.id, tapAt, timer: setInterval(tick, 500) };
+  }
+
+  /**
+   * Quita la pastilla de espera (si es de esa salvación, o cualquiera sin id).
+   * @param {string} [id]
+   * @returns {{id: string, tapAt: number}|null}  La espera que se quitó.
+   */
+  #stopSaveWait(id) {
+    const wait = this.#saveWait;
+    if ( !wait || (id && (wait.id !== id)) ) return null;
+    clearInterval(wait.timer);
+    this.#saveWait = null;
+    const pill = this.element?.querySelector(".bhd-save-wait");
+    if ( pill ) {
+      pill.hidden = true;
+      pill.classList.remove("bhd-save-wait-late");
+    }
+    return wait;
   }
 
   /**
@@ -2376,8 +2502,15 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#finishMidiChat(queued, false);
     }
     const entry = this.#midiChatDone.get(id);
+    const wait = this.#stopSaveWait(id);
     if ( !entry ) return;
     useLog(`Salvación por chat: Midi recibió la tirada (${total ?? "?"})${entry.rolledHere ? "" : " — la tiró Midi"}`);
+    if ( entry.tapAt ) {
+      const ms = Date.now() - entry.tapAt;
+      const created = entry.messageAt ? `${entry.messageAt - entry.tapAt} ms` : "aún no";
+      (ms > 3000 ? useWarn : useLog)(`Salvación por chat | tiempo: toque → Midi la recibió ${ms} ms (toque → mensaje creado: ${created})`);
+      if ( wait && (ms > 3000) ) ui.notifications.info(game.i18n.format("BHD.Save.ReceivedLate", { seconds: (ms / 1000).toFixed(1) }));
+    }
     if ( Number.isFinite(total) ) entry.total = total;
     if ( !entry.rolledHere && Number.isFinite(total) ) {
       this.#showRollResult(game.i18n.localize("BHD.Save.MidiRolled"), { total });
@@ -3144,8 +3277,26 @@ export class BHDMobileApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const item = this.actor?.items.get(itemId);
     if ( !item ) return;
     const activity = activityId ? item.system.activities?.get(activityId) : null;
-    if ( kind === "midi" ) await this.#runMidi(item, activity, { button: target, hudBlock });
+    if ( kind === "choose" ) this.#openActivityPicker(item, target.dataset.activityIds, { hudBlock });
+    else if ( kind === "midi" ) await this.#runMidi(item, activity, { button: target, hudBlock });
     else await this.#runQuick(kind, item, activity ?? null, { event, button: target, hudBlock });
+  }
+
+  /**
+   * Una actividad del selector: se ejecuta como si la fila solo tuviera esa (con Midi, en el DM).
+   * @this {BHDMobileApp}
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onPickActivity(event, target) {
+    this.#closeChooser();
+    const { itemId, activityId, hudBlock } = target.dataset;
+    const item = this.actor?.items.get(itemId);
+    const activity = item?.system.activities?.get(activityId);
+    if ( !activity ) return;
+    useLog(`${item.name} | Actividad elegida: ${activity.name || activity.type}`);
+    if ( isMidiActive() ) await this.#runMidi(item, activity, { hudBlock });
+    else await this.#runQuick(getQuickKind(item, activity), item, activity, { event, hudBlock });
   }
 
   /**

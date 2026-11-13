@@ -78,9 +78,9 @@ export function registerDialogRelay() {
  * pantalla: entonces la ventana es suya).
  * @returns {object|null}
  */
-export function getActiveRemoteRun() {
+export function getActiveRemoteRun({ ignoreGmTap=false }={}) {
   if ( !game.user.isGM ) return null;
-  if ( Date.now() - lastGmTap < GM_TAP_MS ) return null;
+  if ( !ignoreGmTap && (Date.now() - lastGmTap < GM_TAP_MS) ) return null;
   return runs.at(-1) ?? null;
 }
 
@@ -93,12 +93,30 @@ export function getActiveRemoteRun() {
  * @returns {Promise<*>}
  */
 export async function askPhone(run, handler, ...args) {
+  return askPhoneWithin(run, handler, args, { timeoutMs: RELAY_TIMEOUT_MS, timeoutValue: NO_ANSWER });
+}
+
+/**
+ * Como `askPhone`, con otro tiempo límite y otra respuesta al agotarse (p. ej. Cauldron: 30 s y "no usar"). Si el
+ * teléfono no está conectado, se desconecta o falla, devuelve `RELAY_NO_ANSWER`.
+ * @param {object} run
+ * @param {string} handler
+ * @param {Array} args
+ * @param {object} options
+ * @param {number} options.timeoutMs
+ * @param {*} options.timeoutValue
+ * @returns {Promise<*>}
+ */
+export async function askPhoneWithin(run, handler, args, { timeoutMs, timeoutValue }) {
   const socket = getSocket();
   if ( !socket || !run?.user?.active ) return NO_ANSWER;
   let timer;
   let hook;
   const lost = new Promise(resolve => {
-    timer = setTimeout(() => resolve(NO_ANSWER), RELAY_TIMEOUT_MS);
+    timer = setTimeout(() => {
+      console.warn(`BHD Companion | [${run.user.name}] Sin respuesta del teléfono a "${handler}" en ${Math.round(timeoutMs / 1000)} s`);
+      resolve(timeoutValue);
+    }, timeoutMs);
     hook = Hooks.on("userConnected", (user, connected) => {
       if ( (user.id === run.user.id) && !connected ) resolve(NO_ANSWER);
     });

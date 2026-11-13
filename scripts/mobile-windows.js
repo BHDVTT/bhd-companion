@@ -29,6 +29,34 @@ const TAP_WINDOW_MS = 3000;
 /** Momento del último toque en la pantalla. */
 let lastTap = 0;
 
+/** Tiradas del jugador en curso (`holdUserFlow`): sus ventanas cuentan como pedidas por él aunque tarden. */
+let userFlows = 0;
+
+/**
+ * Marca una tirada que el jugador acaba de empezar (p. ej. la salvación que pidió Midi). Mientras dura, las ventanas
+ * que abra (las bonificaciones opcionales de Midi: Bardic Inspiration, Lucky...) son respuesta a su toque: se ven
+ * enseguida en lugar de esperar en la cola detrás de otro aviso, que es lo que dejaba la tirada parada.
+ * @returns {Function}  Llamar al terminar.
+ */
+export function holdUserFlow() {
+  userFlows++;
+  let done = false;
+  return () => {
+    if ( done ) return;
+    done = true;
+    userFlows = Math.max(0, userFlows - 1);
+    lastTap = Date.now();
+  };
+}
+
+/**
+ * ¿La ventana que se abre ahora la pidió el jugador (toque reciente o tirada suya en curso)?
+ * @returns {boolean}
+ */
+function wasRequested() {
+  return (userFlows > 0) || (Date.now() - lastTap < TAP_WINDOW_MS);
+}
+
 /** Al cargar se cierran también los diálogos genéricos (avisos de The Forge, de otros módulos...). */
 let loading = true;
 
@@ -146,7 +174,7 @@ function classify(app, element) {
 
   const names = classNames(app);
   const isGenericDialog = (app instanceof foundry.applications.api.DialogV2) || (app instanceof foundry.appv1.api.Dialog);
-  if ( isGenericDialog ) return loading && (Date.now() - lastTap >= TAP_WINDOW_MS) ? "blocked" : "decision";
+  if ( isGenericDialog ) return loading && !wasRequested() ? "blocked" : "decision";
   const own = names[0] ?? "";
   if ( BLOCKED_NAMES.test(own) ) return "blocked";
   if ( DECISION_NAMES.test(own) ) return "decision";
@@ -204,7 +232,7 @@ function onRender(app, html) {
     element.classList.add("bhd-foreign-window");
   }
 
-  const tapped = Date.now() - lastTap < TAP_WINDOW_MS;
+  const tapped = wasRequested();
   if ( ["decision", "dnd5e"].includes(kind) && !tapped ) {
     // Llegó sola: es una pregunta de un flujo (Midi, Cauldron, otro módulo). Estilo de decisión y a la cola.
     element.classList.add("bhd-decision-window");

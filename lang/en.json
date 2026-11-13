@@ -65,6 +65,8 @@
       "Disadvantage": "Disadvantage",
       "Use": "Use",
       "MoreOptions": "dnd5e window (ammunition, attack mode…)",
+      "ChooseCount": "Choose ({count})",
+      "ChooseActivity": "What do you want to do?",
       "Cancel": "Cancel",
       "Attack": "Attack",
       "Damage": "Damage",
@@ -437,7 +439,9 @@
       "HoldForMode": "Press and hold to choose advantage, normal or disadvantage",
       "ChooseMode": "How do you roll?",
       "MidiRolled": "Time's up: Midi rolled it for you",
-      "Rolled": "Midi got your roll"
+      "Rolled": "Midi got your roll",
+      "Waiting": "Roll sent · Midi hasn't received it yet ({seconds} s)",
+      "ReceivedLate": "Midi got your roll ({seconds} s)"
     },
     "Midi": {
       "Attack": "Attack",
@@ -558,7 +562,9 @@
     },
     "Decision": {
       "Close": "Close without choosing",
-      "More": "{count} more question(s) waiting"
+      "More": "{count} more question(s) waiting",
+      "SecondsLeft": "{seconds} s left: then it is not used",
+      "DontUse": "Don't use"
     },
     "Transform": {
       "Label": "{name}'s form",
